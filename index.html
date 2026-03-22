@@ -161,26 +161,6 @@ tr.clickable{cursor:pointer;}
 .api-key-banner{background:rgba(31,111,235,.08);border:1px solid rgba(88,166,255,.3);border-radius:10px;padding:16px;margin-bottom:16px;}
 .api-key-banner.warning{background:rgba(248,81,73,.08);border-color:rgba(248,81,73,.3);}
 .api-key-banner.success{background:rgba(63,185,80,.08);border-color:rgba(63,185,80,.3);}
-/* ── Daily Mission ── */
-.mission-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:var(--bg3);margin-bottom:8px;transition:all .2s;border:1px solid var(--border);}
-.mission-item.done{opacity:.5;background:var(--bg);}
-.mission-check{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s;font-size:14px;}
-.mission-check.done{background:var(--green);border-color:var(--green);color:#fff;}
-@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
-.pop{animation:pop .3s ease;}
-/* ── Appointment ── */
-.appt-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;transition:border-color .15s;}
-.appt-card:hover{border-color:var(--blue2);}
-.appt-card.urgent{border-left:3px solid var(--red);}
-.appt-card.soon{border-left:3px solid var(--yellow);}
-.appt-card.done-appt{opacity:.5;}
-/* ── Ranking ── */
-.rank-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg3);margin-bottom:6px;border:1px solid transparent;transition:all .2s;}
-.rank-row.me{background:rgba(88,166,255,.08);border-color:rgba(88,166,255,.25);}
-.rank-medal{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;}
-/* ── Reminder Toast ── */
-.reminder-toast{position:fixed;top:66px;left:50%;transform:translateX(-50%);background:var(--bg2);border:2px solid var(--yellow);border-radius:12px;padding:12px 18px;z-index:9998;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:280px;max-width:340px;animation:slideDown .3s ease;}
-@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 </style>
 </head>
 <body>
@@ -200,8 +180,8 @@ const {useState,useEffect,useCallback,useRef,createContext,useContext} = React;
 // ============================================================
 // ⚙️ CONFIG
 // ============================================================
-const SUPA_URL = 'https://lhmycnzarbcmweavhnxh.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobXljbnphcmJjbXdlYXZobnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNzk5NTQsImV4cCI6MjA4OTY1NTk1NH0.t7nbVArhxbsTBYXnAPwNQKfu6xxid2G4bDdAVVZHB9s';
+const SUPA_URL = 'https://hjcogqfkwivezpqivwoz.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqY29ncWZrd2l2ZXpwcWl2d296Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDc4NDgsImV4cCI6MjA4OTUyMzg0OH0.-2BrFbaRL3lJ5Gukf7rB3dSF7Ju4qj3RuLJyNJT-3QI';
 const API_URL  = SUPA_URL;
 
 // ── ✅ FIX: Anthropic Key helpers ──
@@ -239,32 +219,6 @@ const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V'
 function getStatusClass(s){const m={'รอข้อมูล':'s-wait','ไปต่อได้':'s-go','เคสเลี้ยง':'s-nurse','เคสวัด 50/50':'s-half','ติดต่อไม่ได้':'s-cant','ยังไม่สะดวก':'s-later','จอง':'s-book','รอเซ็นต์':'s-sign','รอผล':'s-wait2','อนุมัติ':'s-approve','ปิดเคส':'s-close','รีเจค':'s-reject','ปล่อยแล้ว':'s-release','ได้รถจากที่อื่น':'s-other','โยนเคส':'s-throw','จองแล้ว':'s-book'};return m[s]||'s-wait';}
 function displayContact(contact){if(!contact&&contact!==0)return '-';const s=String(contact).trim();if(s.startsWith('data:image')||s.startsWith('https://drive.google.com'))return '📷 QR Code';return formatContact(s)||'-';}
 function formatContact(contact){if(!contact&&contact!==0)return '';const s=String(contact).trim();if(s.startsWith('http')||s.startsWith('data:'))return s;if(/^\d{9}$/.test(s))return '0'+s;if(/^\d{8}$/.test(s))return '0'+s;return s;}
-
-// ── SLA / Aging ──
-function parseDateStr(d){const s=String(d||'');if(!s)return null;if(s.includes('T')){const dt=new Date(s);return isNaN(dt)?null:dt;}const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m)return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return null;}
-function getSlaInfo(updatedat){
-  const dt=parseDateStr(updatedat);
-  if(!dt)return{level:'ok',hours:0,label:'—',color:'var(--text3)',bg:'transparent',border:'transparent'};
-  const h=(Date.now()-dt.getTime())/3600000;
-  if(h>=48){const d=Math.floor(h/24),hr=Math.floor(h%24);return{level:'critical',hours:h,label:`🔴 ${d}ว${hr?` ${hr}ชม`:''}`,color:'var(--red)',bg:'rgba(248,81,73,.12)',border:'rgba(248,81,73,.4)'};}
-  if(h>=24)return{level:'warning',hours:h,label:`🟡 ${Math.floor(h)}ชม`,color:'var(--yellow)',bg:'rgba(210,153,34,.1)',border:'rgba(210,153,34,.35)'};
-  return{level:'ok',hours:h,label:`🟢 ${h<1?'เมื่อกี้':`${Math.floor(h)}ชม`}`,color:'var(--green)',bg:'rgba(63,185,80,.08)',border:'rgba(63,185,80,.2)'};}
-
-// ── Case Score ──
-function calcCaseScore(c){
-  let score=50;
-  const contact=String(c.contact||'');
-  if(contact&&!contact.startsWith('data:')&&contact.length>3)score+=15;
-  const goodSt=['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'];
-  const badSt=['ติดต่อไม่ได้','ยังไม่สะดวก'];
-  if(goodSt.includes(c.status))score+=20;
-  if(badSt.includes(c.status))score-=15;
-  const dt=parseDateStr(c.updatedat);
-  if(dt){const days=Math.floor((Date.now()-dt.getTime())/86400000);score-=Math.min(days*5,40);}
-  if(String(c.report||'').length>30)score+=10;
-  return Math.max(0,Math.min(100,score));
-}
-function getScoreColor(s){return s>=70?'var(--green)':s>=45?'var(--yellow)':'var(--red)';}
 
 const _cache={};const CACHE_TTL=30000;
 function cacheKey(action,data){return action+':'+JSON.stringify(data||{});}
@@ -377,7 +331,6 @@ const Ico = {
   gsearch:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
   ai:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>,
   key:()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
-  report:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
 };
 
 function StatusBadge({status}){return <span className={`badge ${getStatusClass(status)}`}>{status||'-'}</span>;}
@@ -400,28 +353,6 @@ function SkeletonRows({n=5,cols=6}){return <>{Array.from({length:n}).map((_,i)=>
 
 function Confirm({msg,onOk,onCancel}){
   return <div className="overlay"><div className="modal" style={{maxWidth:340}}><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}}>⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button className="btn btn-ghost" onClick={onCancel}>ยกเลิก</button><button className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
-}
-
-// ── Coming Soon Modal (AI) ──
-function ComingSoonModal({onClose}){
-  return <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{zIndex:9999}}>
-    <div className="modal" style={{maxWidth:400}}>
-      <div className="modal-hd"><span style={{fontWeight:700,fontSize:15}}>🚧 ฟีเจอร์ยังไม่พร้อม</span><button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onClose}><Ico.x/></button></div>
-      <div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}>
-        <div style={{fontSize:52,marginBottom:14}}>🤖</div>
-        <div style={{fontWeight:700,fontSize:16,marginBottom:10}}>ระบบ AI กำลังพัฒนา</div>
-        <p style={{fontSize:14,color:'var(--text2)',lineHeight:1.8,marginBottom:14}}>
-          ระบบ AI อยู่ระหว่างการพัฒนา เพื่อช่วยวิเคราะห์เคส<br/>
-          และแนะนำการปิดการขายให้แม่นยำยิ่งขึ้น
-        </p>
-        <div style={{background:'rgba(88,166,255,.08)',border:'1px solid rgba(88,166,255,.2)',borderRadius:10,padding:'12px 16px',display:'flex',flexDirection:'column',gap:6}}>
-          <div style={{fontSize:12,color:'var(--blue)',fontWeight:700}}>🔜 ฟีเจอร์ที่จะมาเร็ว ๆ นี้</div>
-          {['🧠 AI วิเคราะห์เคสเร่งด่วนทั้งทีม','📊 AI วิเคราะห์ Performance รายบุคคล','🎯 Win Rate Prediction แต่ละเคส','💡 Smart Assign อัตโนมัติ'].map((f,i)=><div key={i} style={{fontSize:12,color:'var(--text2)',textAlign:'left'}}>{f}</div>)}
-        </div>
-      </div>
-      <div className="modal-ft"><button className="btn btn-primary" style={{width:'100%',padding:'10px'}} onClick={onClose}>เข้าใจแล้ว 👍</button></div>
-    </div>
-  </div>;
 }
 
 // ============================================================
@@ -539,13 +470,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
           <div style={{marginBottom:14,display:'grid',gap:9}}>
             <div style={{fontSize:14}}><span style={{color:'var(--text2)'}}>รหัสเคส: </span><span style={{fontWeight:700,color:'var(--blue)'}}>{caseId}</span></div>
             <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ชื่อลูกค้า: </span><span style={{fontWeight:600}}>{caseData.customername||caseData.name||'-'}</span>{(caseData.customername||caseData.name)&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseData.customername||caseData.name||'')}>Copy</button>}</div>
-            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ติดต่อ: </span>{isQR?<div style={{marginTop:6,width:'100%'}}><img src={contactRaw} alt="QR" style={{maxWidth:'100%',maxHeight:220,borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',display:'block'}} onError={e=>{e.target.style.display='none';}}/></div>:<><span style={{fontWeight:600}}>{contactVal||'-'}</span></>}</div>
-            {!isQR&&contactVal&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:2}}>
-              <button className="contact-action-btn" style={{background:'rgba(88,166,255,.15)',color:'var(--blue)'}} onClick={()=>copyText(contactVal)}>📋 คัดลอก</button>
-              {/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`tel:${contactVal}`} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/> โทรทันที</a>}
-              {/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`https://line.me/ti/p/~${contactVal.replace(/\D/g,'')}`} target="_blank" rel="noopener" className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none'}}>💬 เปิด LINE</a>}
-              {/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`sms:${contactVal}`} className="contact-action-btn" style={{background:'rgba(210,153,34,.15)',color:'var(--yellow)',textDecoration:'none'}}>✉️ SMS</a>}
-            </div>}
+            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ติดต่อ: </span>{isQR?<div style={{marginTop:6,width:'100%'}}><img src={contactRaw} alt="QR" style={{maxWidth:'100%',maxHeight:220,borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',display:'block'}} onError={e=>{e.target.style.display='none';}}/></div>:<><span style={{fontWeight:600}}>{contactVal||'-'}</span>{contactVal&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(contactVal)}>Copy</button>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`tel:${contactVal}`} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`https://line.me/ti/p/~${contactVal}`} target="_blank" rel="noopener" className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none'}}>💬 Line</a>}</>}</div>
           </div>
           <div className="form-group"><label>สถานะ:</label><select value={status} onChange={e=>setStatus(e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
           <div className="form-group"><label>เซลส์:</label>{isAdmin&&!isClaimed?<select value={newSales} onChange={e=>setNewSales(e.target.value)}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>:<div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:14}}>{caseData.sales||caseData.sale||currentUser.name}</div>}</div>
@@ -580,36 +505,12 @@ function QrUploader({value,onChange,caseId=''}){return <ImageUploader value={val
 function AddCaseModal({users,currentUser,onClose,onAdded}){
   const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:'ปกติ'});
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
-  const [dupWarn,setDupWarn]=useState(null);
-  const [allCasesCache,setAllCasesCache]=useState([]);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  useEffect(()=>{const d=new Date();const pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');api('getCases',{all:'true'}).then(r=>{if(r.success){const data=r.data||[];setAllCasesCache(data);const max=data.filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[]);
-
-  // Duplicate check on contact change
-  useEffect(()=>{
-    if(!form.contact||form.contact.length<4||form.contact_by==='QR Code'){setDupWarn(null);return;}
-    const norm=String(form.contact).replace(/\D/g,'').toLowerCase();
-    const dup=allCasesCache.find(c=>{const cv=String(c.contact||'').replace(/\D/g,'').toLowerCase();return cv&&cv===norm;});
-    setDupWarn(dup||null);
-  },[form.contact,allCasesCache]);
-
-  // Duplicate check on name change
-  useEffect(()=>{
-    if(!form.customername||form.customername.length<2){if(!form.contact)setDupWarn(null);return;}
-    const norm=form.customername.trim().toLowerCase();
-    const dup=allCasesCache.find(c=>String(c.customername||'').trim().toLowerCase()===norm);
-    if(dup&&!dupWarn)setDupWarn(dup);
-  },[form.customername,allCasesCache]);
-
+  useEffect(()=>{const d=new Date();const pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');api('getCases',{all:'true'}).then(r=>{if(r.success){const max=(r.data||[]).filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[]);
   async function submit(){if(!form.customername||!form.sales)return alert('กรุณากรอกชื่อลูกค้าและเลือกเซลส์');setLoading(true);const r=await api('addCase',{...form});setLoading(false);if(r.success){onAdded();onClose();}else alert(r.error||'เกิดข้อผิดพลาด');}
   return <Modal title="➕ เพิ่มข้อมูลลูกค้า" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
-      {dupWarn&&<div style={{gridColumn:'1/-1',background:'rgba(210,153,34,.1)',border:'1px solid rgba(210,153,34,.4)',borderRadius:8,padding:'10px 14px',fontSize:12}}>
-        <div style={{fontWeight:700,color:'var(--yellow)',marginBottom:4}}>⚠️ พบข้อมูลซ้ำในระบบ</div>
-        <div style={{color:'var(--text2)'}}>ลูกค้า <strong style={{color:'var(--text)'}}>{dupWarn.customername}</strong> มีเคส <strong style={{color:'var(--blue)'}}>{dupWarn.caseid}</strong> อยู่แล้ว (เซลส์: {dupWarn.sales} · สถานะ: {dupWarn.status})</div>
-        <div style={{marginTop:4,color:'var(--text3)',fontSize:11}}>คุณยังสามารถบันทึกได้ถ้าต้องการ</div>
-      </div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อลูกค้า *</label><input value={form.customername} onChange={e=>set('customername',e.target.value)} placeholder="ชื่อ-นามสกุล"/></div>
       <div className="form-group"><label>ติดต่อโดย</label><select value={form.contact_by} onChange={e=>set('contact_by',e.target.value)}>{CONTACT_BY.map(c=><option key={c}>{c}</option>)}</select></div>
       <div className="form-group"><label>ข้อมูลติดต่อ</label>{form.contact_by==='QR Code'?<QrUploader value={form.contact} onChange={v=>set('contact',v)}/>:<input value={form.contact} onChange={e=>set('contact',e.target.value)} placeholder="เบอร์ / ไลน์ / ID"/>}</div>
@@ -659,24 +560,10 @@ function AdminCurrentCases({currentUser,users}){
   async function search(){if(!filter.q){load();return;}setLoading(true);const r=await api('searchCases',{q:filter.q});if(r.success)setCases(r.data||[]);setLoading(false);}
   const filtered=cases.filter(c=>{if(filter.sales!=='all'&&c.sales!==filter.sales)return false;if(filter.status&&c.status!==filter.status)return false;return true;}).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const salesList=users.filter(u=>u.role==='Sales');
-  // SLA counts for banner
-  const slaStats=filtered.reduce((s,c)=>{const l=getSlaInfo(c.updatedat).level;s[l]=(s[l]||0)+1;return s;},{});
   return <div className="page">
     <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8}}><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
-    {/* SLA Banner */}
-    {!loading&&(slaStats.critical||slaStats.warning)>0&&<div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
-      {slaStats.critical>0&&<div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(248,81,73,.1)',border:'1px solid rgba(248,81,73,.35)',borderRadius:8,padding:'7px 14px',fontSize:13}}><span>🔴</span><strong style={{color:'var(--red)'}}>{slaStats.critical} เคส</strong><span style={{color:'var(--text2)'}}>วิกฤต — ค้างเกิน 48 ชม.</span></div>}
-      {slaStats.warning>0&&<div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(210,153,34,.08)',border:'1px solid rgba(210,153,34,.3)',borderRadius:8,padding:'7px 14px',fontSize:13}}><span>🟡</span><strong style={{color:'var(--yellow)'}}>{slaStats.warning} เคส</strong><span style={{color:'var(--text2)'}}>เริ่มเสี่ยง — ค้าง 24-48 ชม.</span></div>}
-    </div>}
-    <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'nowrap',alignItems:'center'}}>
-      <div style={{position:'relative',flex:'1 1 200px',minWidth:0}}><input value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="🔍 ค้นหาชื่อ เบอร์ รหัสเคส" style={{width:'100%'}}/></div>
-      <select value={filter.sales} onChange={e=>setFilter(f=>({...f,sales:e.target.value}))} style={{flex:'0 0 auto',minWidth:90,maxWidth:110,fontSize:13}}><option value="all">ทุกเซลส์</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>
-      <select value={filter.status} onChange={e=>setFilter(f=>({...f,status:e.target.value}))} style={{flex:'0 0 auto',minWidth:100,maxWidth:130,fontSize:13}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
-      <button className="btn btn-primary" onClick={search} style={{flex:'0 0 auto',padding:'8px 14px',fontSize:13,whiteSpace:'nowrap'}}><Ico.search/> ค้นหา</button>
-      <button className="btn btn-ghost" onClick={load} style={{flex:'0 0 auto',padding:'8px 10px'}}>🔄</button>
-    </div>
-    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>สถานะ</th><th>เซลส์</th><th>คะแนน</th><th>SLA</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={7}/>:filtered.length===0?<tr><td colSpan={7} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const sla=getSlaInfo(c.updatedat);const score=calcCaseScore(c);return <tr key={i} className="clickable" style={{background:sla.level==='critical'?'rgba(248,81,73,.04)':sla.level==='warning'?'rgba(210,153,34,.04)':'transparent'}} onClick={()=>setSel(c)}><td><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td style={{fontWeight:500}}>{c.customername}</td><td style={{fontSize:13,color:'var(--text2)'}}>{displayContact(c.contact)}</td><td><StatusBadge status={c.status}/></td><td><span style={{color:'var(--purple)'}}>{c.sales}</span></td><td><span style={{fontWeight:700,fontSize:13,color:getScoreColor(score)}}>{score}</span></td><td><span style={{fontSize:12,fontWeight:600,color:sla.color,whiteSpace:'nowrap'}}>{sla.label}</span></td></tr>;})}
-    </tbody></table></div></div>
+    <div className="search-bar" style={{marginBottom:16}}><div style={{position:'relative',flex:1,maxWidth:280}}><input value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="🔍 ค้นหาชื่อ เบอร์ รหัสเคส"/></div><button className="btn btn-ghost" onClick={search}><Ico.search/> ค้นหา</button><select value={filter.sales} onChange={e=>setFilter(f=>({...f,sales:e.target.value}))} style={{minWidth:100}}><option value="all">ทุกเซลส์</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><select value={filter.status} onChange={e=>setFilter(f=>({...f,status:e.target.value}))} style={{minWidth:120}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" onClick={load}>🔄</button></div>
+    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:filtered.length===0?<tr><td colSpan={6} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=><tr key={i} className="clickable" onClick={()=>setSel(c)}><td><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td style={{fontWeight:500}}>{c.customername}</td><td style={{fontSize:13,color:'var(--text2)'}}>{displayContact(c.contact)}</td><td><StatusBadge status={c.status}/></td><td><span style={{color:'var(--purple)'}}>{c.sales}</span></td><td style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td></tr>)}</tbody></table></div></div>
     {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
     {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={load}/>}
     {showAddBook&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAddBook(false)} onAdded={()=>{}}/>}
@@ -716,115 +603,14 @@ function AdminDashboard({currentUser}){
   const statusMap={};salesList.forEach(s=>{Object.entries(s.statuses||{}).forEach(([k,v])=>{statusMap[k]=(statusMap[k]||0)+v;});});const statusEntries=Object.entries(statusMap).sort((a,b)=>b[1]-a[1]);
   const PALETTE=['#58a6ff','#bc8cff','#3fb950','#ffa657','#f85149','#d29922','#39d353','#79c0ff','#ffd700','#ff7b72','#a5d6ff','#56d364'];
   const STATUS_COLORS={'รอข้อมูล':'#6e7681','ไปต่อได้':'#3fb950','เคสเลี้ยง':'#ffa657','เคสวัด 50/50':'#d29922','ติดต่อไม่ได้':'#f85149','ยังไม่สะดวก':'#bc8cff','จอง':'#58a6ff','รอเซ็นต์':'#39d353','รอผล':'#79c0ff','อนุมัติ':'#56d364','ปิดเคส':'#ff6b6b','รีเจค':'#da3633','ปล่อยแล้ว':'#3fb950','ได้รถจากที่อื่น':'#ffa657','โยนเคส':'#ffd700'};
-  const tabs=[{k:'overview',l:'ภาพรวม'},{k:'sales',l:'รายเซลส์'},{k:'status',l:'สถานะ'},{k:'funnel',l:'🔁 Funnel'},{k:'sla',l:'⏱ SLA'}];
+  const tabs=[{k:'overview',l:'ภาพรวม'},{k:'sales',l:'รายเซลส์'},{k:'status',l:'สถานะ'}];
   return <div className="page">
     <div className="page-hd" style={{marginBottom:16}}><div className="page-title">📊 แดชบอร์ด</div><button className="btn btn-ghost" onClick={load} style={{fontSize:13}}>🔄 รีเฟรช</button></div>
     <div className="stat-grid" style={{marginBottom:20}}>{[['เคสเดือนนี้',totalCases,'var(--blue)'],['ปล่อยแล้ว',totalSold,'var(--green)'],['รับจากตลาด',totalClaimed,'var(--purple)'],['Sales ทั้งหมด',salesList.length,'var(--orange)']].map(([l,v,c])=><div key={l} className="stat-card"><div className="stat-num" style={{color:c}}>{v}</div><div className="stat-lbl">{l}</div></div>)}</div>
     <div style={{display:'flex',gap:6,marginBottom:18,borderBottom:'1px solid var(--border)',paddingBottom:10}}>{tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'6px 18px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:tab===t.k?'var(--blue2)':'var(--bg3)',color:tab===t.k?'#fff':'var(--text2)',transition:'all .15s'}}>{t.l}</button>)}</div>
-    {tab==='overview'&&<div style={{display:'grid',gap:16}}>
-      {/* Team Health */}
-      {(()=>{
-        const CLOSED_ST=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-        const activeCases=allCases.filter(c=>!CLOSED_ST.includes(c.status));
-        const staleAll=activeCases.filter(c=>getSlaInfo(c.updatedat).level==='critical').length;
-        const followingAll=activeCases.filter(c=>getSlaInfo(c.updatedat).level==='warning').length;
-        const nearClose=activeCases.filter(c=>['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'].includes(c.status)).length;
-        const lostToday=allCases.filter(c=>{const s=getSlaInfo(c.updatedat);return CLOSED_ST.slice(0,3).includes(c.status)&&s.hours<24;}).length;
-        // ใครพัง: เซลส์ที่มี critical cases มากสุด
-        const salesPain={};activeCases.forEach(c=>{if(getSlaInfo(c.updatedat).level==='critical'){salesPain[c.sales]=(salesPain[c.sales]||0)+1;}});
-        const painList=Object.entries(salesPain).sort((a,b)=>b[1]-a[1]).slice(0,3);
-        return <>
-          <div className="card">
-            <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>🏥 Team Health วันนี้</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
-              {[['🔴 ค้างนาน',staleAll,'var(--red)'],['🟡 กำลัง follow',followingAll,'var(--yellow)'],['🟢 ใกล้ปิด',nearClose,'var(--green)'],['❌ หลุดวันนี้',lostToday,'var(--orange)']].map(([l,v,c])=>
-                <div key={l} style={{textAlign:'center',background:'var(--bg3)',borderRadius:10,padding:'12px 6px'}}>
-                  <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
-                  <div style={{fontSize:11,color:'var(--text2)',marginTop:3,lineHeight:1.3}}>{l}</div>
-                </div>)}
-            </div>
-            {painList.length>0&&<div>
-              <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:8}}>⚠️ ใครกำลังพัง — มีเคสค้างนาน</div>
-              {painList.map(([name,cnt])=><div key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'rgba(248,81,73,.08)',border:'1px solid rgba(248,81,73,.2)',borderRadius:8,marginBottom:6}}>
-                <span style={{fontWeight:600,fontSize:13}}>{name}</span>
-                <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{fontSize:12,color:'var(--text2)'}}>เคสค้างนาน</span>
-                  <span style={{fontWeight:800,color:'var(--red)',fontSize:16}}>{cnt}</span>
-                </div>
-              </div>)}
-            </div>}
-          </div>
-        </>;
-      })()}
-      <div className="card"><div style={{fontWeight:700,marginBottom:16,fontSize:14}}>📋 เคสต่อเซลส์ (เดือนนี้)</div><div style={{height:220}}><BarChart id="salesBar" labels={salesList.map(s=>s.name)} datasets={[{label:'เคสปัจจุบัน',data:salesList.map(s=>s.currentCases||0),backgroundColor:'rgba(88,166,255,.8)'},{label:'รับตลาด',data:salesList.map(s=>s.claimedCases||0),backgroundColor:'rgba(188,140,255,.8)'},{label:'ปล่อยแล้ว',data:salesList.map(s=>s.sold||0),backgroundColor:'rgba(63,185,80,.85)'}]}/></div></div>
-      {statusEntries.length>0&&<div className="card"><div style={{fontWeight:700,marginBottom:16,fontSize:14}}>🏷 สัดส่วนสถานะ</div><div style={{height:240}}><DonutChart id="statusDonut" labels={statusEntries.map(([k])=>k)} values={statusEntries.map(([,v])=>v)} colors={statusEntries.map(([k],i)=>STATUS_COLORS[k]||PALETTE[i%PALETTE.length])}/></div></div>}
-    </div>}
+    {tab==='overview'&&<div style={{display:'grid',gap:16}}><div className="card"><div style={{fontWeight:700,marginBottom:16,fontSize:14}}>📋 เคสต่อเซลส์ (เดือนนี้)</div><div style={{height:220}}><BarChart id="salesBar" labels={salesList.map(s=>s.name)} datasets={[{label:'เคสปัจจุบัน',data:salesList.map(s=>s.currentCases||0),backgroundColor:'rgba(88,166,255,.8)'},{label:'รับตลาด',data:salesList.map(s=>s.claimedCases||0),backgroundColor:'rgba(188,140,255,.8)'},{label:'ปล่อยแล้ว',data:salesList.map(s=>s.sold||0),backgroundColor:'rgba(63,185,80,.85)'}]}/></div></div>{statusEntries.length>0&&<div className="card"><div style={{fontWeight:700,marginBottom:16,fontSize:14}}>🏷 สัดส่วนสถานะ</div><div style={{height:240}}><DonutChart id="statusDonut" labels={statusEntries.map(([k])=>k)} values={statusEntries.map(([,v])=>v)} colors={statusEntries.map(([k],i)=>STATUS_COLORS[k]||PALETTE[i%PALETTE.length])}/></div></div>}</div>}
     {tab==='sales'&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>{salesList.map((s,i)=>{const stEntries=Object.entries(s.statuses||{}).sort((a,b)=>b[1]-a[1]);const maxSt=stEntries.reduce((m,[,v])=>v>m?v:m,1);return <div key={i} className="card"><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}><div style={{width:46,height:46,borderRadius:'50%',background:'var(--bg3)',border:'2px solid var(--border)',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{s.avatar?<img src={s.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:<Ico.user/>}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:15}}>{s.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Sales</div></div></div><div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>{[['เคส',s.currentCases||0,'var(--blue)'],['ตลาด',s.claimedCases||0,'var(--purple)'],['ปล่อย',s.sold||0,'var(--green)']].map(([l,v,c])=><div key={l} style={{textAlign:'center',background:'var(--bg3)',borderRadius:8,padding:'10px 4px'}}><div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:11,color:'var(--text2)'}}>{l}</div></div>)}</div></div>;})}  </div>}
     {tab==='status'&&<div style={{display:'grid',gap:14}}><div className="card"><div style={{fontWeight:700,marginBottom:14,fontSize:14}}>📊 สรุปสถานะ</div>{statusEntries.map(([st,cnt],i)=>{const pct=Math.round(cnt/(totalCases||1)*100);return <div key={st} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{width:10,height:10,borderRadius:'50%',background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],flexShrink:0}}/><div style={{flex:1,fontSize:13}}><StatusBadge status={st}/></div><div style={{flex:2,height:8,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],width:`${pct}%`,transition:'width .4s'}}/></div><div style={{fontSize:13,fontWeight:700,minWidth:28,textAlign:'right'}}>{cnt}</div><div style={{fontSize:11,color:'var(--text3)',minWidth:36,textAlign:'right'}}>{pct}%</div></div>;})} </div></div>}
-    {tab==='funnel'&&(()=>{
-      const FUNNEL_STAGES=[
-        {label:'รอข้อมูล',statuses:['รอข้อมูล'],color:'#6e7681'},
-        {label:'ติดต่อแล้ว',statuses:['ไปต่อได้','เคสเลี้ยง','เคสวัด 50/50','ยังไม่สะดวก','ติดต่อไม่ได้'],color:'#58a6ff'},
-        {label:'จอง',statuses:['จอง','รอเซ็นต์','รอผล'],color:'#bc8cff'},
-        {label:'อนุมัติ',statuses:['อนุมัติ'],color:'#3fb950'},
-        {label:'ปิดการขาย ✅',statuses:['ปล่อยแล้ว'],color:'#39d353'},
-      ];
-      const stageCounts=FUNNEL_STAGES.map(s=>({...s,count:allCases.filter(c=>s.statuses.includes(c.status)).length}));
-      const maxCount=Math.max(...stageCounts.map(s=>s.count),1);
-      return <div className="card"><div style={{fontWeight:700,marginBottom:18,fontSize:14}}>🔁 Case Flow Funnel</div>
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {stageCounts.map((s,i)=>{
-            const pct=Math.round(s.count/maxCount*100);
-            const conv=i>0&&stageCounts[i-1].count>0?Math.round(s.count/stageCounts[i-1].count*100):null;
-            return <div key={s.label}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-                <span style={{fontSize:13,fontWeight:600,color:s.color}}>{s.label}</span>
-                <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  {conv!==null&&<span style={{fontSize:11,color:conv>=60?'var(--green)':conv>=30?'var(--yellow)':'var(--red)',background:'var(--bg3)',padding:'1px 8px',borderRadius:20}}>Conversion: {conv}%</span>}
-                  <span style={{fontWeight:700,fontSize:14,color:s.color,minWidth:24,textAlign:'right'}}>{s.count}</span>
-                </div>
-              </div>
-              <div style={{height:28,background:'var(--bg3)',borderRadius:6,overflow:'hidden',position:'relative'}}>
-                <div style={{height:'100%',width:`${pct}%`,background:s.color,borderRadius:6,opacity:0.85,transition:'width .5s',display:'flex',alignItems:'center',justifyContent:'flex-end',paddingRight:8}}>
-                  {pct>10&&<span style={{fontSize:11,fontWeight:700,color:'#fff'}}>{pct}%</span>}
-                </div>
-              </div>
-              {i<stageCounts.length-1&&<div style={{textAlign:'center',color:'var(--text3)',fontSize:14,marginTop:2}}>▼</div>}
-            </div>;
-          })}
-        </div>
-        <div style={{marginTop:16,padding:'12px',background:'var(--bg3)',borderRadius:8,fontSize:12,color:'var(--text2)'}}>
-          💡 เคสที่หลุดออกจาก Funnel: <strong style={{color:'var(--red)'}}>{allCases.filter(c=>['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส'].includes(c.status)).length}</strong> เคส (ปิด/รีเจค/หลุด)
-        </div>
-      </div>;
-    })()}
-    {tab==='sla'&&(()=>{
-      const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-      const activeCases=allCases.filter(c=>!CLOSED.includes(c.status));
-      const critical=activeCases.filter(c=>getSlaInfo(c.updatedat).level==='critical');
-      const warning=activeCases.filter(c=>getSlaInfo(c.updatedat).level==='warning');
-      const ok=activeCases.filter(c=>getSlaInfo(c.updatedat).level==='ok');
-      // Group critical by sales
-      const critBySales={};critical.forEach(c=>{if(!critBySales[c.sales])critBySales[c.sales]=[];critBySales[c.sales].push(c);});
-      return <div style={{display:'grid',gap:14}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
-          {[['🔴 วิกฤต',critical.length,'var(--red)','ค้างเกิน 48 ชม.'],['🟡 เสี่ยง',warning.length,'var(--yellow)','ค้าง 24-48 ชม.'],['🟢 ปกติ',ok.length,'var(--green)','อัปเดตล่าสุด <24 ชม.']].map(([l,v,c,sub])=><div key={l} className="stat-card"><div className="stat-num" style={{color:c}}>{v}</div><div className="stat-lbl">{l}</div><div style={{fontSize:10,color:'var(--text3)',marginTop:3}}>{sub}</div></div>)}
-        </div>
-        {critical.length>0&&<div className="card"><div style={{fontWeight:700,marginBottom:12,fontSize:14,color:'var(--red)'}}>🔴 เคสวิกฤต — ต้องติดตามด่วน</div>
-          <div className="table-wrap"><table><thead><tr><th>รหัสเคส</th><th>ลูกค้า</th><th>เซลส์</th><th>สถานะ</th><th>ค้างมา</th></tr></thead><tbody>
-            {critical.sort((a,b)=>getSlaInfo(b.updatedat).hours-getSlaInfo(a.updatedat).hours).slice(0,20).map((c,i)=>{const sla=getSlaInfo(c.updatedat);return <tr key={i}><td><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td>{c.customername}</td><td style={{color:'var(--purple)'}}>{c.sales}</td><td><StatusBadge status={c.status}/></td><td><span style={{fontWeight:700,color:'var(--red)',fontSize:12}}>{sla.label}</span></td></tr>;})}
-          </tbody></table></div>
-        </div>}
-        {Object.keys(critBySales).length>0&&<div className="card"><div style={{fontWeight:700,marginBottom:12,fontSize:14}}>👥 เคสวิกฤตแยกตามเซลส์</div>
-          {Object.entries(critBySales).sort((a,b)=>b[1].length-a[1].length).map(([sales,cs])=><div key={sales} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'rgba(248,81,73,.07)',border:'1px solid rgba(248,81,73,.25)',borderRadius:8,marginBottom:6}}><span style={{fontWeight:600}}>{sales}</span><span style={{fontWeight:800,color:'var(--red)',fontSize:16}}>{cs.length} เคส</span></div>)}
-        </div>}
-        {warning.length>0&&<div className="card"><div style={{fontWeight:700,marginBottom:12,fontSize:14,color:'var(--yellow)'}}>🟡 เคสเริ่มเสี่ยง — ควร follow up</div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-            {warning.slice(0,15).map((c,i)=><div key={i} style={{background:'rgba(210,153,34,.1)',border:'1px solid rgba(210,153,34,.3)',borderRadius:8,padding:'6px 12px',fontSize:12}}><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span><span style={{color:'var(--text2)',marginLeft:6}}>{c.customername}</span></div>)}
-          </div>
-        </div>}
-      </div>;
-    })()}
   </div>;
 }
 
@@ -870,8 +656,12 @@ function AdminAIPage({currentUser}){
   const [cases,setCases]=useState([]);
   const [users,setUsers]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [aiText,setAiText]=useState('');
+  const [aiLoading,setAiLoading]=useState(false);
+  const [aiDone,setAiDone]=useState(false);
   const [tab,setTab]=useState('urgent');
-  const [showCS,setShowCS]=useState(false);
+  const [apiKey,setApiKey]=useState(getAnthropicKey);
+  const abortRef=useRef(null);
 
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
 
@@ -887,6 +677,53 @@ function AdminAIPage({currentUser}){
 
   function daysAgo(d){const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return 0;const dt=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return Math.floor((Date.now()-dt.getTime())/86400000);}
 
+  // ✅ FIX: streamAI ที่มี headers ถูกต้อง
+  async function streamAI(prompt,sys){
+    if(!apiKey){setAiText('❌ กรุณาใส่ Anthropic API Key ก่อน');setAiDone(true);setAiLoading(false);return;}
+    setAiLoading(true);setAiText('');setAiDone(false);
+    if(abortRef.current)abortRef.current.abort();
+    const ctrl=new AbortController();abortRef.current=ctrl;
+    try{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',signal:ctrl.signal,
+        headers:{
+          'Content-Type':'application/json',
+          'x-api-key': apiKey,                                    // ✅ API Key header
+          'anthropic-version': '2023-06-01',                     // ✅ version header
+          'anthropic-dangerous-direct-browser-access': 'true'    // ✅ browser CORS header
+        },
+        body:JSON.stringify({
+          model:'claude-sonnet-4-20250514',max_tokens:2000,stream:true,
+          system:sys||'คุณคือที่ปรึกษาผู้จัดการทีมขายรถยนต์ ให้คำแนะนำเป็นภาษาไทย กระชับ ตรงประเด็น ใช้ emoji',
+          messages:[{role:'user',content:prompt}]
+        })
+      });
+      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API error ${res.status}`);}
+      const reader=res.body.getReader();const dec=new TextDecoder();
+      while(true){const{done,value}=await reader.read();if(done)break;
+        for(const line of dec.decode(value).split('\n')){if(!line.startsWith('data:'))continue;const d=line.slice(5).trim();if(d==='[DONE]')continue;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta?.text)setAiText(t=>t+j.delta.text);}catch(e){}}}
+      setAiDone(true);
+    }catch(err){if(err.name!=='AbortError')setAiText(t=>t+(t?'\n\n':'')+'❌ '+err.message);setAiDone(true);}
+    setAiLoading(false);
+  }
+
+  function buildTeamSummary(){
+    const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
+    return users.map(u=>{const my=cases.filter(c=>c.sales===u.name);const thisMonth=my.filter(c=>String(c.caseid||'').startsWith(pre));const sold=thisMonth.filter(c=>c.status==='ปล่อยแล้ว').length;const active=thisMonth.filter(c=>!CLOSED.includes(c.status)).length;const stale=my.filter(c=>daysAgo(c.updatedat)>=2).length;return`${u.name}: เคสเดือนนี้ ${thisMonth.length} | ปิดได้ ${sold} | active ${active} | ค้างนาน ${stale}`;}).join('\n');
+  }
+
+  function buildUrgentSummary(){
+    return [...cases].sort((a,b)=>daysAgo(b.updatedat)-daysAgo(a.updatedat)).slice(0,50).map((c,i)=>`${i+1}. [${c.caseid}] ${c.customername} | เซลส์: ${c.sales} | สถานะ: ${c.status} | ไม่อัปเดต: ${daysAgo(c.updatedat)} วัน | รีพอร์ต: ${(c.report||'ไม่มี').slice(0,80)}`).join('\n');
+  }
+
+  async function askAI(){
+    if(loading){setAiText('❌ กำลังโหลดข้อมูล กรุณารอสักครู่');setAiDone(true);return;}
+    if(tab==='urgent'){await streamAI(`ทีมขายรถยนต์มีเคส active ดังนี้:\n\n${buildUrgentSummary()}\n\nวิเคราะห์:\n1. 🚨 TOP 10 เคสที่ต้องติดตามด่วนที่สุด พร้อมเหตุผล\n2. ⚠️ pattern ที่น่าเป็นห่วง\n3. 💡 คำแนะนำให้ทีม`);}
+    else if(tab==='performance'){await streamAI(`สรุปผลงานทีมขาย:\n\n${buildTeamSummary()}\n\nวิเคราะห์:\n1. 🏆 จัดอันดับ performance พร้อมเหตุผล\n2. 💪 จุดแข็งของแต่ละคน\n3. ⚠️ ใครต้องการความช่วยเหลือ\n4. 💡 คำแนะนำสำหรับผู้จัดการ`);}
+    else if(tab==='winrate'){const top=cases.filter(c=>['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'].includes(c.status)).slice(0,40);const prompt=top.map((c,i)=>`${i+1}. [${c.caseid}] ${c.customername} | เซลส์: ${c.sales} | สถานะ: ${c.status} | รีพอร์ต: ${(c.report||'ไม่มี').slice(0,80)}`).join('\n');await streamAI(`เคสที่มีสถานะดี:\n\n${prompt}\n\nประเมิน Win Rate % จัดอันดับจากสูงสุด พร้อมบอกว่าเซลส์คนไหนควรได้รับ support`);}
+    else if(tab==='assign'){const teamSummary=buildTeamSummary();const newCases=cases.filter(c=>c.status==='รอข้อมูล'&&daysAgo(c.updatedat)===0).slice(0,20);const newList=newCases.map((c,i)=>`${i+1}. [${c.caseid}] ${c.customername} | ปัจจุบัน: ${c.sales}`).join('\n');await streamAI(`ภาระงานทีม:\n${teamSummary}\n\nเคสใหม่วันนี้:\n${newList||'ไม่มีเคสใหม่'}\n\nแนะนำการ assign เคสใหม่ พร้อมเหตุผล`);}
+  }
+
   const TABS=[['urgent','🚨 เร่งด่วน'],['performance','📊 Performance'],['winrate','🎯 Win Rate ทีม'],['assign','💡 แนะนำ Assign']];
 
   return <div className="page">
@@ -897,19 +734,12 @@ function AdminAIPage({currentUser}){
       <button className="btn btn-ghost" style={{fontSize:13}} onClick={load}>🔄</button>
     </div>
 
-    {/* Coming Soon Banner */}
-    <div style={{background:'linear-gradient(135deg,rgba(88,166,255,.08),rgba(188,140,255,.08))',border:'1px solid rgba(188,140,255,.3)',borderRadius:12,padding:'16px 20px',marginBottom:16,display:'flex',alignItems:'center',gap:14}}>
-      <div style={{fontSize:36}}>🤖</div>
-      <div style={{flex:1}}>
-        <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>AI Admin — Coming Soon</div>
-        <div style={{fontSize:12,color:'var(--text2)',lineHeight:1.7}}>ระบบ AI กำลังพัฒนาเพื่อวิเคราะห์เคสและแนะนำการจัดการทีมขายอัตโนมัติ</div>
-      </div>
-      <span style={{background:'rgba(188,140,255,.2)',color:'var(--purple)',fontSize:11,fontWeight:700,padding:'4px 12px',borderRadius:20,whiteSpace:'nowrap'}}>🔜 เร็ว ๆ นี้</span>
-    </div>
+    {/* ✅ API Key Manager */}
+    <ApiKeyManager onKeyReady={setApiKey}/>
 
     {/* Tabs */}
     <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto',paddingBottom:4}}>
-      {TABS.map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{padding:'7px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)',transition:'all .15s'}}>{l}</button>)}
+      {TABS.map(([k,l])=><button key={k} onClick={()=>{setTab(k);setAiText('');setAiDone(false);}} style={{padding:'7px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)',transition:'all .15s'}}>{l}</button>)}
     </div>
 
     {/* Stats */}
@@ -923,226 +753,130 @@ function AdminAIPage({currentUser}){
     </div>}
 
     {/* Description */}
-    <div style={{background:'var(--bg3)',borderRadius:10,padding:'14px',fontSize:13,color:'var(--text2)',lineHeight:1.9,marginBottom:14}}>
+    {!aiText&&!aiLoading&&<div style={{background:'var(--bg3)',borderRadius:10,padding:'14px',fontSize:13,color:'var(--text2)',lineHeight:1.9,marginBottom:14}}>
       {tab==='urgent'&&<>🚨 <strong>เร่งด่วน</strong> — AI คัด 10 เคสที่ต้องติดตามก่อนจากทั้งทีม</>}
       {tab==='performance'&&<>📊 <strong>Performance</strong> — วิเคราะห์ผลงานเซลส์แต่ละคน จัดอันดับ หาจุดแข็ง/อ่อน</>}
       {tab==='winrate'&&<>🎯 <strong>Win Rate ทีม</strong> — หาเคสที่มีโอกาสปิดสูงทั่วทั้งทีม</>}
       {tab==='assign'&&<>💡 <strong>แนะนำ Assign</strong> — AI แนะนำว่าเคสใหม่ควรให้ใคร ดูจากภาระงาน + performance</>}
-    </div>
+    </div>}
 
-    {/* Ask button → Coming Soon */}
-    <button
-      className="btn"
-      style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,borderRadius:10,background:'linear-gradient(135deg,#1f3a5f,#2d1b4e)',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',gap:8,color:'var(--text2)',border:'1px dashed rgba(188,140,255,.4)',cursor:'pointer',position:'relative',overflow:'hidden'}}
-      onClick={()=>setShowCS(true)}>
+    {/* Ask button */}
+    {!aiLoading&&(!aiText||aiDone)&&<button
+      className="btn btn-primary"
+      style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,borderRadius:10,background:apiKey?'linear-gradient(135deg,#1f6feb,#8250df)':'var(--bg3)',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',gap:8,color:apiKey?'#fff':'var(--text3)'}}
+      disabled={loading||!apiKey}
+      onClick={askAI}>
       <span style={{fontSize:20}}>🧠</span>
-      {tab==='urgent'?'วิเคราะห์เคสเร่งด่วนทั้งทีม':tab==='performance'?'วิเคราะห์ Performance ทีม':tab==='winrate'?'หาเคสโอกาสปิดสูงทั่วทีม':'แนะนำการ Assign เคส'}
-      <span style={{position:'absolute',top:6,right:8,background:'rgba(188,140,255,.3)',color:'var(--purple)',fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20}}>Coming Soon</span>
-    </button>
+      {!apiKey?'ใส่ API Key ก่อนใช้งาน':tab==='urgent'?'วิเคราะห์เคสเร่งด่วนทั้งทีม':tab==='performance'?'วิเคราะห์ Performance ทีม':tab==='winrate'?'หาเคสโอกาสปิดสูงทั่วทีม':'แนะนำการ Assign เคส'}
+    </button>}
 
-    {showCS&&<ComingSoonModal onClose={()=>setShowCS(false)}/>}
+    {/* Output */}
+    {(aiText||aiLoading)&&<div className="card" style={{marginBottom:14}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <div style={{fontWeight:700,fontSize:13,color:'var(--purple)',display:'flex',alignItems:'center',gap:6}}>
+          🧠 {aiLoading?'AI กำลังวิเคราะห์...':'ผลวิเคราะห์'}
+        </div>
+        <div style={{display:'flex',gap:6}}>
+          {aiLoading&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>abortRef.current?.abort()}>หยุด</button>}
+          {aiDone&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>{setAiText('');setAiDone(false);}}>ล้าง</button>}
+        </div>
+      </div>
+      <div className="ai-stream">{aiText}{aiLoading&&<span className="ai-cursor"/>}</div>
+    </div>}
   </div>;
 }
 
 // ============================================================
-// SALES AI ADVISOR — Coming Soon
+// SALES AI ADVISOR
 // ============================================================
 function AIAdvisorPage({currentUser}){
-  const [showCS,setShowCS]=useState(false);
-  const [tab,setTab]=useState('recommend');
+  const [cases,setCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [loading,setLoading]=useState(true);const [aiText,setAiText]=useState('');const [aiLoading,setAiLoading]=useState(false);const [aiDone,setAiDone]=useState(false);const [tab,setTab]=useState('recommend');const [scriptCase,setScriptCase]=useState('');const [apiKey,setApiKey]=useState(getAnthropicKey);const abortRef=useRef(null);
+  const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
+  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name})]).then(([cr,ccr])=>{if(cr.success)setCases((cr.data||[]).filter(c=>!CLOSED.includes(c.status)));if(ccr.success)setClaimedCases(ccr.data||[]);setLoading(false);});},[currentUser.name]);
+  useEffect(()=>{load();},[load]);
+  function daysAgo(d){const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return 0;const dt=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return Math.floor((Date.now()-dt.getTime())/86400000);}
+  function buildCaseSummary(){return[...cases.map(c=>({id:c.caseid,name:c.customername,status:c.status,report:(c.report||'').slice(0,120),daysNoUpdate:daysAgo(c.updatedat),source:'เคสของฉัน'})),...claimedCases.map(c=>({id:c.caseID,name:c.customername,status:c.newstatus||c.status,report:(c.report||'').slice(0,120),daysNoUpdate:daysAgo(c.date),source:'รับจากตลาด'}))];}
+
+  // ✅ FIX: headers ถูกต้อง
+  async function askAI(promptType){
+    if(!apiKey){setAiText('❌ กรุณาใส่ Anthropic API Key ก่อน');setAiDone(true);return;}
+    const summary=buildCaseSummary();if(summary.length===0){setAiText('❌ ไม่มีเคสที่ active');setAiDone(true);return;}
+    setAiLoading(true);setAiText('');setAiDone(false);
+    if(abortRef.current)abortRef.current.abort();const ctrl=new AbortController();abortRef.current=ctrl;
+    let prompt='';
+    if(promptType==='recommend'){prompt=`เซลส์ "${currentUser.name}" มีเคส:\n\n`+summary.map((c,i)=>`${i+1}. [${c.id}] ${c.name} | สถานะ: ${c.status} | ไม่อัปเดต: ${c.daysNoUpdate} วัน | ${c.source}\n   รีพอร์ต: ${c.report||'ไม่มี'}`).join('\n\n')+`\n\nวิเคราะห์:\n1. 🎯 TOP 5 เคสที่ควรปิดก่อน\n2. ⚠️ เคสที่ต้องระวัง\n3. 💡 คำแนะนำเฉพาะ`;}
+    else if(promptType==='winrate'){prompt=`เคสของเซลส์ "${currentUser.name}":\n\n`+summary.map((c,i)=>`${i+1}. [${c.id}] ${c.name} | สถานะ: ${c.status} | ไม่อัปเดต: ${c.daysNoUpdate} วัน\n   รีพอร์ต: ${c.report||'ไม่มี'}`).join('\n\n')+`\n\nประเมิน Win Rate % แต่ละเคส จัดเรียงจากสูงสุด`;}
+    else if(promptType==='script'){const c=cases.find(x=>x.caseid===scriptCase)||claimedCases.find(x=>x.caseID===scriptCase);if(!c){setAiText('❌ ไม่พบเคสนี้');setAiLoading(false);setAiDone(true);return;}prompt=`สร้าง Script โทรหาลูกค้า:\nชื่อ: ${c.customername||c.name}\nสถานะ: ${c.status||c.newstatus}\nรีพอร์ต: ${c.report||'ไม่มี'}\n\nสร้าง Script ภาษาไทย เป็นธรรมชาติ มี opening, body, closing, objection handling`;}
+    try{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',signal:ctrl.signal,
+        headers:{
+          'Content-Type':'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,stream:true,system:'คุณคือที่ปรึกษาเซลส์รถยนต์มืออาชีพ ตอบภาษาไทย กระชับ ใช้ emoji',messages:[{role:'user',content:prompt}]})
+      });
+      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API error ${res.status}`);}
+      const reader=res.body.getReader();const dec=new TextDecoder();
+      while(true){const{done,value}=await reader.read();if(done)break;for(const line of dec.decode(value).split('\n')){if(!line.startsWith('data:'))continue;const d=line.slice(5).trim();if(d==='[DONE]')continue;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta?.text)setAiText(t=>t+j.delta.text);}catch(e){}}}
+      setAiDone(true);
+    }catch(err){if(err.name!=='AbortError')setAiText(t=>t+(t?'\n\n':'')+'❌ '+err.message);setAiDone(true);}
+    setAiLoading(false);
+  }
+  const activeCases=[...cases,...claimedCases.map(c=>({...c,caseid:c.caseID,customername:c.customername}))];
   return <div className="page">
-    <div className="page-hd"><div><div className="page-title">🧠 AI แนะนำ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>วิเคราะห์เคสด้วย AI Claude</div></div></div>
-    {/* Coming Soon Banner */}
-    <div style={{background:'linear-gradient(135deg,rgba(88,166,255,.08),rgba(188,140,255,.08))',border:'1px solid rgba(188,140,255,.3)',borderRadius:12,padding:'18px 20px',marginBottom:18,display:'flex',alignItems:'center',gap:14}}>
-      <div style={{fontSize:40}}>🤖</div>
-      <div style={{flex:1}}>
-        <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>AI Advisor — Coming Soon</div>
-        <div style={{fontSize:13,color:'var(--text2)',lineHeight:1.7}}>AI กำลังถูกพัฒนาเพื่อช่วยคุณวิเคราะห์เคสและเพิ่มโอกาสปิดการขาย</div>
-      </div>
-      <span style={{background:'rgba(188,140,255,.2)',color:'var(--purple)',fontSize:11,fontWeight:700,padding:'4px 12px',borderRadius:20,whiteSpace:'nowrap',flexShrink:0}}>🔜 เร็ว ๆ นี้</span>
-    </div>
-    {/* Tabs (preview) */}
-    <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto',paddingBottom:4}}>
-      {[['recommend','🎯 แนะนำลำดับ'],['winrate','📊 Win Rate'],['script','📞 Script โทร']].map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{padding:'7px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)',transition:'all .15s'}}>{l}</button>)}
-    </div>
-    <div style={{background:'var(--bg3)',borderRadius:10,padding:'16px',fontSize:13,color:'var(--text2)',lineHeight:1.8,marginBottom:14}}>
-      {tab==='recommend'&&<>🎯 <strong>แนะนำลำดับ</strong> — AI จะวิเคราะห์และบอกว่าเคสไหนควรปิดก่อน พร้อมเหตุผล</>}
-      {tab==='winrate'&&<>📊 <strong>Win Rate</strong> — ประเมินโอกาสปิดการขาย % ของแต่ละเคส</>}
-      {tab==='script'&&<>📞 <strong>Script โทร</strong> — AI สร้างบทพูดสำหรับโทรหาลูกค้าแต่ละเคสโดยเฉพาะ</>}
-    </div>
-    {/* Preview Button → Coming Soon */}
-    <button className="btn" style={{width:'100%',padding:'14px',fontSize:15,fontWeight:700,borderRadius:10,background:'linear-gradient(135deg,#1f3a5f,#2d1b4e)',marginBottom:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8,color:'var(--text2)',border:'1px dashed rgba(188,140,255,.4)',cursor:'pointer',position:'relative',overflow:'hidden'}} onClick={()=>setShowCS(true)}>
-      <span style={{fontSize:20}}>🧠</span>
-      {tab==='recommend'?'วิเคราะห์เคสทั้งหมด':tab==='winrate'?'ประเมิน Win Rate':'สร้าง Script โทร'}
-      <span style={{position:'absolute',top:6,right:8,background:'rgba(188,140,255,.3)',color:'var(--purple)',fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20}}>Coming Soon</span>
-    </button>
-    {/* Feature roadmap */}
-    <div className="card">
-      <div style={{fontWeight:700,fontSize:13,marginBottom:12,color:'var(--blue)'}}>🗺️ Roadmap ฟีเจอร์ AI</div>
-      {[['🎯','แนะนำลำดับเคส','AI วิเคราะห์ priority จากสถานะ + ข้อมูลลูกค้า'],['📊','Win Rate Prediction','ประเมินโอกาสปิด % แต่ละเคสด้วย ML'],['📞','Script Generator','สร้างบทโทรหาลูกค้าที่ตรงกับแต่ละสถานการณ์'],['🔁','Auto Reassign','ย้ายเคสอัตโนมัติเมื่อค้างเกิน 48 ชม.']].map(([icon,title,desc])=><div key={title} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:'1px solid var(--border)'}}><div style={{fontSize:22,flexShrink:0,width:32,textAlign:'center'}}>{icon}</div><div><div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{title}</div><div style={{fontSize:12,color:'var(--text2)'}}>{desc}</div></div></div>)}
-    </div>
-    {showCS&&<ComingSoonModal onClose={()=>setShowCS(false)}/>}
+    <div className="page-hd"><div><div className="page-title">🧠 AI แนะนำ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>วิเคราะห์เคสด้วย AI Claude</div></div><button className="btn btn-ghost" style={{fontSize:13}} onClick={load}>🔄</button></div>
+    <ApiKeyManager onKeyReady={setApiKey}/>
+    <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto',paddingBottom:4}}>{[['recommend','🎯 แนะนำลำดับ'],['winrate','📊 Win Rate'],['script','📞 Script โทร']].map(([k,l])=><button key={k} onClick={()=>{setTab(k);setAiText('');setAiDone(false);}} style={{padding:'7px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)',transition:'all .15s'}}>{l}</button>)}</div>
+    {tab==='script'&&<div className="card" style={{marginBottom:14}}><div style={{fontWeight:600,fontSize:13,marginBottom:8}}>เลือกเคส</div>{loading?<Loading/>:<select value={scriptCase} onChange={e=>setScriptCase(e.target.value)}><option value="">-- เลือกเคส --</option>{activeCases.map(c=><option key={c.caseid} value={c.caseid}>[{c.caseid}] {c.customername}</option>)}</select>}</div>}
+    {!aiText&&!aiLoading&&<div style={{background:'var(--bg3)',borderRadius:10,padding:'16px',fontSize:13,color:'var(--text2)',lineHeight:1.8,marginBottom:14}}>🎯 แนะนำลำดับ — Top 5 เคสที่ควรปิดก่อน<br/>📊 Win Rate — ประเมินโอกาสปิด %<br/>📞 Script โทร — สร้างบทพูดสำหรับเคส</div>}
+    {!aiLoading&&(!aiText||aiDone)&&<button className="btn btn-primary" style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,borderRadius:10,background:apiKey?'linear-gradient(135deg,#1f6feb,#8250df)':'var(--bg3)',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',gap:8,color:apiKey?'#fff':'var(--text3)'}} disabled={loading||!apiKey||(tab==='script'&&!scriptCase)} onClick={()=>askAI(tab)}><span style={{fontSize:20}}>🧠</span>{!apiKey?'ใส่ API Key ก่อน':tab==='recommend'?'วิเคราะห์เคสทั้งหมด':tab==='winrate'?'ประเมิน Win Rate':'สร้าง Script โทร'}</button>}
+    {(aiText||aiLoading)&&<div className="card" style={{marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontWeight:700,fontSize:13,color:'var(--purple)'}}>{aiLoading?'🧠 AI กำลังวิเคราะห์...':'🧠 ผลวิเคราะห์'}</div><div style={{display:'flex',gap:6}}>{aiLoading&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>abortRef.current?.abort()}>หยุด</button>}{aiDone&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>{setAiText('');setAiDone(false);}}>ล้าง</button>}</div></div><div className="ai-stream">{aiText}{aiLoading&&<span className="ai-cursor"/>}</div></div>}
   </div>;
 }
 
 // ── remaining Sales pages (unchanged) ──
-function QuickUpdateModal({caseData,currentUser,onClose,onUpdated}){
-  const [status,setStatus]=useState(caseData.status||'รอข้อมูล');
-  const [note,setNote]=useState('');
-  const [loading,setLoading]=useState(false);
-  async function save(){
-    setLoading(true);
-    if(note.trim()){try{const prev=JSON.parse(localStorage.getItem('cnotes_'+caseData.caseid)||'[]');prev.push({text:note.trim(),date:new Date().toLocaleString('th-TH'),by:currentUser.name});localStorage.setItem('cnotes_'+caseData.caseid,JSON.stringify(prev));}catch(e){}}
-    await api('updateCase',{caseid:caseData.caseid,status,changedBy:currentUser.name,detail:'Quick update → '+status});
-    setLoading(false);onUpdated();onClose();
-  }
-  const contactVal=formatContact(caseData.contact||'');const isPhone=/^\d{9,10}$/.test(contactVal.replace(/\D/g,''));
-  return <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{zIndex:200}}>
-    <div className="modal" style={{maxWidth:380}}>
-      <div className="modal-hd"><span style={{fontWeight:700}}>⚡ Quick Update — {caseData.caseid}</span><button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onClose}><Ico.x/></button></div>
-      <div className="modal-bd">
-        <div style={{fontWeight:600,fontSize:15,marginBottom:12}}>{caseData.customername}</div>
-        {contactVal&&<div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
-          {isPhone&&<a href={`tel:${contactVal}`} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none',padding:'7px 16px',borderRadius:8,fontWeight:700,fontSize:13}}><Ico.phone/> โทรทันที</a>}
-          {isPhone&&<a href={`https://line.me/ti/p/~${contactVal.replace(/\D/g,'')}`} target="_blank" rel="noopener" className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none',padding:'7px 16px',borderRadius:8,fontWeight:700,fontSize:13}}>💬 LINE</a>}
-          <button className="contact-action-btn" style={{background:'rgba(88,166,255,.15)',color:'var(--blue)',padding:'7px 16px',borderRadius:8,fontWeight:700,fontSize:13}} onClick={()=>copyText(contactVal)}>📋 คัดลอก</button>
-        </div>}
-        <div className="form-group"><label>เปลี่ยนสถานะ</label><select value={status} onChange={e=>setStatus(e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-        <div className="form-group"><label>Note สั้น ๆ (ไม่บังคับ)</label><textarea rows={2} value={note} onChange={e=>setNote(e.target.value)} placeholder="ผลการติดต่อ..."/></div>
-      </div>
-      <div className="modal-ft"><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" style={{padding:'9px 24px'}} onClick={save} disabled={loading}>{loading?'บันทึก...':'💾 บันทึก'}</button></div>
-    </div>
-  </div>;
-}
-
 function DailyFocusPage({currentUser,onNavigate}){
-  const [myCases,setMyCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [marketCount,setMarketCount]=useState(0);const [loading,setLoading]=useState(true);const [quickCase,setQuickCase]=useState(null);const [salesData,setSalesData]=useState([]);const now=Date.now();
-  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name}),api('getMarket',{sales:currentUser.name})]).then(([cr,ccr,mr])=>{if(cr.success)setMyCases(cr.data||[]);if(ccr.success)setClaimedCases(ccr.data||[]);if(mr.success)setMarketCount((mr.data||[]).filter(c=>c.old_sales!==currentUser.name).length);setLoading(false);});},[currentUser.name]);
+  const [myCases,setMyCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [marketCount,setMarketCount]=useState(0);const [loading,setLoading]=useState(true);const [selCase,setSelCase]=useState(null);const [quickCase,setQuickCase]=useState(null);const [users,setUsers]=useState([]);const now=Date.now();
+  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name}),api('getMarket',{sales:currentUser.name}),api('getUsers')]).then(([cr,ccr,mr,ur])=>{if(cr.success)setMyCases(cr.data||[]);if(ccr.success)setClaimedCases(ccr.data||[]);if(mr.success)setMarketCount((mr.data||[]).filter(c=>c.old_sales!==currentUser.name).length);if(ur.success)setUsers(ur.data||[]);setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   function parseDate(d){const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
   function hoursAgo(d){const dt=parseDate(d);if(!dt)return 0;return(now-dt.getTime())/3600000;}
-  function hText(h){if(h<1)return'เมื่อกี้';if(h<24)return`${Math.floor(h)} ชม.`;return`${Math.floor(h/24)} วัน`;}
-
-  const active=myCases.filter(c=>!CLOSED.includes(c.status));
-  const closedToday=myCases.filter(c=>{const dt=parseDate(c.updatedat);if(!dt)return false;const h=hoursAgo(c.updatedat);return CLOSED.includes(c.status)&&h<24;});
-  const newToday=myCases.filter(c=>{const dt=parseDate(c.createdat||c.updatedat);if(!dt)return false;return(now-dt.getTime())<86400000;});
-
-  // เคสด่วน = critical (>48h) + hot status
-  const autoSendSoon=active.filter(c=>hoursAgo(c.updatedat)>=60);
-  const critical=active.filter(c=>hoursAgo(c.updatedat)>=48&&hoursAgo(c.updatedat)<60);
-  const warn=active.filter(c=>hoursAgo(c.updatedat)>=12&&hoursAgo(c.updatedat)<48);
-  const hotStatuses=['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'];
-  const hot=active.filter(c=>hotStatuses.includes(c.status));
-
-  // Focus Top 3: เรียงจากด่วนที่สุด
-  const focusTop3=[...autoSendSoon,...critical,...hot.filter(c=>!autoSendSoon.includes(c)&&!critical.includes(c))].slice(0,3);
-  const stale=active.filter(c=>hoursAgo(c.updatedat)>=48).length;
-  const allClear=autoSendSoon.length===0&&critical.length===0&&warn.length===0;
-
-  const h=new Date().getHours();
-  const greeting=h<12?'🌅 อรุณสวัสดิ์':h<17?'☀️ สวัสดีตอนบ่าย':'🌆 สวัสดีตอนเย็น';
-
-  function CaseUrgentRow({c}){
-    const hrs=hoursAgo(c.updatedat);
+  function hText(h){if(h<1)return'เมื่อกี้';if(h<24)return`${Math.floor(h)} ชม.ที่แล้ว`;return`${Math.floor(h/24)} วันที่แล้ว`;}
+  const active=myCases.filter(c=>!CLOSED.includes(c.status));const autoSendSoon=active.filter(c=>hoursAgo(c.updatedat)>=60);const critical=active.filter(c=>hoursAgo(c.updatedat)>=48&&hoursAgo(c.updatedat)<60);const warn=active.filter(c=>hoursAgo(c.updatedat)>=12&&hoursAgo(c.updatedat)<48);const hotStatuses=['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'];const hot=active.filter(c=>hotStatuses.includes(c.status));
+  const h=new Date().getHours();const greeting=h<12?'🌅 อรุณสวัสดิ์':h<17?'☀️ สวัสดีตอนบ่าย':'🌆 สวัสดีตอนเย็น';const allClear=autoSendSoon.length===0&&critical.length===0&&warn.length===0;
+  function CaseRow({c,accentColor}){
     const contactVal=formatContact(c.contact||'');
     const isPhone=/^\d{9,10}$/.test(contactVal.replace(/\D/g,''));
-    const isHot=hotStatuses.includes(c.status);
     return <div style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 12px',marginBottom:8}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <span style={{color:'var(--blue)',fontWeight:800,fontSize:13}}>{c.caseid}</span>
-          <span style={{fontWeight:600,fontSize:14,maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.customername}</span>
+        <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0,flex:1}}>
+          <span style={{color:'var(--blue)',fontWeight:800,fontSize:13,flexShrink:0}}>{c.caseid}</span>
+          <span style={{fontWeight:600,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.customername}</span>
         </div>
-        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+        <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0,marginLeft:8}}>
           <StatusBadge status={c.status}/>
-          <span style={{fontSize:11,fontWeight:700,color:hrs>=48?'var(--red)':isHot?'var(--green)':'var(--yellow)',whiteSpace:'nowrap'}}>{hrs>=48?`🔴 ${hText(hrs)}`:isHot?'🔥 ร้อน':`⏰ ${hText(hrs)}`}</span>
+          <span style={{fontSize:11,fontWeight:700,color:accentColor,whiteSpace:'nowrap'}}>{hText(hoursAgo(c.updatedat))}</span>
         </div>
       </div>
       <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
         {isPhone&&<a href={`tel:${contactVal}`} style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,border:'1px solid rgba(63,185,80,.3)'}}><Ico.phone/> โทร</a>}
         {isPhone&&<a href={`https://line.me/ti/p/~${contactVal.replace(/\D/g,'')}`} target="_blank" rel="noopener" style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,border:'1px solid rgba(0,200,83,.3)'}}>💬 LINE</a>}
-        {contactVal&&<button onClick={()=>copyText(contactVal)} style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(88,166,255,.1)',color:'var(--blue)',border:'1px solid rgba(88,166,255,.3)',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer'}}>📋 คัดลอก</button>}
+        <button onClick={()=>setSelCase(c)} style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(88,166,255,.1)',color:'var(--blue)',border:'1px solid rgba(88,166,255,.3)',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer'}}>📄 ดูข้อมูล</button>
         <button onClick={()=>setQuickCase(c)} style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(188,140,255,.12)',color:'var(--purple)',border:'1px solid rgba(188,140,255,.3)',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer'}}>📝 อัปเดต</button>
       </div>
     </div>;
   }
-
+  const FocusBlock=({color,borderColor,bg,title,items,extra=null})=><div className="focus-block" style={{background:bg,border:`1px solid ${borderColor}`}}><div style={{fontWeight:700,color,marginBottom:10,fontSize:13}}>{title}</div>{items.slice(0,5).map((c,i)=><CaseRow key={i} c={c} accentColor={color}/>)}{items.length>5&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginTop:4}}>+{items.length-5} รายการ</div>}{extra}</div>;
   return <div className="page">
-    {/* Header Card */}
-    <div style={{background:'linear-gradient(135deg,#1a2a4a 0%,#0f2233 100%)',border:'1px solid rgba(88,166,255,.2)',borderRadius:14,padding:'18px 20px',marginBottom:14}}>
-      <div style={{fontSize:12,color:'var(--blue)',marginBottom:2}}>{greeting}</div>
-      <div style={{fontSize:19,fontWeight:800,marginBottom:4}}>{currentUser.name} 👋</div>
-      <div style={{fontSize:12,color:'var(--text2)'}}>{new Date().toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
-    </div>
-
-    {/* Daily Summary */}
-    {!loading&&<div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px',marginBottom:14}}>
-      <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:'var(--text2)'}}>📊 สรุปวันนี้</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-        {[['เคส Active',active.length,'var(--blue)'],['ค้างนาน',stale,'var(--red)'],['ใกล้ปิด',hot.length,'var(--green)'],['ปิดวันนี้',closedToday.length,'var(--purple)']].map(([l,v,c])=>
-          <div key={l} style={{textAlign:'center',background:'var(--bg3)',borderRadius:8,padding:'10px 4px'}}>
-            <div style={{fontSize:20,fontWeight:800,color:c}}>{v}</div>
-            <div style={{fontSize:10,color:'var(--text2)',marginTop:2}}>{l}</div>
-          </div>)}
-      </div>
-    </div>}
-
-    {/* Daily Mission */}
-    <DailyMissionBlock currentUser={currentUser}/>
-
-    {/* Ranking */}
-    {!loading&&salesData.length>0&&<DailyRankingBlock currentUser={currentUser} salesData={salesData}/>}
-
-    {/* Upcoming Appointments */}
-    {(()=>{const appts=loadAppts(currentUser.userId).filter(a=>!a.done&&a.datetime&&new Date(a.datetime).getTime()>Date.now()-3600000).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime)).slice(0,3);if(!appts.length)return null;function fmtT(dt){const d=new Date(dt);return`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}return <div style={{background:'rgba(88,166,255,.06)',border:'1px solid rgba(88,166,255,.2)',borderRadius:12,padding:'12px 16px',marginBottom:14}}><div style={{fontWeight:700,fontSize:13,marginBottom:10,color:'var(--blue)'}}>📅 นัดหมายที่กำลังมา</div>{appts.map(a=>{const ms=new Date(a.datetime).getTime()-Date.now();const soon=ms<1800000&&ms>0;return <div key={a.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid rgba(88,166,255,.1)'}}><div><div style={{fontSize:13,fontWeight:600}}>{a.customerName||'ไม่ระบุ'}{a.caseId&&<span style={{fontSize:11,color:'var(--blue)',marginLeft:6}}>{a.caseId}</span>}</div>{a.note&&<div style={{fontSize:11,color:'var(--text3)'}}>{a.note}</div>}</div><div style={{textAlign:'right',flexShrink:0,marginLeft:8}}><div style={{fontSize:12,fontWeight:700,color:soon?'var(--yellow)':'var(--text2)'}}>{soon?`⚡ อีก ${Math.ceil(ms/60000)} นาที`:`🕐 ${fmtT(a.datetime)}`}</div></div></div>;})} <button onClick={()=>onNavigate('appt')} style={{fontSize:12,color:'var(--blue)',background:'none',border:'none',cursor:'pointer',marginTop:8,textDecoration:'underline'}}>ดูนัดทั้งหมด →</button></div>;})()} 
-
-    {/* Stat Shortcuts */}
-    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
-      {[['📋 เคส Active',active.length,'var(--blue)','cases'],['🏪 ตลาดว่าง',marketCount,'var(--green)','market'],['📥 รับแล้ว',claimedCases.length,'var(--purple)','claimed']].map(([l,v,c,key])=>
-        <div key={key} onClick={()=>onNavigate(key)} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center',cursor:'pointer'}} onMouseOver={e=>e.currentTarget.style.borderColor=c} onMouseOut={e=>e.currentTarget.style.borderColor='var(--border)'}>
-          <div style={{fontSize:11,color:'var(--text2)',marginBottom:4}}>{l}</div>
-          <div style={{fontSize:22,fontWeight:800,color:c}}>{loading?'—':v}</div>
-        </div>)}
-    </div>
-
-    {loading?<Loading/>:<>
-      {/* 🔥 เคสด่วนวันนี้ */}
-      {focusTop3.length>0&&<div style={{background:'rgba(248,81,73,.06)',border:'1px solid rgba(248,81,73,.35)',borderRadius:12,padding:'14px 16px',marginBottom:14}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-          <div style={{fontWeight:700,fontSize:14,color:'var(--red)'}}>🔥 เคสด่วน — ต้องทำวันนี้ ({focusTop3.length})</div>
-          <button onClick={()=>onNavigate('cases')} style={{fontSize:11,color:'var(--blue)',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>ดูทั้งหมด</button>
-        </div>
-        {focusTop3.map((c,i)=><CaseUrgentRow key={i} c={c}/>)}
-      </div>}
-
-      {/* 🎯 Focus Mode Top 3 */}
-      {hot.length>0&&focusTop3.filter(c=>hotStatuses.includes(c.status)).length===0&&<div style={{background:'rgba(63,185,80,.06)',border:'1px solid rgba(63,185,80,.3)',borderRadius:12,padding:'14px 16px',marginBottom:14}}>
-        <div style={{fontWeight:700,fontSize:14,color:'var(--green)',marginBottom:12}}>🎯 Focus Mode — โอกาสปิดการขาย</div>
-        {hot.slice(0,3).map((c,i)=><CaseUrgentRow key={i} c={c}/>)}
-      </div>}
-
-      {/* ⚠️ ส่งตลาดอัตโนมัติ */}
-      {autoSendSoon.length>0&&<div style={{background:'rgba(248,81,73,.07)',border:'2px solid rgba(248,81,73,.5)',borderRadius:12,padding:'12px 16px',marginBottom:12}}>
-        <div style={{fontWeight:700,color:'var(--red)',marginBottom:6,fontSize:13}}>🚨 ใกล้ถูกส่งตลาดอัตโนมัติ ({autoSendSoon.length})</div>
-        {autoSendSoon.slice(0,3).map((c,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0',fontSize:13}}><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span><span style={{color:'var(--text2)'}}>{c.customername}</span><span style={{color:'var(--red)',fontSize:11}}>⚡ {hText(hoursAgo(c.updatedat))}</span></div>)}
-        {autoSendSoon.length>3&&<div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>+{autoSendSoon.length-3} เคส</div>}
-        <div style={{fontSize:12,color:'rgba(248,81,73,.8)',marginTop:8}}>⚡ รีบอัปเดตก่อนเคสถูกส่งตลาด!</div>
-      </div>}
-
-      {/* ⏰ Follow up วันนี้ */}
-      {warn.length>0&&<div style={{background:'rgba(210,153,34,.07)',border:'1px solid rgba(210,153,34,.35)',borderRadius:12,padding:'12px 16px',marginBottom:12}}>
-        <div style={{fontWeight:700,color:'var(--yellow)',marginBottom:6,fontSize:13}}>⏰ ควร follow up วันนี้ ({warn.length})</div>
-        {warn.slice(0,4).map((c,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0',fontSize:13}}><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span><span style={{color:'var(--text2)',flex:1,marginLeft:8,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.customername}</span><button onClick={()=>setQuickCase(c)} style={{fontSize:11,color:'var(--purple)',background:'rgba(188,140,255,.1)',border:'1px solid rgba(188,140,255,.3)',borderRadius:20,padding:'2px 10px',cursor:'pointer',flexShrink:0}}>📝 อัปเดต</button></div>)}
-        {warn.length>4&&<div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>+{warn.length-4} เคส</div>}
-      </div>}
-
-      {allClear&&hot.length===0&&<div style={{textAlign:'center',padding:'36px 0',color:'var(--green)'}}><div style={{fontSize:52,marginBottom:12}}>✅</div><div style={{fontWeight:800,fontSize:17}}>ทุกอย่างอัปเดตแล้ว!</div><div style={{fontSize:13,color:'var(--text2)',marginTop:6}}>คุณกำลังทำได้ยอดเยี่ยมมาก 🎉</div></div>}
-
-      {marketCount>0&&<div onClick={()=>onNavigate('market')} style={{background:'rgba(188,140,255,.08)',border:'1px solid rgba(188,140,255,.3)',borderRadius:10,padding:'14px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:12,marginBottom:12}} onMouseOver={e=>e.currentTarget.style.borderColor='var(--purple)'} onMouseOut={e=>e.currentTarget.style.borderColor='rgba(188,140,255,.3)'}><div style={{fontSize:28}}>🏪</div><div><div style={{fontWeight:700,color:'var(--purple)',fontSize:14}}>ตลาดมีเคสว่าง {marketCount} ใบ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กดเพื่อไปหน้าตลาด →</div></div></div>}
-    </>}
-
-    <button className="btn btn-ghost" style={{marginTop:8,width:'100%',fontSize:13}} onClick={load}>🔄 รีเฟรช</button>
+    <div style={{background:'linear-gradient(135deg,#1a2a4a 0%,#0f2233 100%)',border:'1px solid rgba(88,166,255,.2)',borderRadius:14,padding:'20px 22px',marginBottom:18}}><div style={{fontSize:12,color:'var(--blue)',marginBottom:3}}>{greeting}</div><div style={{fontSize:20,fontWeight:800,marginBottom:6}}>{currentUser.name} 👋</div><div style={{fontSize:12,color:'var(--text2)'}}>{new Date().toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>{[['📋 เคส Active',active.length,'var(--blue)','cases'],['🏪 ตลาดว่าง',marketCount,'var(--green)','market'],['📥 รับแล้ว',claimedCases.length,'var(--purple)','claimed']].map(([l,v,c,key])=><div key={key} onClick={()=>onNavigate(key)} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center',cursor:'pointer'}} onMouseOver={e=>e.currentTarget.style.borderColor=c} onMouseOut={e=>e.currentTarget.style.borderColor='var(--border)'}><div style={{fontSize:12,color:'var(--text2)',marginBottom:4}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:c}}>{loading?'—':v}</div></div>)}</div>
+    {loading?<Loading/>:<>{autoSendSoon.length>0&&<FocusBlock color="var(--red)" borderColor="rgba(248,81,73,.45)" bg="rgba(248,81,73,.07)" title={`🚨 ใกล้ถูกส่งตลาดอัตโนมัติ (${autoSendSoon.length})`} items={autoSendSoon} extra={<div style={{fontSize:12,color:'rgba(248,81,73,.8)',marginTop:6}}>⚡ รีบอัปเดตก่อนเคสถูกส่งตลาด</div>}/>}{critical.length>0&&<FocusBlock color="var(--yellow)" borderColor="rgba(210,153,34,.4)" bg="rgba(210,153,34,.07)" title={`⚠️ ค้างนาน — ควร follow up ด่วน (${critical.length})`} items={critical}/>}{warn.length>0&&<FocusBlock color="var(--blue)" borderColor="rgba(88,166,255,.25)" bg="rgba(88,166,255,.05)" title={`⏰ ควร follow up วันนี้ (${warn.length})`} items={warn}/>}{hot.length>0&&<FocusBlock color="var(--green)" borderColor="rgba(63,185,80,.25)" bg="rgba(63,185,80,.05)" title={`🎯 สถานะดี — โอกาสปิดการขาย (${hot.length})`} items={hot}/>}{allClear&&hot.length===0&&<div style={{textAlign:'center',padding:'36px 0',color:'var(--green)'}}><div style={{fontSize:52,marginBottom:12}}>✅</div><div style={{fontWeight:800,fontSize:17}}>ทุกอย่างอัปเดตแล้ว!</div><div style={{fontSize:13,color:'var(--text2)',marginTop:6}}>คุณกำลังทำได้ยอดเยี่ยมมาก 🎉</div></div>}{marketCount>0&&<div onClick={()=>onNavigate('market')} style={{background:'rgba(188,140,255,.08)',border:'1px solid rgba(188,140,255,.3)',borderRadius:10,padding:'14px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:12}} onMouseOver={e=>e.currentTarget.style.borderColor='var(--purple)'} onMouseOut={e=>e.currentTarget.style.borderColor='rgba(188,140,255,.3)'}><div style={{fontSize:28}}>🏪</div><div><div style={{fontWeight:700,color:'var(--purple)',fontSize:14}}>ตลาดมีเคสว่าง {marketCount} ใบ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กดเพื่อไปหน้าตลาด →</div></div></div>}</>}
+    <button className="btn btn-ghost" style={{marginTop:14,width:'100%',fontSize:13}} onClick={load}>🔄 รีเฟรช</button>
+    {selCase&&<CaseModal caseData={selCase} users={users} currentUser={currentUser} onClose={()=>setSelCase(null)} onUpdated={()=>{setSelCase(null);load();}}/>}
     {quickCase&&<QuickUpdateModal caseData={quickCase} currentUser={currentUser} onClose={()=>setQuickCase(null)} onUpdated={()=>{setQuickCase(null);load();}}/>}
   </div>;
 }
@@ -1189,8 +923,7 @@ function SalesMarket({currentUser}){
   async function claim(caseId){setClaimedIds(prev=>new Set([...prev,caseId]));setClaimedCases(prev=>[...prev,{caseID:caseId,sale:currentUser.name}]);showToast('✅ รับเคส '+caseId+' สำเร็จ!','ok');const r=await api('claimCase',{caseId,sales:currentUser.name});if(!r.success){setClaimedIds(prev=>{const s=new Set(prev);s.delete(caseId);return s;});setClaimedCases(prev=>prev.filter(c=>c.caseID!==caseId));showToast('❌ '+(r.error||'รับเคสไม่สำเร็จ'),'err');}else{setTimeout(()=>load(true),2000);}}
   async function notInterested(caseId){setSkippedIds(prev=>new Set([...prev,caseId]));await api('returnCase',{caseId,sales:'_skip_'+currentUser.name});setTimeout(()=>load(true),1000);}
   function getDateBadge(c){const id=String(c.ID||'');if(id.length>=4){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
-  const MARKET_HIDE_STATUSES=['ปล่อยแล้ว','ปิดเคส','รีเจค','โยนเคส'];
-  const visibleCases=cases.filter(c=>!claimedIds.has(c.ID)&&!skippedIds.has(c.ID)&&!MARKET_HIDE_STATUSES.includes(c.status));const myStats=leaderboard.find(s=>s.name===currentUser.name)||{};const totalInMarket=visibleCases.length;const myClaimed=claimedCases.length+(claimedIds.size);const lbSorted=[...leaderboard].sort((a,b)=>(b.claimedCases||0)-(a.claimedCases||0));
+  const visibleCases=cases.filter(c=>!claimedIds.has(c.ID)&&!skippedIds.has(c.ID));const myStats=leaderboard.find(s=>s.name===currentUser.name)||{};const totalInMarket=visibleCases.length;const myClaimed=claimedCases.length+(claimedIds.size);const lbSorted=[...leaderboard].sort((a,b)=>(b.claimedCases||0)-(a.claimedCases||0));
   return <div className="mk-page">
     <div className="mk-hero"><div className="mk-hero-top"><div><div style={{fontSize:20,fontWeight:800,display:'flex',alignItems:'center',gap:8}}>🎯 ตลาดเคส</div><div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ใครไวได้ก่อน</div></div><button className="btn btn-ghost" onClick={()=>load(false)} style={{fontSize:13}}>🔄</button></div><div className="mk-stats">{[['ว่างอยู่',totalInMarket,'var(--blue)'],['ของฉัน',myClaimed,'var(--green)']].map(([l,v,c])=><div key={l} className="mk-stat"><div className="mk-stat-num" style={{color:c}}>{v}</div><div className="mk-stat-lbl">{l}</div></div>)}</div></div>
     <div className="mk-body"><div className="mk-cards-area">
@@ -1202,28 +935,18 @@ function SalesMarket({currentUser}){
 }
 
 function SalesCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');
+  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
   const CLOSED_STATUSES=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'];
   const load=useCallback(()=>{setLoading(true);api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{if(r.success)setCases(r.data||[]);setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
-  // ฝั่ง Sales ซ่อนเคสปิดทั้งหมดเสมอ
-  const filtered=cases.filter(c=>{
-    if(CLOSED_STATUSES.includes(c.status))return false;
-    if(filterStatus&&c.status!==filterStatus)return false;
-    if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}
-    return true;
-  }).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
-  const activeCount=filtered.length;
+  const filtered=cases.filter(c=>{if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
+  const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   function formatDate(d){const s=String(d||'');if(s.includes('T')){const dt=new Date(s);if(!isNaN(dt)){return`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getFullYear()).slice(-2)} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;}}const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m)return`${m[1]}/${m[2]}/${String(m[3]).slice(-2)} ${m[4]}:${m[5]}`;return s.split(' ')[0]||'-';}
   return <div className="page">
-    <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส</div></div><button className="btn btn-ghost" onClick={load} style={{padding:'6px 10px'}}>🔄</button></div>
+    <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส{closedCount>0&&<span style={{marginLeft:8,color:'var(--text3)'}}>· ปิดแล้ว {closedCount}</span>}</div></div><button className="btn btn-ghost" onClick={load} style={{padding:'6px 10px'}}>🔄</button></div>
     <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:180}}><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)',pointerEvents:'none',fontSize:14}}>🔍</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหาชื่อ เบอร์ รหัสเคส..." style={{paddingLeft:32,fontSize:13}}/></div>{q&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>setQ('')}>✕ ล้าง</button>}</div>
-    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
-      <button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button>
-      <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.filter(s=>!CLOSED_STATUSES.includes(s)).map(s=><option key={s}>{s}</option>)}</select>
-      <span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span>
-    </div>
-    {loading?<SkeletonCards n={4}/>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=>{const sla=getSlaInfo(c.updatedat||c.createdat);const score=calcCaseScore(c);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer',borderLeft:sla.level==='critical'?'3px solid var(--red)':sla.level==='warning'?'3px solid var(--yellow)':'1px solid var(--border)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:15}}>{c.caseid}</span><div style={{display:'flex',gap:6,alignItems:'center'}}><span style={{fontSize:11,fontWeight:700,color:getScoreColor(score),background:'var(--bg3)',border:`1px solid ${getScoreColor(score)}40`,borderRadius:20,padding:'1px 7px'}}>★ {score}</span><StatusBadge status={c.status}/></div></div><div style={{fontWeight:600,marginBottom:4,fontSize:15}}>{c.customername}</div><div style={{fontSize:12,color:'var(--text2)',marginBottom:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><span>📞 {displayContact(c.contact)}</span><span style={{color:'var(--text3)'}}>·</span><span style={{color:sla.color,fontWeight:600}}>{sla.label}</span></div>{c.report&&<div style={{fontSize:12,color:'var(--text2)',background:'var(--bg3)',padding:'6px 10px',borderRadius:6,marginTop:4,lineHeight:1.5}}>{String(c.report).slice(0,100)}{String(c.report).length>100?'...':''}</div>}</div>;})}
+    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>setShowClosed(v=>!v)}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
+    {loading?<SkeletonCards n={4}/>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=><div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer',opacity:['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'].includes(c.status)?0.6:1}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:15}}>{c.caseid}</span><StatusBadge status={c.status}/></div><div style={{fontWeight:600,marginBottom:4,fontSize:15}}>{c.customername}</div><div style={{fontSize:12,color:'var(--text2)',marginBottom:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}><span>📞 {displayContact(c.contact)}</span><span style={{color:'var(--text3)'}}>·</span><span>🕐 {formatDate(c.updatedat||c.createdat)}</span></div>{c.report&&<div style={{fontSize:12,color:'var(--text2)',background:'var(--bg3)',padding:'6px 10px',borderRadius:6,marginTop:4,lineHeight:1.5}}>{String(c.report).slice(0,100)}{String(c.report).length>100?'...':''}</div>}</div>)}
     {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
   </div>;
 }
@@ -1238,10 +961,10 @@ function SalesClaimedCases({currentUser,users}){
   async function doReturn(caseId){const r=await api('returnCase',{caseId,sales:currentUser.name});if(!r.success){alert(r.error||'ไม่สามารถคืนเคสได้');return;}load();}
   return <div className="page">
     <div className="page-hd"><div className="page-title">📥 เคสที่รับจากตลาด</div><button className="btn btn-ghost" onClick={load}>🔄</button></div>
-    {loading?<SkeletonCards n={3}/>:cases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:cases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);const sla=getSlaInfo(c.AssignedAt||c['วันที่รับเคส']||c.date);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer',borderLeft:sla.level==='critical'?'3px solid var(--red)':sla.level==='warning'?'3px solid var(--yellow)':'1px solid var(--border)'}}>
+    {loading?<SkeletonCards n={3}/>:cases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:cases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer'}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseID}</span><StatusBadge status={c.newstatus||c.status}/></div>
       <div style={{fontWeight:500,marginBottom:4}}>{c.customername}</div>
-      <div style={{fontSize:12,color:'var(--text2)',marginBottom:6,display:'flex',gap:8,flexWrap:'wrap'}}>รับมาจาก: <span style={{color:'var(--orange)'}}>{c.fromsales||'-'}</span>{' · '}<span style={{color:sla.color,fontWeight:600}}>{sla.label}</span></div>
+      <div style={{fontSize:12,color:'var(--text2)',marginBottom:6}}>รับมาจาก: <span style={{color:'var(--orange)'}}>{c.fromsales||'-'}</span>{' · '}รับเมื่อ: {String(c.AssignedAt||'').split(' ')[0]}</div>
       {!ok&&<div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(210,153,34,.10)',border:'1px solid rgba(210,153,34,.35)',borderRadius:6,padding:'5px 10px',marginBottom:8,fontSize:12,color:'var(--yellow)'}}>🔒 คืนเคสได้หลังจากอีก <strong style={{marginLeft:4}}>{left}</strong></div>}
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
         <button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px',color:'var(--green)'}} onClick={e=>{e.stopPropagation();copyText(formatContact(c.contact)||'');}}><Ico.copy/> {formatContact(c.contact)||'ไม่มีเบอร์'}</button>
@@ -1280,266 +1003,6 @@ function SalesDashboard({currentUser}){
   </div>;
 }
 
-
-
-// ============================================================
-// 🎯 DAILY MISSION SYSTEM
-// ============================================================
-function getMissionKey(userId){const d=new Date();return`cp_missions_${userId}_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;}
-function getStreakKey(userId){return`cp_streak_${userId}`;}
-function loadMissions(userId){
-  const key=getMissionKey(userId);
-  const DEFAULT=[
-    {id:'m1',icon:'📞',title:'โทรหาลูกค้า 3 เคส',target:3,current:0,done:false},
-    {id:'m2',icon:'📝',title:'อัปเดตสถานะเคส 2 ครั้ง',target:2,current:0,done:false},
-    {id:'m3',icon:'🏪',title:'เช็คตลาดเคส',target:1,current:0,done:false},
-    {id:'m4',icon:'⚡',title:'Follow up เคสค้าง 1 เคส',target:1,current:0,done:false},
-  ];
-  try{const s=localStorage.getItem(key);return s?JSON.parse(s):DEFAULT;}catch(e){return DEFAULT;}
-}
-function saveMissions(userId,missions){try{localStorage.setItem(getMissionKey(userId),JSON.stringify(missions));}catch(e){}}
-function loadStreak(userId){try{const s=localStorage.getItem(getStreakKey(userId));return s?JSON.parse(s):{count:0,lastDate:''};}catch(e){return{count:0,lastDate:''};}}
-function saveStreak(userId,streak){try{localStorage.setItem(getStreakKey(userId),JSON.stringify(streak));}catch(e){}}
-
-function DailyMissionBlock({currentUser,onMissionComplete}){
-  const [missions,setMissions]=useState(()=>loadMissions(currentUser.userId));
-  const [streak,setStreak]=useState(()=>loadStreak(currentUser.userId));
-  const [popping,setPopping]=useState(null);
-  const doneCount=missions.filter(m=>m.done).length;
-  const allDone=doneCount===missions.length;
-
-  function toggleMission(id){
-    const updated=missions.map(m=>{
-      if(m.id!==id)return m;
-      const newDone=!m.done;
-      const newCurrent=newDone?m.target:Math.max(0,m.current-1);
-      return{...m,done:newDone,current:newCurrent};
-    });
-    setMissions(updated);
-    saveMissions(currentUser.userId,updated);
-    setPopping(id);setTimeout(()=>setPopping(null),400);
-    // Check if all done → update streak
-    const nowAllDone=updated.every(m=>m.done);
-    if(nowAllDone){
-      const today=new Date().toISOString().split('T')[0];
-      const yesterday=new Date(Date.now()-86400000).toISOString().split('T')[0];
-      const newStreak={count:streak.lastDate===yesterday?streak.count+1:1,lastDate:today};
-      setStreak(newStreak);saveStreak(currentUser.userId,newStreak);
-    }
-    if(onMissionComplete)onMissionComplete();
-  }
-
-  // increment a specific mission counter (called from outside)
-  window['cp_mission_inc']=function(missionId){
-    setMissions(prev=>{
-      const updated=prev.map(m=>{
-        if(m.id!==missionId||m.done)return m;
-        const newCurrent=Math.min(m.current+1,m.target);
-        return{...m,current:newCurrent,done:newCurrent>=m.target};
-      });
-      saveMissions(currentUser.userId,updated);
-      return updated;
-    });
-  };
-
-  return <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px',marginBottom:14}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-      <div style={{fontWeight:700,fontSize:14}}>🎯 Daily Mission</div>
-      <div style={{display:'flex',alignItems:'center',gap:10}}>
-        {streak.count>0&&<div style={{display:'flex',alignItems:'center',gap:4,background:'rgba(255,166,87,.1)',border:'1px solid rgba(255,166,87,.3)',borderRadius:20,padding:'2px 10px',fontSize:12,fontWeight:700,color:'var(--orange)'}}>🔥 {streak.count} วันติด</div>}
-        <div style={{fontSize:12,color:allDone?'var(--green)':'var(--text2)',fontWeight:600}}>{doneCount}/{missions.length}</div>
-      </div>
-    </div>
-    {/* Progress bar */}
-    <div style={{height:6,background:'var(--bg3)',borderRadius:3,overflow:'hidden',marginBottom:12}}>
-      <div style={{height:'100%',borderRadius:3,background:allDone?'var(--green)':'var(--blue)',width:`${(doneCount/missions.length)*100}%`,transition:'width .4s'}}/>
-    </div>
-    {missions.map(m=><div key={m.id} className={`mission-item${m.done?' done':''}`}>
-      <div className={`mission-check${m.done?' done':''}${popping===m.id?' pop':''}`} onClick={()=>toggleMission(m.id)}>
-        {m.done?'✓':''}
-      </div>
-      <div style={{flex:1}}>
-        <div style={{fontSize:13,fontWeight:600,textDecoration:m.done?'line-through':'none',color:m.done?'var(--text3)':'var(--text)'}}>{m.icon} {m.title}</div>
-        {m.target>1&&!m.done&&<div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{m.current}/{m.target}</div>}
-      </div>
-    </div>)}
-    {allDone&&<div style={{textAlign:'center',padding:'8px 0 2px',fontSize:13,color:'var(--green)',fontWeight:700}}>🎉 ทำครบทุก Mission วันนี้แล้ว!</div>}
-  </div>;
-}
-
-// ============================================================
-// 📅 APPOINTMENT / REMINDER SYSTEM
-// ============================================================
-function getApptKey(userId){return`cp_appts_${userId}`;}
-function loadAppts(userId){try{const s=localStorage.getItem(getApptKey(userId));return s?JSON.parse(s):[];}catch(e){return[];}}
-function saveAppts(userId,appts){try{localStorage.setItem(getApptKey(userId),JSON.stringify(appts));}catch(e){}}
-
-function AddApptModal({currentUser,cases,onClose,onAdded}){
-  const [form,setForm]=useState({caseId:'',customerName:'',datetime:'',note:'',done:false});
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  // Pre-fill default datetime to next hour
-  useEffect(()=>{const d=new Date();d.setHours(d.getHours()+1,0,0,0);const pad=n=>String(n).padStart(2,'0');set('datetime',`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:00`);if(cases.length>0)set('caseId',cases[0].caseid||'');},[]);
-  // Auto-fill customer name when case selected
-  useEffect(()=>{if(!form.caseId)return;const c=cases.find(x=>x.caseid===form.caseId);if(c)set('customerName',c.customername||'');},[form.caseId]);
-
-  function save(){
-    if(!form.datetime)return alert('กรุณาเลือกวันที่นัด');
-    const appts=loadAppts(currentUser.userId);
-    const newAppt={...form,id:'A'+Date.now(),createdAt:new Date().toISOString()};
-    saveAppts(currentUser.userId,[...appts,newAppt]);
-    onAdded();onClose();
-  }
-  return <Modal title="📅 เพิ่มนัดหมาย" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={save}>💾 บันทึก</button></>}>
-    <div style={{display:'grid',gap:12}}>
-      <div className="form-group"><label>เลือกเคส</label>
-        <select value={form.caseId} onChange={e=>set('caseId',e.target.value)}>
-          <option value="">-- เลือกเคส --</option>
-          {cases.map(c=><option key={c.caseid} value={c.caseid}>[{c.caseid}] {c.customername}</option>)}
-        </select>
-      </div>
-      <div className="form-group"><label>ชื่อลูกค้า</label><input value={form.customerName} onChange={e=>set('customerName',e.target.value)} placeholder="ชื่อลูกค้า"/></div>
-      <div className="form-group"><label>วันเวลานัด</label><input type="datetime-local" value={form.datetime} onChange={e=>set('datetime',e.target.value)}/></div>
-      <div className="form-group"><label>หมายเหตุ</label><textarea rows={2} value={form.note} onChange={e=>set('note',e.target.value)} placeholder="รายละเอียดนัด..."/></div>
-    </div>
-  </Modal>;
-}
-
-function AppointmentPage({currentUser}){
-  const [appts,setAppts]=useState([]);const [showAdd,setShowAdd]=useState(false);const [cases,setCases]=useState([]);const [now,setNow]=useState(Date.now());
-  const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-  useEffect(()=>{setAppts(loadAppts(currentUser.userId));api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{if(r.success)setCases((r.data||[]).filter(c=>!CLOSED.includes(c.status)));});},[]);
-  useEffect(()=>{const t=setInterval(()=>{setNow(Date.now());setAppts(loadAppts(currentUser.userId));},30000);return()=>clearInterval(t);},[]);
-
-  function reload(){setAppts(loadAppts(currentUser.userId));}
-  function toggleDone(id){const updated=appts.map(a=>a.id===id?{...a,done:!a.done}:a);saveAppts(currentUser.userId,updated);setAppts(updated);}
-  function deleteAppt(id){if(!confirm('ลบนัดนี้?'))return;const updated=appts.filter(a=>a.id!==id);saveAppts(currentUser.userId,updated);setAppts(updated);}
-
-  function getApptStatus(a){
-    if(a.done)return{label:'✅ เสร็จแล้ว',color:'var(--green)',cls:'done-appt'};
-    if(!a.datetime)return{label:'',color:'var(--text3)',cls:''};
-    const ms=new Date(a.datetime).getTime()-now;
-    if(ms<0)return{label:'⏰ เลยเวลาแล้ว',color:'var(--red)',cls:'urgent'};
-    if(ms<1800000)return{label:`⚡ อีก ${Math.ceil(ms/60000)} นาที`,color:'var(--yellow)',cls:'soon'};
-    if(ms<3600000)return{label:`🔔 อีก ${Math.ceil(ms/60000)} นาที`,color:'var(--yellow)',cls:'soon'};
-    const h=Math.floor(ms/3600000);const d=Math.floor(ms/86400000);
-    if(d>0)return{label:`📅 อีก ${d} วัน`,color:'var(--text2)',cls:''};
-    return{label:`⏱ อีก ${h} ชม.`,color:'var(--blue)',cls:''};
-  }
-  function formatApptTime(dt){if(!dt)return'-';const d=new Date(dt);return`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
-
-  const sorted=[...appts].sort((a,b)=>{if(a.done&&!b.done)return 1;if(!a.done&&b.done)return-1;return new Date(a.datetime||0)-new Date(b.datetime||0);});
-  const upcoming=sorted.filter(a=>!a.done);const done=sorted.filter(a=>a.done);
-
-  return <div className="page">
-    <div className="page-hd">
-      <div><div className="page-title">📅 นัดหมาย</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>upcoming {upcoming.length} รายการ</div></div>
-      <button className="btn btn-primary" onClick={()=>setShowAdd(true)}>+ นัดใหม่</button>
-    </div>
-    {upcoming.length===0&&done.length===0&&<div style={{textAlign:'center',padding:'48px 0',color:'var(--text2)'}}>
-      <div style={{fontSize:48,marginBottom:12}}>📅</div>
-      <div style={{fontWeight:600,fontSize:15,marginBottom:6}}>ยังไม่มีนัดหมาย</div>
-      <div style={{fontSize:13}}>กด + นัดใหม่ เพื่อเพิ่มนัดกับลูกค้า</div>
-    </div>}
-    {upcoming.map(a=>{const st=getApptStatus(a);return <div key={a.id} className={`appt-card ${st.cls}`}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
-        <div>
-          <div style={{fontWeight:700,fontSize:14}}>{a.customerName||'ไม่ระบุชื่อ'}{a.caseId&&<span style={{fontSize:12,color:'var(--blue)',marginLeft:8,fontWeight:400}}>{a.caseId}</span>}</div>
-          <div style={{fontSize:13,color:'var(--text2)',marginTop:2}}>🕐 {formatApptTime(a.datetime)}</div>
-          {a.note&&<div style={{fontSize:12,color:'var(--text3)',marginTop:4,background:'var(--bg3)',padding:'5px 8px',borderRadius:6}}>{a.note}</div>}
-        </div>
-        <span style={{fontSize:12,fontWeight:700,color:st.color,whiteSpace:'nowrap',marginLeft:8}}>{st.label}</span>
-      </div>
-      <div style={{display:'flex',gap:8,marginTop:8}}>
-        <button className="btn btn-green" style={{fontSize:12,padding:'5px 14px'}} onClick={()=>toggleDone(a.id)}>✅ เสร็จแล้ว</button>
-        <button className="btn btn-ghost" style={{fontSize:12,padding:'5px 10px',color:'var(--red)'}} onClick={()=>deleteAppt(a.id)}>🗑</button>
-      </div>
-    </div>;})}
-    {done.length>0&&<><div style={{fontSize:12,color:'var(--text3)',marginTop:16,marginBottom:8,fontWeight:700}}>✅ เสร็จแล้ว ({done.length})</div>
-    {done.map(a=>{const st=getApptStatus(a);return <div key={a.id} className={`appt-card ${st.cls}`}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div><div style={{fontWeight:600,fontSize:13,color:'var(--text3)'}}>{a.customerName||'-'}{a.caseId&&<span style={{fontSize:11,color:'var(--blue)',marginLeft:6}}>{a.caseId}</span>}</div><div style={{fontSize:11,color:'var(--text3)'}}>🕐 {formatApptTime(a.datetime)}</div></div>
-        <button className="btn btn-ghost" style={{fontSize:11,padding:'3px 8px',color:'var(--red)'}} onClick={()=>deleteAppt(a.id)}>ลบ</button>
-      </div>
-    </div>;})}
-    </>}
-    {showAdd&&<AddApptModal currentUser={currentUser} cases={cases} onClose={()=>setShowAdd(false)} onAdded={reload}/>}
-  </div>;
-}
-
-// ── Reminder checker hook ──
-function useApptReminder(userId,salesName){
-  const [reminderToast,setReminderToast]=useState(null);
-  const notifiedRef=useRef(new Set());
-  useEffect(()=>{
-    if(!userId)return;
-    function check(){
-      const appts=loadAppts(userId);
-      const now=Date.now();
-      appts.forEach(a=>{
-        if(a.done||!a.datetime||notifiedRef.current.has(a.id))return;
-        const ms=new Date(a.datetime).getTime()-now;
-        if(ms>0&&ms<=1800000){// within 30 min
-          notifiedRef.current.add(a.id);
-          setReminderToast({appt:a,ms});
-          setTimeout(()=>setReminderToast(null),8000);
-          try{if(Notification.permission==='granted')new Notification('📅 นัดหมายใกล้ถึงแล้ว!',{body:`${a.customerName||''} — อีก ${Math.ceil(ms/60000)} นาที`,icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png'});}catch(e){}
-        }
-      });
-    }
-    check();const t=setInterval(check,60000);return()=>clearInterval(t);
-  },[userId]);
-  return{reminderToast,closeReminder:()=>setReminderToast(null)};
-}
-
-// ============================================================
-// 🏆 DAILY RANKING BLOCK
-// ============================================================
-function DailyRankingBlock({currentUser,salesData}){
-  if(!salesData||salesData.length===0)return null;
-  const today=new Date();const yy=String(today.getFullYear()).slice(-2),mm=String(today.getMonth()+1).padStart(2,'0');const pre=yy+mm;
-
-  // Sort by sold desc, then by total cases
-  const ranked=[...salesData].sort((a,b)=>(b.sold||0)-(a.sold||0)||(b.currentCases||0)-(a.currentCases||0));
-  const myRank=ranked.findIndex(s=>s.name===currentUser.name)+1;
-  const top5=ranked.slice(0,5);
-
-  function medalStyle(i){
-    if(i===0)return{bg:'#3d2a00',color:'#ffd700',text:'🥇'};
-    if(i===1)return{bg:'#1c1c2e',color:'#c0c0c0',text:'🥈'};
-    if(i===2)return{bg:'#1a2a00',color:'#cd7f32',text:'🥉'};
-    return{bg:'var(--bg4)',color:'var(--text2)',text:String(i+1)};
-  }
-
-  return <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px',marginBottom:14}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-      <div style={{fontWeight:700,fontSize:14}}>🏆 Ranking เดือนนี้</div>
-      {myRank>0&&<div style={{fontSize:12,background:'rgba(88,166,255,.1)',color:'var(--blue)',border:'1px solid rgba(88,166,255,.25)',borderRadius:20,padding:'2px 10px',fontWeight:700}}>คุณ #{myRank}</div>}
-    </div>
-    {top5.map((s,i)=>{
-      const md=medalStyle(i);const isMe=s.name===currentUser.name;
-      return <div key={s.name} className={`rank-row${isMe?' me':''}`}>
-        <div className="rank-medal" style={{background:md.bg,color:md.color}}>{md.text}</div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:isMe?700:500,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:isMe?'var(--blue)':'var(--text)'}}>{s.name}{isMe&&' 👈'}</div>
-          <div style={{fontSize:11,color:'var(--text3)'}}>{s.currentCases||0} เคส · ปิด {s.sold||0}</div>
-        </div>
-        <div style={{textAlign:'right',flexShrink:0}}>
-          <div style={{fontSize:15,fontWeight:800,color:i===0?'var(--yellow)':i<3?'var(--orange)':'var(--text)'}}>{s.sold||0}</div>
-          <div style={{fontSize:10,color:'var(--text3)'}}>ปล่อยแล้ว</div>
-        </div>
-      </div>;
-    })}
-    {ranked.length>5&&myRank>5&&<div style={{paddingTop:8,borderTop:'1px solid var(--border)',marginTop:6}}>
-      {ranked.slice(myRank-1,myRank).map((s,i)=>{const isMe=true;const md=medalStyle(myRank-1);return <div key={s.name} className="rank-row me">
-        <div className="rank-medal" style={{background:md.bg,color:md.color}}>{myRank}</div>
-        <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:'var(--blue)'}}>{s.name} 👈</div></div>
-        <div style={{textAlign:'right'}}><div style={{fontSize:15,fontWeight:800}}>{s.sold||0}</div><div style={{fontSize:10,color:'var(--text3)'}}>ปล่อยแล้ว</div></div>
-      </div>;})}
-    </div>}
-  </div>;
-}
-
-
 function OnboardingTour({currentUser,onDone}){
   const [step,setStep]=useState(0);
   const steps=[{icon:'🎉',title:'ยินดีต้อนรับสู่ CasePool!',desc:'ระบบจัดการเคสลูกค้าที่ช่วยให้คุณทำงานเป็นระบบ',tip:null},{icon:'📊',title:'วันนี้ฉันต้องทำอะไร',desc:'หน้า "วันนี้" บอกทุกอย่างที่ต้องทำ',tip:'💡 เช็คทุกเช้าก่อนเริ่มงาน!'},{icon:'🏪',title:'ตลาดเคส',desc:'เคสจากลูกค้าที่รอคนดูแล',tip:'⚡ ใครไวได้ก่อน!'},{icon:'📋',title:'เคสของฉัน',desc:'เคสที่ได้รับมอบหมาย อัปเดตสถานะทุกวัน',tip:'⚠️ ไม่อัปเดต 3 วัน ระบบส่งตลาดอัตโนมัติ!'},{icon:'📥',title:'รับจากตลาด',desc:'เคสที่คุณรับมาเอง',tip:'🔒 ต้องรอ 24 ชม. หลังรับเคสถึงจะคืนได้'},{icon:'🧠',title:'AI แนะนำ',desc:'ใช้ AI วิเคราะห์เคสและให้คำแนะนำ',tip:'🔑 ต้องมี Anthropic API Key ใส่ครั้งเดียวจำไว้เลย'}];
@@ -1562,665 +1025,11 @@ function LoginPage({onLogin}){
   </div>;
 }
 
-// ============================================================
-// 📋 ADMIN DAILY REPORT — ดึงจาก Google Sheet
-// ============================================================
-const SHEET_ID = '19l-cEYR3M0NlhRUlBKPjgeHvQK9KBNnA1NeiQKBZRhA';
-const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
-
-function parseCSV(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 3) return [];
-  // Row 0 = title, Row 1 = headers, Row 2+ = data
-  const headers = lines[1].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-  return lines.slice(2).map(line => {
-    const vals = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
-      else cur += ch;
-    }
-    vals.push(cur.trim());
-    const row = {};
-    headers.forEach((h, i) => { row[h] = (vals[i] || '').replace(/^"|"$/g, '').trim(); });
-    return row;
-  }).filter(r => r[headers[0]] || r[headers[1]]);
-}
-
-function normalizeDate(d) {
-  if (!d) return null;
-  // Handle dd/mm/yyyy or dd/mm/yy or d/m/yyyy
-  const m = String(d).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (!m) return null;
-  let [, dd, mo, yy] = m;
-  if (yy.length === 2) yy = '25' + yy; // Buddhist year 25xx → keep as is for comparison
-  // Convert Buddhist year to CE if > 2500
-  const yr = parseInt(yy) > 2500 ? parseInt(yy) - 543 : parseInt(yy);
-  return `${yr}-${String(mo).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
-}
-
-function fmtShortDate(d) {
-  if (!d) return '';
-  const m = String(d).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (!m) return d;
-  return `${m[1]}/${m[2]}/${String(m[3]).slice(-2)}`;
-}
-
-function getPlate4(plate) {
-  if (!plate) return '';
-  const digits = String(plate).replace(/\s/g, '');
-  // Get last 4 chars
-  return digits.slice(-4);
-}
-
-function AdminDailyReport() {
-  const today = new Date();
-  const padZ = n => String(n).padStart(2,'0');
-  const todayISO = `${today.getFullYear()}-${padZ(today.getMonth()+1)}-${padZ(today.getDate())}`;
-
-  // ── Daily cache keys ──
-  const CACHE_KEY = 'cp_sheet_cache';
-  const CACHE_DATE_KEY = 'cp_sheet_cache_date';
-
-  const [rows, setRows] = useState(()=>{
-    try{
-      const cached=localStorage.getItem(CACHE_KEY);
-      const cachedDate=localStorage.getItem(CACHE_DATE_KEY);
-      if(cached&&cachedDate===todayISO) return JSON.parse(cached);
-    }catch(e){}
-    return [];
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [sheetUrl, setSheetUrl] = useState(SHEET_CSV_URL);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [headers, setHeaders] = useState(()=>{
-    try{
-      const cached=localStorage.getItem(CACHE_KEY);
-      const cachedDate=localStorage.getItem(CACHE_DATE_KEY);
-      if(cached&&cachedDate===todayISO){const p=JSON.parse(cached);return p.length?Object.keys(p[0]):[];}
-    }catch(e){}
-    return [];
-  });
-  const [tab, setTab] = useState('overview');
-  const [searchQ, setSearchQ] = useState('');
-  const [tooltip, setTooltip] = useState(null);
-  const [bankLogos, setBankLogos] = useState({});
-
-  // ── Fetch bank logos from "bank" sheet ──
-// ── Fetch bank logos from Supabase ──
-useEffect(()=>{
-    const LOGO_CACHE_KEY = 'cp_bank_logos';
-    try {
-      const cached = localStorage.getItem(LOGO_CACHE_KEY);
-      if (cached) { setBankLogos(JSON.parse(cached)); return; }
-    } catch(e) {}
-    sbQ('GET','bank_logos',{select:'name,logo_url'})
-      .then(rows => {
-        if (!rows || !rows.length) return;
-        const map = {};
-        rows.forEach(r => {
-          if (r.name && r.logo_url) map[r.name] = r.logo_url;
-        });
-        setBankLogos(map);
-        try { localStorage.setItem('cp_bank_logos', JSON.stringify(map)); } catch(e) {}
-      })
-      .catch(()=>{});
-  }, []);
-
-  // ── Match bank name to logo (exact → contains) ──
-  function getBankLogo(bankName) {
-    if (!bankName) return null;
-    // exact match
-    if (bankLogos[bankName]) return bankLogos[bankName];
-    // contains match (case-insensitive)
-    const lower = bankName.toLowerCase();
-    const key = Object.keys(bankLogos).find(k => lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower));
-    return key ? bankLogos[key] : null;
-  } // {x,y,content}
-
-  const isCachedToday = headers.length > 0 && rows.length > 0;
-
-  function getV(row, ...keys) {
-    for (const k of keys) {
-      if (row[k] !== undefined && row[k] !== '') return row[k];
-    }
-    for (const k of keys) {
-      const found = Object.keys(row).find(rk => rk.trim().toLowerCase().includes(k.trim().toLowerCase()));
-      if (found && row[found] !== undefined && row[found] !== '') return row[found];
-    }
-    return '';
-  }
-
-  // ── Normalize sales name: เพ้นท์1/เพ้นท์2 → เพ้นท์, แฟ้บ1/แฟ้บ2 → แฟ้บ ──
-  function normalizeSalesName(name) {
-    if (!name) return name;
-    // Strip trailing digits/spaces: "เพ้นท์1" → "เพ้นท์", "แฟ้บ 2" → "แฟ้บ", "พีร์1" → "พีร์"
-    return name.replace(/\s*\d+$/, '').trim();
-  }
-
-  const RELEASED_ST = ['ปล่อยรถแล้ว','ปล่อยแล้ว','ปล่อย'];
-  const APPROVED_ST = ['อนุมัติรับรถ','อนุมัติ'];
-  const isReleased = st => RELEASED_ST.some(s => st.includes(s));
-  const isApproved = st => APPROVED_ST.some(s => st.includes(s));
-
-  async function fetchSheet(force=false) {
-    // Check daily cache
-    if (!force) {
-      try {
-        const cachedDate = localStorage.getItem(CACHE_DATE_KEY);
-        if (cachedDate === todayISO && rows.length > 0) return; // already cached today
-      } catch(e) {}
-    }
-    setLoading(true); setError(''); setRows([]); setHeaders([]);
-    try {
-      const res = await fetch(sheetUrl + '&t=' + Date.now());
-      if (!res.ok) throw new Error('ดึงข้อมูลไม่ได้ — ตรวจสอบว่า Sheet เป็น Public');
-      const text = await res.text();
-      const parsed = parseCSV(text);
-      setRows(parsed);
-      if (parsed.length > 0) setHeaders(Object.keys(parsed[0]));
-      // Save to daily cache
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
-        localStorage.setItem(CACHE_DATE_KEY, todayISO);
-      } catch(e) {}
-    } catch(e) {
-      setError(e.message || 'เกิดข้อผิดพลาด — Sheet ต้องตั้งเป็น "ใครก็ดูได้"');
-    }
-    setLoading(false);
-  }
-
-  // ── Analytics ──
-  const stats = rows.length ? (() => {
-    const byStatus={}, bySales={}, byBank={}, bySource={}, byBrand={}, byMonth={}, bySourceDetail={};
-    let totalRevenue=0, totalDown=0, totalApproved=0;
-    rows.forEach(r => {
-      const st  = (getV(r,'สถานะ','status') || '').trim();
-      const sl  = normalizeSalesName((getV(r,'เซลล์','เซลส์','ชื่อเซลส์','sales','Sale','SALES') || '').trim());
-      const bk  = (getV(r,'ธนาคาร','bank','Bank') || '').trim();
-      const src = (getV(r,'แหล่งที่มา','source','Source') || '').trim();
-      const br  = (getV(r,'ยี่ห้อ','ยี่นอค','brand','Brand','make') || '').trim();
-      const price = parseFloat(String(getV(r,'ราคารถ','ราคา','price')||'0').replace(/,/g,'')) || 0;
-      const down  = parseFloat(String(getV(r,'เงินดาวน์','down')||'0').replace(/,/g,'')) || 0;
-      const appAmt= parseFloat(String(getV(r,'ยอดอนุมัติ','อนุมัติ','approved')||'0').replace(/,/g,'')) || 0;
-      const dateBook = normalizeDate(getV(r,'Date จอง','date จอง','วันที่จอง','จอง'));
-      if (dateBook) {
-        const mon = dateBook.slice(0,7);
-        if (!byMonth[mon]) byMonth[mon]={total:0,released:0,revenue:0};
-        byMonth[mon].total++;
-        if (isReleased(st)) byMonth[mon].released++;
-        byMonth[mon].revenue += price;
-      }
-      if (st) byStatus[st] = (byStatus[st]||0)+1;
-      if (sl) {
-        if(!bySales[sl]) bySales[sl]={total:0,released:0,approved:0,waiting:0,booked:0,lost:0};
-        bySales[sl].total++;
-        if (isReleased(st)) bySales[sl].released++;
-        else if (isApproved(st)) bySales[sl].approved++;
-        else if (['รอผล','รอเซ็นต์','รอเซ็น'].some(s=>st.includes(s))) bySales[sl].waiting++;
-        else if (['ปิดเคส','รีเจค','ยกเลิก'].some(s=>st.includes(s))) bySales[sl].lost++;
-        else bySales[sl].booked++; // จอง/รอข้อมูล/อื่น ๆ
-      }
-      if (bk) {
-        if(!byBank[bk]) byBank[bk]={total:0,released:0,approved:0,waiting:0,lost:0};
-        byBank[bk].total++;
-        if(isReleased(st)) byBank[bk].released++;
-        else if(isApproved(st)) byBank[bk].approved++;
-        else if(['รอผล','รอเซ็นต์','รอเซ็น'].some(s=>st.includes(s))) byBank[bk].waiting++;
-        else if(['ปิดเคส','รีเจค','ยกเลิก'].some(s=>st.includes(s))) byBank[bk].lost++;
-      }
-      if (src) {
-        bySource[src] = (bySource[src]||0)+1;
-        if (!bySourceDetail[src]) bySourceDetail[src]={total:0,released:0,approved:0,waiting:0,lost:0};
-        bySourceDetail[src].total++;
-        if (isReleased(st)) bySourceDetail[src].released++;
-        else if (isApproved(st)) bySourceDetail[src].approved++;
-        else if (['รอผล','รอเซ็นต์'].some(s=>st.includes(s))) bySourceDetail[src].waiting++;
-        else if (['ปิดเคส','รีเจค','ยกเลิก'].some(s=>st.includes(s))) bySourceDetail[src].lost++;
-      }
-      if (br) byBrand[br] = (byBrand[br]||0)+1;
-      totalRevenue += price; totalDown += down; totalApproved += appAmt;
-    });
-    // avg days: booking → release
-    let totalDays=0, cntDays=0;
-    rows.forEach(r=>{
-      const d1=getV(r,'Date จอง','date จอง','วันที่จอง');
-      const d2=getV(r,'Date วันปล่อย','date วันปล่อย','วันปล่อย','ปล่อย');
-      const n1=normalizeDate(d1), n2=normalizeDate(d2);
-      if(n1&&n2){const diff=(new Date(n2)-new Date(n1))/86400000;if(diff>=0&&diff<365){totalDays+=diff;cntDays++;}}
-    });
-    return { byStatus, bySales, byBank, bySource, bySourceDetail, byBrand, byMonth,
-      totalRevenue, totalDown, totalApproved,
-      avgDays: cntDays>0?Math.round(totalDays/cntDays):null, total:rows.length };
-  })() : null;
-
-  const filteredRows = rows.filter(r => {
-    if (!searchQ) return true;
-    return Object.values(r).some(v => String(v).toLowerCase().includes(searchQ.toLowerCase()));
-  });
-
-  const TABS = [['overview','📊 ภาพรวม'],['sales','👤 รายเซลส์'],['bank','🏦 ธนาคาร'],['source','📌 แหล่งที่มา'],['brand','🚗 ยี่ห้อ'],['table','🗂 ตารางข้อมูล']];
-
-  const fmt = n => n ? Number(n).toLocaleString() : '0';
-
-  return <div className="page">
-    <div className="page-hd">
-      <div><div className="page-title">📊 Sheet Analyzer</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>วิเคราะห์ข้อมูลจาก Google Sheet</div></div>
-      <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setShowUrlInput(v=>!v)}>⚙️ Sheet URL</button>
-    </div>
-
-    {showUrlInput && <div className="card" style={{marginBottom:14}}>
-      <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🔗 Google Sheet CSV URL</div>
-      <div style={{display:'flex',gap:8}}>
-        <input value={sheetUrl} onChange={e=>setSheetUrl(e.target.value)} style={{flex:1,fontSize:12}} placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0"/>
-        <button className="btn btn-primary" style={{fontSize:12,whiteSpace:'nowrap'}} onClick={()=>{setShowUrlInput(false);fetchSheet();}}>บันทึก</button>
-      </div>
-      <div style={{fontSize:11,color:'var(--text3)',marginTop:6}}>⚠️ Sheet ต้องตั้งเป็น "ใครก็ดูได้ที่มีลิงก์" ก่อนครับ</div>
-    </div>}
-
-    <div style={{display:'flex',gap:8,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
-      <button className="btn btn-primary" style={{flex:1,padding:'12px',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8}} onClick={()=>fetchSheet(false)} disabled={loading}>
-        {loading ? <><span className="spin" style={{width:18,height:18}}/> กำลังดึงข้อมูล...</> : isCachedToday ? '✅ ข้อมูลวันนี้พร้อมแล้ว' : '🔄 ดึงข้อมูลจาก Google Sheet'}
-      </button>
-      {isCachedToday && <button className="btn btn-ghost" style={{fontSize:12,padding:'9px 14px',whiteSpace:'nowrap'}} onClick={()=>fetchSheet(true)} disabled={loading}>🔄 รีเฟรช</button>}
-    </div>
-    {isCachedToday && !loading && <div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginBottom:10,marginTop:-8}}>📦 ใช้ข้อมูลจาก cache วันนี้ — กด รีเฟรช ถ้าต้องการดึงใหม่</div>}
-
-    {error && <div style={{background:'rgba(248,81,73,.1)',border:'1px solid var(--red)',borderRadius:8,padding:'12px 16px',marginBottom:14,fontSize:13,color:'var(--red)'}}>{error}</div>}
-
-    {rows.length > 0 && stats && <>
-      {/* KPI strip */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:8,marginBottom:14}}>
-        {[
-          ['📄 ทั้งหมด', stats.total, 'var(--text)'],
-          ['🚗 ปล่อยรถแล้ว', Object.entries(stats.byStatus).filter(([k])=>isReleased(k)).reduce((s,[,v])=>s+v,0), 'var(--green)'],
-          ['✅ อนุมัติรับรถ', Object.entries(stats.byStatus).filter(([k])=>isApproved(k)&&!isReleased(k)).reduce((s,[,v])=>s+v,0), '#00bcd4'],
-          ['⏳ รอผล', stats.byStatus['รอผล']||0, 'var(--purple)'],
-          ['📋 จอง', stats.byStatus['จอง']||0, 'var(--blue)'],
-          ['❌ ปิดเคส', stats.byStatus['ปิดเคส']||0, 'var(--red)'],
-          stats.avgDays!=null ? ['⏱ เฉลี่ยจอง→ปล่อย', stats.avgDays+' วัน', 'var(--orange)'] : null,
-        ].filter(Boolean).map(([l,v,c])=><div key={l} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center'}}>
-          <div style={{fontSize:18,fontWeight:800,color:c}}>{v}</div>
-          <div style={{fontSize:10,color:'var(--text3)',marginTop:3,lineHeight:1.3}}>{l}</div>
-        </div>)}
-      </div>
-
-      {/* Tabs */}
-      <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto',paddingBottom:4}}>
-        {TABS.map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{padding:'6px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)'}}>{l}</button>)}
-      </div>
-
-      {/* Overview */}
-      {tab==='overview' && <div style={{display:'grid',gap:14}}>
-        {/* Status breakdown */}
-        <div className="card">
-          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📋 สถานะทั้งหมด</div>
-          {Object.entries(stats.byStatus).sort((a,b)=>b[1]-a[1]).map(([st,cnt])=>{
-            const pct=Math.round(cnt/stats.total*100);
-            return <div key={st} style={{marginBottom:10}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                <StatusBadge status={st}/>
-                <span style={{fontSize:13,fontWeight:700}}>{cnt} <span style={{fontSize:11,color:'var(--text3)'}}>({pct}%)</span></span>
-              </div>
-              <div style={{height:7,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}>
-                <div style={{height:'100%',borderRadius:4,background:'var(--blue)',width:`${pct}%`,transition:'width .4s'}}/>
-              </div>
-            </div>;
-          })}
-        </div>
-
-        {/* Monthly trend */}
-        {Object.keys(stats.byMonth).length > 0 && <div className="card">
-          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📈 Trend รายเดือน (จากวันที่จอง)</div>
-          {Object.entries(stats.byMonth).sort((a,b)=>a[0].localeCompare(b[0])).slice(-6).map(([mon,d])=>{
-            const [y,m] = mon.split('-');
-            const yr = parseInt(y); // already CE from normalizeDate
-            const label = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(m)-1]+' '+(yr+543).toString().slice(-2);
-            const wr = d.total>0?Math.round(d.released/d.total*100):0;
-            const maxBar = Math.max(...Object.values(stats.byMonth).map(x=>x.total),1);
-            return <div key={mon} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-              <div style={{fontSize:12,color:'var(--text2)',width:56,flexShrink:0}}>{label}</div>
-              <div style={{flex:1,height:24,background:'var(--bg3)',borderRadius:5,overflow:'hidden',position:'relative'}}>
-                <div style={{height:'100%',width:`${Math.round(d.total/maxBar*100)}%`,background:'rgba(88,166,255,.4)',borderRadius:5}}/>
-                <div style={{position:'absolute',inset:0,height:'100%',width:`${Math.round(d.released/maxBar*100)}%`,background:'rgba(63,185,80,.7)',borderRadius:5}}/>
-                <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',paddingLeft:8,fontSize:11,fontWeight:700,color:'var(--text)'}}>
-                  จอง {d.total} · ปล่อย {d.released} · <span style={{color:wr>=50?'var(--green)':'var(--yellow)',marginLeft:4}}>{wr}%</span>
-                </div>
-              </div>
-            </div>;
-          })}
-          <div style={{display:'flex',gap:12,marginTop:8,fontSize:11,color:'var(--text3)'}}>
-            <span><span style={{display:'inline-block',width:12,height:8,background:'rgba(88,166,255,.4)',borderRadius:2,marginRight:4}}/>จอง</span>
-            <span><span style={{display:'inline-block',width:12,height:8,background:'rgba(63,185,80,.7)',borderRadius:2,marginRight:4}}/>ปล่อยรถแล้ว</span>
-          </div>
-        </div>}
-      </div>}
-
-      {/* Sales tab */}
-      {tab==='sales' && <div style={{display:'grid',gap:10}}>
-        {/* Elegant Tooltip */}
-        {tooltip && <div style={{position:'fixed',left:Math.min(tooltip.x+16,window.innerWidth-240),top:tooltip.y-10,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'12px 16px',zIndex:9000,pointerEvents:'none',boxShadow:'0 16px 40px rgba(0,0,0,.6)',minWidth:210,fontSize:12}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:8,paddingBottom:6,borderBottom:'1px solid var(--border)',color:'var(--text)'}}>{tooltip.src}</div>
-          {tooltip.lines.map((l,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-            <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:8,height:8,borderRadius:50,background:l.color,flexShrink:0}}/><span style={{color:'var(--text2)'}}>{l.label}</span></div>
-            <span style={{fontWeight:700,color:l.color}}>{l.val} <span style={{fontWeight:400,color:'var(--text3)'}}>({l.pct}%)</span></span>
-          </div>)}
-          <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between'}}>
-            <span style={{color:'var(--text3)',fontSize:11}}>ทั้งหมด {tooltip.total} คัน</span>
-            <span style={{fontWeight:700,fontSize:12,color:tooltip.wr>=50?'#3fb950':tooltip.wr>=25?'#d29922':'#f85149'}}>Win {tooltip.wr}%</span>
-          </div>
-        </div>}
-
-        {Object.keys(stats.bySales).length === 0
-          ? <div className="card" style={{textAlign:'center',padding:'28px 20px',color:'var(--text2)'}}>
-              <div style={{fontSize:32,marginBottom:8}}>🔍</div>
-              <div style={{fontWeight:600,marginBottom:6}}>ไม่พบข้อมูลเซลส์</div>
-              <div style={{fontSize:12,color:'var(--text3)',marginBottom:12}}>คอลัมน์ที่พบใน Sheet:</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center'}}>
-                {headers.map(h=><span key={h} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:20,padding:'2px 10px',fontSize:11}}>{h}</span>)}
-              </div>
-            </div>
-          : <>
-            {/* Legend */}
-            <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:2}}>
-              {[['#3fb950','ปล่อยรถแล้ว'],['#00bcd4','อนุมัติ'],['#d29922','รอผล'],['#f85149','ปิดเคส'],['#484f58','จอง/อื่น ๆ']].map(([c,l])=>
-                <div key={l} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--text3)'}}>
-                  <div style={{width:8,height:8,borderRadius:'50%',background:c}}/>{l}
-                </div>)}
-            </div>
-            {Object.entries(stats.bySales).sort((a,b)=>b[1].released-a[1].released).map(([name,d],i)=>{
-              const total=d.total||1;
-              const pR=Math.round(d.released/total*100);
-              const pA=Math.round(d.approved/total*100);
-              const pW=Math.round(d.waiting/total*100);
-              const pL=Math.round(d.lost/total*100);
-              const pO=Math.max(0,100-pR-pA-pW-pL);
-              const wr=Math.round(d.released/total*100);
-              const medals=['🥇','🥈','🥉'];
-
-              function showSalesTooltip(e){setTooltip({x:e.clientX,y:e.clientY,src:name,total:d.total,wr,lines:[
-                {label:'ปล่อยรถแล้ว',val:d.released,pct:pR,color:'#3fb950'},
-                {label:'อนุมัติรับรถ',val:d.approved,pct:pA,color:'#00bcd4'},
-                {label:'รอผล/รอเซ็น',val:d.waiting,pct:pW,color:'#d29922'},
-                {label:'ปิดเคส',val:d.lost,pct:pL,color:'#f85149'},
-                {label:'จอง/อื่น ๆ',val:d.booked,pct:pO,color:'#484f58'},
-              ].filter(l=>l.val>0)});}
-
-              return <div key={name} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px',transition:'border-color .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor='rgba(88,166,255,.35)'}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';setTooltip(null);}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-                  <div style={{width:26,height:26,borderRadius:'50%',background:i===0?'#3d2a00':i===1?'#1c1c2e':i===2?'#1a2a00':'var(--bg3)',color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>
-                    {i<3?medals[i]:i+1}
-                  </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:700,fontSize:14}}>{name}</div>
-                    <div style={{fontSize:11,color:'var(--text3)',marginTop:1}}>
-                      {[d.released&&`✅ ${d.released}`,d.approved&&`🔵 ${d.approved}`,d.waiting&&`⏳ ${d.waiting}`,d.lost&&`❌ ${d.lost}`,d.booked&&`📋 ${d.booked}`].filter(Boolean).join('  ·  ')}
-                    </div>
-                  </div>
-                  <div style={{textAlign:'right',flexShrink:0}}>
-                    <div style={{fontSize:17,fontWeight:800,color:wr>=60?'#3fb950':wr>=30?'#d29922':'#f85149',lineHeight:1}}>{wr}%</div>
-                    <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>Win Rate</div>
-                  </div>
-                </div>
-                {/* Slim stacked bar */}
-                <div style={{height:6,borderRadius:99,overflow:'hidden',display:'flex',background:'var(--bg3)'}}
-                  onMouseMove={showSalesTooltip}>
-                  {pR>0&&<div style={{width:`${pR}%`,background:'#3fb950',transition:'width .5s'}}/>}
-                  {pA>0&&<div style={{width:`${pA}%`,background:'#00bcd4',transition:'width .5s'}}/>}
-                  {pW>0&&<div style={{width:`${pW}%`,background:'#d29922',transition:'width .5s'}}/>}
-                  {pL>0&&<div style={{width:`${pL}%`,background:'#f85149',transition:'width .5s'}}/>}
-                  {pO>0&&<div style={{width:`${pO}%`,background:'#484f58',transition:'width .5s'}}/>}
-                </div>
-              </div>;
-            })}
-          </>}
-      </div>}
-
-      {/* Bank tab */}
-      {tab==='bank' && <div style={{display:'grid',gap:10}}>
-        {/* Elegant Tooltip */}
-        {tooltip && <div style={{position:'fixed',left:Math.min(tooltip.x+16,window.innerWidth-240),top:tooltip.y-10,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'12px 16px',zIndex:9000,pointerEvents:'none',boxShadow:'0 16px 40px rgba(0,0,0,.6)',minWidth:210,fontSize:12,backdropFilter:'blur(8px)'}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:8,paddingBottom:6,borderBottom:'1px solid var(--border)',color:'var(--text)',display:'flex',alignItems:'center',gap:8}}>
-            {getBankLogo(tooltip.src)&&<img src={getBankLogo(tooltip.src)} alt="" style={{width:20,height:20,objectFit:'contain',background:'#fff',borderRadius:4,padding:1}} onError={e=>e.target.style.display='none'}/>}
-            {tooltip.src}
-          </div>
-          {tooltip.lines.map((l,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-            <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:8,height:8,borderRadius:50,background:l.color,flexShrink:0}}/><span style={{color:'var(--text2)'}}>{l.label}</span></div>
-            <span style={{fontWeight:700,color:l.color}}>{l.val} <span style={{fontWeight:400,color:'var(--text3)'}}>({l.pct}%)</span></span>
-          </div>)}
-          <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between'}}>
-            <span style={{color:'var(--text3)',fontSize:11}}>ทั้งหมด {tooltip.total} เคส</span>
-            <span style={{fontWeight:700,fontSize:12,color:tooltip.wr>=50?'#3fb950':tooltip.wr>=25?'#d29922':'#f85149'}}>Win {tooltip.wr}%</span>
-          </div>
-        </div>}
-
-        {/* Legend pill row */}
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:4}}>
-          {[['#3fb950','ปล่อยรถแล้ว'],['#00bcd4','อนุมัติ'],['#d29922','รอผล'],['#f85149','ปิดเคส'],['#484f58','อื่น ๆ']].map(([c,l])=>
-            <div key={l} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--text3)'}}>
-              <div style={{width:8,height:8,borderRadius:'50%',background:c}}/>{l}
-            </div>)}
-        </div>
-
-        {Object.entries(stats.byBank).sort((a,b)=>b[1].total-a[1].total).map(([bk,d])=>{
-          const total=d.total||1;
-          const pR=Math.round(d.released/total*100);
-          const pA=Math.round(d.approved/total*100);
-          const pW=Math.round(d.waiting/total*100);
-          const pL=Math.round(d.lost/total*100);
-          const pO=Math.max(0,100-pR-pA-pW-pL);
-          const other=d.total-d.released-d.approved-d.waiting-d.lost;
-          const wr=Math.round(d.released/total*100);
-          const logo=getBankLogo(bk);
-
-          function showBankTip(e){setTooltip({x:e.clientX,y:e.clientY,src:bk,total:d.total,wr,lines:[
-            {label:'ปล่อยรถแล้ว',val:d.released,pct:pR,color:'#3fb950'},
-            {label:'อนุมัติรับรถ',val:d.approved,pct:pA,color:'#00bcd4'},
-            {label:'รอผล/รอเซ็น',val:d.waiting,pct:pW,color:'#d29922'},
-            {label:'ปิดเคส',val:d.lost,pct:pL,color:'#f85149'},
-            {label:'อื่น ๆ',val:other,pct:pO,color:'#484f58'},
-          ].filter(l=>l.val>0)});}
-
-          return <div key={bk} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px',cursor:'default',transition:'border-color .15s'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor='rgba(88,166,255,.35)'}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';setTooltip(null);}}>
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
-              {/* Bank logo */}
-              <div style={{width:38,height:38,borderRadius:8,background:'#fff',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,padding:2}}>
-                {logo
-                  ? <img src={logo} alt={bk} style={{width:'100%',height:'100%',objectFit:'contain'}}
-                      onError={e=>{e.target.style.display='none';}}/>
-                  : <span style={{fontSize:11,fontWeight:800,color:'var(--text3)'}}>{bk.slice(0,3)}</span>}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:14,letterSpacing:'-.2px'}}>{bk}</div>
-                <div style={{fontSize:11,color:'var(--text3)',marginTop:1}}>
-                  {[d.released&&`✅ ${d.released}`,d.approved&&`🔵 ${d.approved}`,d.waiting&&`⏳ ${d.waiting}`,d.lost&&`❌ ${d.lost}`].filter(Boolean).join('  ·  ')}
-                </div>
-              </div>
-              <div style={{textAlign:'right',flexShrink:0}}>
-                <div style={{fontSize:16,fontWeight:800,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149',lineHeight:1}}>{d.total}</div>
-                <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>เคส</div>
-              </div>
-            </div>
-            {/* Slim stacked bar */}
-            <div style={{height:6,borderRadius:99,overflow:'hidden',display:'flex',background:'var(--bg3)'}}
-              onMouseMove={showBankTip}>
-              {pR>0&&<div style={{width:`${pR}%`,background:'#3fb950',transition:'width .5s'}}/>}
-              {pA>0&&<div style={{width:`${pA}%`,background:'#00bcd4',transition:'width .5s'}}/>}
-              {pW>0&&<div style={{width:`${pW}%`,background:'#d29922',transition:'width .5s'}}/>}
-              {pL>0&&<div style={{width:`${pL}%`,background:'#f85149',transition:'width .5s'}}/>}
-              {pO>0&&<div style={{width:`${pO}%`,background:'#484f58',transition:'width .5s'}}/>}
-            </div>
-            {/* Percentage labels */}
-            <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
-              <span style={{fontSize:10,color:'#3fb950',fontWeight:600}}>{pR>0?`${pR}% จบ`:''}</span>
-              <span style={{fontSize:10,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149',fontWeight:700}}>Win Rate {wr}%</span>
-            </div>
-          </div>;
-        })}
-      </div>}
-
-      {/* Source tab — Stacked funnel */}
-      {tab==='source' && <div style={{display:'grid',gap:14}}>
-        {/* Tooltip overlay */}
-        {tooltip && <div style={{position:'fixed',left:tooltip.x+12,top:tooltip.y-8,background:'rgba(13,17,23,.96)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 14px',zIndex:9000,pointerEvents:'none',boxShadow:'0 8px 24px rgba(0,0,0,.5)',minWidth:180,fontSize:12}}>
-          <div style={{fontWeight:700,marginBottom:6,fontSize:13,color:'var(--text)'}}>{tooltip.src}</div>
-          {tooltip.lines.map((l,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-            <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:8,height:8,borderRadius:50,background:l.color,flexShrink:0}}/><span style={{color:'var(--text2)'}}>{l.label}</span></div>
-            <span style={{fontWeight:700,color:l.color}}>{l.val} <span style={{fontWeight:400,color:'var(--text3)'}}>({l.pct}%)</span></span>
-          </div>)}
-          <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between'}}>
-            <span style={{color:'var(--text3)',fontSize:11}}>ทั้งหมด {tooltip.total} คัน</span>
-            <span style={{fontWeight:700,fontSize:12,color:tooltip.wr>=50?'#3fb950':tooltip.wr>=25?'#d29922':'#f85149'}}>Win {tooltip.wr}%</span>
-          </div>
-        </div>}
-
-        <div style={{display:'grid',gap:10}}>
-          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:2}}>
-            {[['#3fb950','ปล่อยรถแล้ว'],['#00bcd4','อนุมัติ'],['#d29922','รอผล'],['#f85149','ปิดเคส'],['#484f58','อื่น ๆ']].map(([c,l])=>
-              <div key={l} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--text3)'}}>
-                <div style={{width:8,height:8,borderRadius:'50%',background:c}}/>{l}
-              </div>)}
-          </div>
-          {Object.entries(stats.bySourceDetail).sort((a,b)=>b[1].total-a[1].total).map(([src,d])=>{
-            const total = d.total || 1;
-            const pReleased = Math.round(d.released/total*100);
-            const pApproved = Math.round(d.approved/total*100);
-            const pWaiting  = Math.round(d.waiting/total*100);
-            const pLost     = Math.round(d.lost/total*100);
-            const pOther    = Math.max(0, 100-pReleased-pApproved-pWaiting-pLost);
-            const wr = Math.round(d.released/total*100);
-            const other = d.total-d.released-d.approved-d.waiting-d.lost;
-
-            function showTip(e) {
-              setTooltip({
-                x: e.clientX, y: e.clientY, src, total: d.total, wr,
-                lines:[
-                  {label:'ปล่อยรถแล้ว',val:d.released,pct:pReleased,color:'#3fb950'},
-                  {label:'อนุมัติรับรถ',val:d.approved,pct:pApproved,color:'#00bcd4'},
-                  {label:'รอผล/รอเซ็น',val:d.waiting,pct:pWaiting,color:'#d29922'},
-                  {label:'ปิดเคส',val:d.lost,pct:pLost,color:'#f85149'},
-                  {label:'อื่น ๆ',val:other,pct:pOther,color:'#484f58'},
-                ].filter(l=>l.val>0)
-              });
-            }
-
-            return <div key={src} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px',transition:'border-color .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor='rgba(88,166,255,.35)'}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';setTooltip(null);}}>
-              <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:14}}>{src}</div>
-                  <div style={{fontSize:11,color:'var(--text3)',marginTop:1}}>
-                    {[d.released&&`✅ ${d.released}`,d.approved&&`🔵 ${d.approved}`,d.waiting&&`⏳ ${d.waiting}`,d.lost&&`❌ ${d.lost}`].filter(Boolean).join('  ·  ')}
-                  </div>
-                </div>
-                <div style={{textAlign:'right',flexShrink:0}}>
-                  <div style={{fontSize:16,fontWeight:800,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149',lineHeight:1}}>{d.total}</div>
-                  <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>คัน</div>
-                </div>
-              </div>
-              <div style={{height:6,borderRadius:99,overflow:'hidden',display:'flex',background:'var(--bg3)'}}
-                onMouseMove={showTip}>
-                {pReleased>0&&<div style={{width:`${pReleased}%`,background:'#3fb950',transition:'width .5s'}}/>}
-                {pApproved>0&&<div style={{width:`${pApproved}%`,background:'#00bcd4',transition:'width .5s'}}/>}
-                {pWaiting>0&&<div style={{width:`${pWaiting}%`,background:'#d29922',transition:'width .5s'}}/>}
-                {pLost>0&&<div style={{width:`${pLost}%`,background:'#f85149',transition:'width .5s'}}/>}
-                {pOther>0&&<div style={{width:`${pOther}%`,background:'#484f58',transition:'width .5s'}}/>}
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
-                <span style={{fontSize:10,color:'#3fb950'}}>{pReleased>0?`${pReleased}% ปล่อย`:''}</span>
-                <span style={{fontSize:10,fontWeight:700,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149'}}>Win {wr}%</span>
-              </div>
-            </div>;
-          })}
-        </div>
-
-        {/* Conversion summary table */}
-        <div className="card">
-          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>🎯 Conversion Rate ตามแหล่งที่มา</div>
-          <div className="table-wrap"><table><thead><tr>
-            <th>แหล่งที่มา</th><th style={{textAlign:'right'}}>จอง</th><th style={{textAlign:'right'}}>ปล่อย</th><th style={{textAlign:'right'}}>Win Rate</th>
-          </tr></thead><tbody>
-            {Object.entries(stats.bySourceDetail).sort((a,b)=>b[1].released-a[1].released).map(([src,d])=>{
-              const wr = d.total>0?Math.round(d.released/d.total*100):0;
-              return <tr key={src}>
-                <td style={{fontWeight:600}}>{src}</td>
-                <td style={{textAlign:'right'}}>{d.total}</td>
-                <td style={{textAlign:'right',color:'var(--green)',fontWeight:700}}>{d.released}</td>
-                <td style={{textAlign:'right'}}>
-                  <span style={{fontWeight:800,color:wr>=50?'var(--green)':wr>=25?'var(--yellow)':'var(--red)'}}>{wr}%</span>
-                </td>
-              </tr>;
-            })}
-          </tbody></table></div>
-        </div>
-      </div>}
-
-      {/* Brand tab */}
-      {tab==='brand' && <div className="card">
-        <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>🚗 ยี่ห้อรถที่ขายบ่อย</div>
-        {Object.entries(stats.byBrand).sort((a,b)=>b[1]-a[1]).map(([br,cnt])=>{
-          const pct=Math.round(cnt/(Object.values(stats.byBrand).reduce((a,b)=>a+b,0))*100);
-          return <div key={br} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:600,width:80,flexShrink:0}}>{br}</div>
-            <div style={{flex:1,height:26,background:'var(--bg3)',borderRadius:6,overflow:'hidden',position:'relative'}}>
-              <div style={{height:'100%',background:'rgba(63,185,80,.6)',width:`${pct}%`,borderRadius:6}}/>
-              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',paddingLeft:10,fontSize:12,fontWeight:700}}>{cnt} คัน ({pct}%)</div>
-            </div>
-          </div>;
-        })}
-      </div>}
-
-      {/* Table tab */}
-      {tab==='table' && <div className="card" style={{padding:0}}>
-        <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',gap:10,alignItems:'center'}}>
-          <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 ค้นหาในตาราง..." style={{flex:1,fontSize:13}}/>
-          <span style={{fontSize:12,color:'var(--text3)',flexShrink:0}}>{filteredRows.length} แถว</span>
-        </div>
-        <div className="table-wrap" style={{maxHeight:500,overflowY:'auto'}}>
-          <table>
-            <thead><tr>
-              <th>ยี่ห้อ</th><th>รุ่น</th><th>ทะเบียน</th><th>สี</th><th>เซลส์</th><th>แหล่งที่มา</th><th>ธนาคาร</th><th>สถานะ</th><th>วันจอง</th>
-            </tr></thead>
-            <tbody>
-              {filteredRows.slice(0,100).map((r,i)=><tr key={i}>
-                <td style={{fontWeight:600}}>{getV(r,'ยี่ห้อ','brand')}</td>
-                <td>{getV(r,'รุ่นรถ','รุ่น')}</td>
-                <td style={{color:'var(--blue)',fontWeight:600}}>{getV(r,'ทะเบียน','plate')}</td>
-                <td style={{fontSize:12,color:'var(--text2)'}}>{getV(r,'สีรถ','สี')}</td>
-                <td style={{color:'var(--purple)'}}>{getV(r,'เซลล์','เซลส์','sales')}</td>
-                <td style={{fontSize:12}}>{getV(r,'แหล่งที่มา','source')}</td>
-                <td style={{fontSize:12}}>{getV(r,'ธนาคาร','bank')}</td>
-                <td><StatusBadge status={getV(r,'สถานะ','status')}/></td>
-                <td style={{fontSize:11,color:'var(--text3)'}}>{getV(r,'date จอง','Date จอง')}</td>
-              </tr>)}
-            </tbody>
-          </table>
-          {filteredRows.length > 100 && <div style={{padding:'8px 16px',fontSize:12,color:'var(--text3)',textAlign:'center'}}>แสดง 100 แถวแรก / {filteredRows.length} แถว</div>}
-        </div>
-      </div>}
-    </>}
-
-    {!rows.length && !loading && !error && <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text2)'}}>
-      <div style={{fontSize:52,marginBottom:16}}>📊</div>
-      <div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ยังไม่มีข้อมูล</div>
-      <div style={{fontSize:13,color:'var(--text3)',lineHeight:1.8}}>กด "ดึงข้อมูลจาก Google Sheet"<br/>เพื่อดูการวิเคราะห์ข้อมูลทั้งหมดครับ</div>
-    </div>}
-  </div>;
-}
-
 function AdminApp({currentUser,onLogout}){
   const [page,setPage]=useState('cases');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);
   useEffect(()=>{api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});api('getNotifications',{sales:'admin'}).then(r=>{if(r.success){const u=r.data.filter(n=>n['สถานะ']==='unread');setNotifCount(u.length);}});},[]);
-  const pages={cases:<AdminCurrentCases currentUser={currentUser} users={users}/>,market:<AdminMarket currentUser={currentUser} users={users}/>,dashboard:<AdminDashboard currentUser={currentUser}/>,bookings:<AdminBookings currentUser={currentUser} users={users}/>,users:<AdminUsers currentUser={currentUser}/>,ai:<AdminAIPage currentUser={currentUser}/>,report:<AdminDailyReport/>};
-  const navItems=[{key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},{key:'market',icon:<Ico.market/>,label:'ตลาดเคส'},{key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},{key:'bookings',icon:<Ico.book/>,label:'การจอง'},{key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},{key:'ai',icon:<Ico.ai/>,label:'AI Admin'},{key:'report',icon:<Ico.report/>,label:'Daily Report'}];
+  const pages={cases:<AdminCurrentCases currentUser={currentUser} users={users}/>,market:<AdminMarket currentUser={currentUser} users={users}/>,dashboard:<AdminDashboard currentUser={currentUser}/>,bookings:<AdminBookings currentUser={currentUser} users={users}/>,users:<AdminUsers currentUser={currentUser}/>,ai:<AdminAIPage currentUser={currentUser}/>};
+  const navItems=[{key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},{key:'market',icon:<Ico.market/>,label:'ตลาดเคส'},{key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},{key:'bookings',icon:<Ico.book/>,label:'การจอง'},{key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},{key:'ai',icon:<Ico.ai/>,label:'AI Admin'}];
   return <div>
     <div className="sidebar"><div className="sidebar-logo"><div style={{fontWeight:800,fontSize:18,color:'var(--blue)'}}>🚗 CasePool</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Admin Panel</div></div><nav className="sidebar-nav">{navItems.map(n=><div key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)}>{n.icon}<span>{n.label}</span></div>)}</nav>
     <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{width:36,height:36,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{currentUser.avatar?<img src={currentUser.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div><div><div style={{fontWeight:600,fontSize:13}}>{currentUser.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Admin</div></div></div><div style={{display:'flex',gap:6}}><button className="btn btn-ghost" style={{flex:1,fontSize:12,position:'relative'}} onClick={()=>setShowNotif(!showNotif)}><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:2,right:4,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button><button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={()=>toggleTheme()} title="เปลี่ยนธีม">🌓</button><button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={onLogout}><Ico.logout/></button></div></div></div>
