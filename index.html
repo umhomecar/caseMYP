@@ -637,14 +637,80 @@ function BookingDetailModal({booking,onClose,onUpdated}){
 }
 
 function AdminUsers({currentUser}){
-  const [users,setUsers]=useState([]);const [loading,setLoading]=useState(true);const [showAdd,setShowAdd]=useState(false);const [form,setForm]=useState({username:'',password:'1234',name:'',role:'Sales'});const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const load=()=>{setLoading(true);api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);setLoading(false);});};useEffect(()=>{load();},[]);
+  const [users,setUsers]=useState([]);const [loading,setLoading]=useState(true);
+  const [showAdd,setShowAdd]=useState(false);
+  const [editUser,setEditUser]=useState(null); // user object being edited
+  const [form,setForm]=useState({username:'',password:'1234',name:'',role:'Sales'});
+  const [editForm,setEditForm]=useState({name:'',password:'',status:'active',role:'Sales'});
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const setE=(k,v)=>setEditForm(f=>({...f,[k]:v}));
+  const load=()=>{setLoading(true);api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);setLoading(false);});};
+  useEffect(()=>{load();},[]);
   async function addUser(){if(!form.username||!form.name)return alert('กรอกชื่อและ username');await api('addUser',form);load();setShowAdd(false);setForm({username:'',password:'1234',name:'',role:'Sales'});}
+  function openEdit(u){setEditUser(u);setEditForm({name:u.name,password:'',status:u.status,role:u.role});}
+  async function saveEdit(){
+    if(!editForm.name)return alert('กรุณากรอกชื่อ');
+    setSaving(true);
+    const upd={name:editForm.name,status:editForm.status,role:editForm.role};
+    if(editForm.password.trim())upd.password=editForm.password.trim();
+    await api('updateUser',{userId:editUser.userId,...upd});
+    setSaving(false);setEditUser(null);load();
+  }
+  async function toggleStatus(u){
+    const newStatus=u.status==='active'?'inactive':'active';
+    await api('updateUser',{userId:u.userId,status:newStatus});
+    load();
+  }
   return <div className="page">
     <div className="page-hd"><div className="page-title">👥 จัดการผู้ใช้</div><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มผู้ใช้</button></div>
-    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>ID</th><th>Username</th><th>ชื่อ</th><th>Role</th><th>สถานะ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={5}/>:users.map((u,i)=><tr key={i}><td style={{fontSize:12,color:'var(--text2)'}}>{u.userId}</td><td style={{fontWeight:600}}>{u.username}</td><td>{u.name}</td><td><span className={`badge ${u.role==='Admin'?'s-approve':'s-book'}`}>{u.role}</span></td><td><span className={`badge ${u.status==='active'?'s-go':'s-reject'}`}>{u.status}</span></td></tr>)}</tbody></table></div></div>
-    {showAdd&&<Modal title="เพิ่มผู้ใช้ใหม่" onClose={()=>setShowAdd(false)} footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={addUser}>บันทึก</button></>}>
-      <div style={{display:'grid',gap:12}}><div className="form-group"><label>Username</label><input value={form.username} onChange={e=>set('username',e.target.value)}/></div><div className="form-group"><label>รหัสผ่าน</label><input value={form.password} onChange={e=>set('password',e.target.value)}/></div><div className="form-group"><label>ชื่อที่แสดง</label><input value={form.name} onChange={e=>set('name',e.target.value)}/></div><div className="form-group"><label>Role</label><select value={form.role} onChange={e=>set('role',e.target.value)}><option>Sales</option><option>Admin</option></select></div></div>
+    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>ID</th><th>Username</th><th>ชื่อ</th><th>Role</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:users.map((u,i)=><tr key={i}>
+      <td style={{fontSize:12,color:'var(--text2)'}}>{u.userId}</td>
+      <td style={{fontWeight:600}}>{u.username}</td>
+      <td>{u.name}</td>
+      <td><span className={`badge ${u.role==='Admin'?'s-approve':'s-book'}`}>{u.role}</span></td>
+      <td><span className={`badge ${u.status==='active'?'s-go':'s-reject'}`}>{u.status}</span></td>
+      <td><div style={{display:'flex',gap:6'}}>
+        <button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>openEdit(u)}>✏️ แก้ไข</button>
+        {u.userId!==currentUser.userId&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px',color:u.status==='active'?'var(--red)':'var(--green)'}} onClick={()=>toggleStatus(u)}>{u.status==='active'?'🔒 ปิด':'🔓 เปิด'}</button>}
+      </div></td>
+    </tr>)}</tbody></table></div></div>
+
+    {/* Add User Modal */}
+    {showAdd&&<Modal title="➕ เพิ่มผู้ใช้ใหม่" onClose={()=>setShowAdd(false)} footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={addUser}>บันทึก</button></>}>
+      <div style={{display:'grid',gap:12}}>
+        <div className="form-group"><label>Username</label><input value={form.username} onChange={e=>set('username',e.target.value)} placeholder="ตัวอักษรภาษาอังกฤษ"/></div>
+        <div className="form-group"><label>รหัสผ่าน</label><input value={form.password} onChange={e=>set('password',e.target.value)}/></div>
+        <div className="form-group"><label>ชื่อที่แสดง</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อจริง"/></div>
+        <div className="form-group"><label>Role</label><select value={form.role} onChange={e=>set('role',e.target.value)}><option>Sales</option><option>Admin</option></select></div>
+      </div>
+    </Modal>}
+
+    {/* Edit User Modal */}
+    {editUser&&<Modal title={`✏️ แก้ไข — ${editUser.username}`} onClose={()=>setEditUser(null)} footer={<><button className="btn btn-ghost" onClick={()=>setEditUser(null)}>ยกเลิก</button><button className="btn btn-primary" onClick={saveEdit} disabled={saving}>{saving?'กำลังบันทึก...':'💾 บันทึก'}</button></>}>
+      <div style={{display:'grid',gap:12}}>
+        <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 14px',fontSize:13}}>
+          <span style={{color:'var(--text2)'}}>Username: </span><strong>{editUser.username}</strong>
+          <span style={{color:'var(--text2)',marginLeft:16}}>ID: </span><strong style={{color:'var(--blue)'}}>{editUser.userId}</strong>
+        </div>
+        <div className="form-group"><label>ชื่อที่แสดง</label><input value={editForm.name} onChange={e=>setE('name',e.target.value)}/></div>
+        <div className="form-group">
+          <label>รหัสผ่านใหม่ <span style={{fontSize:11,color:'var(--text3)'}}>(ถ้าไม่เปลี่ยน ปล่อยว่างไว้)</span></label>
+          <input type="text" value={editForm.password} onChange={e=>setE('password',e.target.value)} placeholder="กรอกรหัสใหม่ หรือปล่อยว่าง"/>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div className="form-group"><label>Role</label>
+            <select value={editForm.role} onChange={e=>setE('role',e.target.value)}>
+              <option>Sales</option><option>Admin</option>
+            </select>
+          </div>
+          <div className="form-group"><label>สถานะ</label>
+            <select value={editForm.status} onChange={e=>setE('status',e.target.value)}>
+              <option value="active">active</option><option value="inactive">inactive</option>
+            </select>
+          </div>
+        </div>
+      </div>
     </Modal>}
   </div>;
 }
@@ -839,8 +905,8 @@ function AIAdvisorPage({currentUser}){
 
 // ── remaining Sales pages (unchanged) ──
 function DailyFocusPage({currentUser,onNavigate}){
-  const [myCases,setMyCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [marketCount,setMarketCount]=useState(0);const [loading,setLoading]=useState(true);const [selCase,setSelCase]=useState(null);const [quickCase,setQuickCase]=useState(null);const [users,setUsers]=useState([]);const now=Date.now();
-  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name}),api('getMarket',{sales:currentUser.name}),api('getUsers')]).then(([cr,ccr,mr,ur])=>{if(cr.success)setMyCases(cr.data||[]);if(ccr.success)setClaimedCases(ccr.data||[]);if(mr.success)setMarketCount((mr.data||[]).filter(c=>c.old_sales!==currentUser.name).length);if(ur.success)setUsers(ur.data||[]);setLoading(false);});},[currentUser.name]);
+  const [myCases,setMyCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [marketCount,setMarketCount]=useState(0);const [loading,setLoading]=useState(true);const now=Date.now();
+  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name}),api('getMarket',{sales:currentUser.name})]).then(([cr,ccr,mr])=>{if(cr.success)setMyCases(cr.data||[]);if(ccr.success)setClaimedCases(ccr.data||[]);if(mr.success)setMarketCount((mr.data||[]).filter(c=>c.old_sales!==currentUser.name).length);setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   function parseDate(d){const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
@@ -848,36 +914,12 @@ function DailyFocusPage({currentUser,onNavigate}){
   function hText(h){if(h<1)return'เมื่อกี้';if(h<24)return`${Math.floor(h)} ชม.ที่แล้ว`;return`${Math.floor(h/24)} วันที่แล้ว`;}
   const active=myCases.filter(c=>!CLOSED.includes(c.status));const autoSendSoon=active.filter(c=>hoursAgo(c.updatedat)>=60);const critical=active.filter(c=>hoursAgo(c.updatedat)>=48&&hoursAgo(c.updatedat)<60);const warn=active.filter(c=>hoursAgo(c.updatedat)>=12&&hoursAgo(c.updatedat)<48);const hotStatuses=['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'];const hot=active.filter(c=>hotStatuses.includes(c.status));
   const h=new Date().getHours();const greeting=h<12?'🌅 อรุณสวัสดิ์':h<17?'☀️ สวัสดีตอนบ่าย':'🌆 สวัสดีตอนเย็น';const allClear=autoSendSoon.length===0&&critical.length===0&&warn.length===0;
-  function CaseRow({c,accentColor}){
-    const contactVal=formatContact(c.contact||'');
-    const isPhone=/^\d{9,10}$/.test(contactVal.replace(/\D/g,''));
-    return <div style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 12px',marginBottom:8}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0,flex:1}}>
-          <span style={{color:'var(--blue)',fontWeight:800,fontSize:13,flexShrink:0}}>{c.caseid}</span>
-          <span style={{fontWeight:600,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.customername}</span>
-        </div>
-        <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0,marginLeft:8}}>
-          <StatusBadge status={c.status}/>
-          <span style={{fontSize:11,fontWeight:700,color:accentColor,whiteSpace:'nowrap'}}>{hText(hoursAgo(c.updatedat))}</span>
-        </div>
-      </div>
-      <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-        {isPhone&&<a href={`tel:${contactVal}`} style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,border:'1px solid rgba(63,185,80,.3)'}}><Ico.phone/> โทร</a>}
-        {isPhone&&<a href={`https://line.me/ti/p/~${contactVal.replace(/\D/g,'')}`} target="_blank" rel="noopener" style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,border:'1px solid rgba(0,200,83,.3)'}}>💬 LINE</a>}
-        <button onClick={()=>setSelCase(c)} style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(88,166,255,.1)',color:'var(--blue)',border:'1px solid rgba(88,166,255,.3)',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer'}}>📄 ดูข้อมูล</button>
-        <button onClick={()=>setQuickCase(c)} style={{display:'inline-flex',alignItems:'center',gap:4,background:'rgba(188,140,255,.12)',color:'var(--purple)',border:'1px solid rgba(188,140,255,.3)',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer'}}>📝 อัปเดต</button>
-      </div>
-    </div>;
-  }
-  const FocusBlock=({color,borderColor,bg,title,items,extra=null})=><div className="focus-block" style={{background:bg,border:`1px solid ${borderColor}`}}><div style={{fontWeight:700,color,marginBottom:10,fontSize:13}}>{title}</div>{items.slice(0,5).map((c,i)=><CaseRow key={i} c={c} accentColor={color}/>)}{items.length>5&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginTop:4}}>+{items.length-5} รายการ</div>}{extra}</div>;
+  const FocusBlock=({color,borderColor,bg,title,items,extra=null})=><div className="focus-block" style={{background:bg,border:`1px solid ${borderColor}`}}><div style={{fontWeight:700,color,marginBottom:8,fontSize:13}}>{title}</div>{items.slice(0,5).map((c,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',borderRadius:7,background:'rgba(255,255,255,.03)',marginBottom:i<items.length-1?4:0}}><div style={{display:'flex',alignItems:'center',gap:6,minWidth:0,flex:1}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:12,flexShrink:0}}>{c.caseid}</span><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.customername}</span><StatusBadge status={c.status}/></div><span style={{fontSize:11,color,flexShrink:0,marginLeft:8}}>{hText(hoursAgo(c.updatedat))}</span></div>)}{items.length>5&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginTop:4}}>+{items.length-5} รายการ</div>}{extra}</div>;
   return <div className="page">
     <div style={{background:'linear-gradient(135deg,#1a2a4a 0%,#0f2233 100%)',border:'1px solid rgba(88,166,255,.2)',borderRadius:14,padding:'20px 22px',marginBottom:18}}><div style={{fontSize:12,color:'var(--blue)',marginBottom:3}}>{greeting}</div><div style={{fontSize:20,fontWeight:800,marginBottom:6}}>{currentUser.name} 👋</div><div style={{fontSize:12,color:'var(--text2)'}}>{new Date().toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>{[['📋 เคส Active',active.length,'var(--blue)','cases'],['🏪 ตลาดว่าง',marketCount,'var(--green)','market'],['📥 รับแล้ว',claimedCases.length,'var(--purple)','claimed']].map(([l,v,c,key])=><div key={key} onClick={()=>onNavigate(key)} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center',cursor:'pointer'}} onMouseOver={e=>e.currentTarget.style.borderColor=c} onMouseOut={e=>e.currentTarget.style.borderColor='var(--border)'}><div style={{fontSize:12,color:'var(--text2)',marginBottom:4}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:c}}>{loading?'—':v}</div></div>)}</div>
     {loading?<Loading/>:<>{autoSendSoon.length>0&&<FocusBlock color="var(--red)" borderColor="rgba(248,81,73,.45)" bg="rgba(248,81,73,.07)" title={`🚨 ใกล้ถูกส่งตลาดอัตโนมัติ (${autoSendSoon.length})`} items={autoSendSoon} extra={<div style={{fontSize:12,color:'rgba(248,81,73,.8)',marginTop:6}}>⚡ รีบอัปเดตก่อนเคสถูกส่งตลาด</div>}/>}{critical.length>0&&<FocusBlock color="var(--yellow)" borderColor="rgba(210,153,34,.4)" bg="rgba(210,153,34,.07)" title={`⚠️ ค้างนาน — ควร follow up ด่วน (${critical.length})`} items={critical}/>}{warn.length>0&&<FocusBlock color="var(--blue)" borderColor="rgba(88,166,255,.25)" bg="rgba(88,166,255,.05)" title={`⏰ ควร follow up วันนี้ (${warn.length})`} items={warn}/>}{hot.length>0&&<FocusBlock color="var(--green)" borderColor="rgba(63,185,80,.25)" bg="rgba(63,185,80,.05)" title={`🎯 สถานะดี — โอกาสปิดการขาย (${hot.length})`} items={hot}/>}{allClear&&hot.length===0&&<div style={{textAlign:'center',padding:'36px 0',color:'var(--green)'}}><div style={{fontSize:52,marginBottom:12}}>✅</div><div style={{fontWeight:800,fontSize:17}}>ทุกอย่างอัปเดตแล้ว!</div><div style={{fontSize:13,color:'var(--text2)',marginTop:6}}>คุณกำลังทำได้ยอดเยี่ยมมาก 🎉</div></div>}{marketCount>0&&<div onClick={()=>onNavigate('market')} style={{background:'rgba(188,140,255,.08)',border:'1px solid rgba(188,140,255,.3)',borderRadius:10,padding:'14px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:12}} onMouseOver={e=>e.currentTarget.style.borderColor='var(--purple)'} onMouseOut={e=>e.currentTarget.style.borderColor='rgba(188,140,255,.3)'}><div style={{fontSize:28}}>🏪</div><div><div style={{fontWeight:700,color:'var(--purple)',fontSize:14}}>ตลาดมีเคสว่าง {marketCount} ใบ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กดเพื่อไปหน้าตลาด →</div></div></div>}</>}
     <button className="btn btn-ghost" style={{marginTop:14,width:'100%',fontSize:13}} onClick={load}>🔄 รีเฟรช</button>
-    {selCase&&<CaseModal caseData={selCase} users={users} currentUser={currentUser} onClose={()=>setSelCase(null)} onUpdated={()=>{setSelCase(null);load();}}/>}
-    {quickCase&&<QuickUpdateModal caseData={quickCase} currentUser={currentUser} onClose={()=>setQuickCase(null)} onUpdated={()=>{setQuickCase(null);load();}}/>}
   </div>;
 }
 
