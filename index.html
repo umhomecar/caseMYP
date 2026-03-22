@@ -670,7 +670,7 @@ function AdminUsers({currentUser}){
       <td>{u.name}</td>
       <td><span className={`badge ${u.role==='Admin'?'s-approve':'s-book'}`}>{u.role}</span></td>
       <td><span className={`badge ${u.status==='active'?'s-go':'s-reject'}`}>{u.status}</span></td>
-      <td><div style={{display:'flex',gap:6'}}>
+      <td><div style={{display:'flex',gap:6}}>
         <button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>openEdit(u)}>✏️ แก้ไข</button>
         {u.userId!==currentUser.userId&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px',color:u.status==='active'?'var(--red)':'var(--green)'}} onClick={()=>toggleStatus(u)}>{u.status==='active'?'🔒 ปิด':'🔓 เปิด'}</button>}
       </div></td>
