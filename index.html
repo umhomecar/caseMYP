@@ -1091,10 +1091,44 @@ function LoginPage({onLogin}){
 // ============================================================
 // 📋 ADMIN DAILY REPORT — Sheet Analyzer
 // ============================================================
-const SHEET_ID = '19l-cEYR3M0NlhRUlBKPjgeHvQK9KBNnA1NeiQKBZRhA';
+const SHEET_ID = '1bcnrlBDACCWqavQb8qqdhP6bj94RNpO6KKVr4s25v2w';
 const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 
-function parseCSV(text){const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2)return[];const headers=lines[0].split(',').map(h=>h.replace(/^"|"$/g,'').trim());return lines.slice(1).map(line=>{const vals=[];let cur='',inQ=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){vals.push(cur.trim());cur='';}else cur+=ch;}vals.push(cur.trim());const row={};headers.forEach((h,i)=>{row[h]=(vals[i]||'').replace(/^"|"$/g,'').trim();});return row;}).filter(r=>r[headers[0]]||r[headers[1]]);}
+function parseCSV(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2)return{headers:[],rows:[]};
+
+  // หา header row — หา row แรกที่มีข้อมูลหลาย column และไม่ใช่ title
+  let headerIdx=0;
+  for(let i=0;i<Math.min(5,lines.length);i++){
+    const cols=lines[i].split(',').length;
+    if(cols>=5){headerIdx=i;break;}
+  }
+
+  function parseLine(line){
+    const vals=[];let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){inQ=!inQ;}
+      else if(ch===','&&!inQ){vals.push(cur.trim().replace(/^"|"$/g,''));cur='';}
+      else cur+=ch;
+    }
+    vals.push(cur.trim().replace(/^"|"$/g,''));
+    return vals;
+  }
+
+  const headerVals=parseLine(lines[headerIdx]);
+  const headers=headerVals.map(h=>h.trim());
+
+  const rows=lines.slice(headerIdx+1).map(line=>{
+    const vals=parseLine(line);
+    const row={};
+    headers.forEach((h,i)=>{row[h]=(vals[i]||'').trim();});
+    return row;
+  }).filter(r=>headers.some(h=>r[h]&&r[h].trim()!=''));
+
+  return{headers,rows};
+}
 
 function normalizeDate(d){if(!d)return null;const m=String(d).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return null;let[,dd,mo,yy]=m;if(yy.length===2)yy='25'+yy;const yr=parseInt(yy)>2500?parseInt(yy)-543:parseInt(yy);return`${yr}-${String(mo).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
 
@@ -1102,78 +1136,125 @@ function AdminDailyReport(){
   const today=new Date();const padZ=n=>String(n).padStart(2,'0');const todayISO=`${today.getFullYear()}-${padZ(today.getMonth()+1)}-${padZ(today.getDate())}`;
   const CACHE_KEY='cp_sheet_cache';const CACHE_DATE_KEY='cp_sheet_cache_date';
   const [rows,setRows]=useState(()=>{try{const c=localStorage.getItem(CACHE_KEY),d=localStorage.getItem(CACHE_DATE_KEY);if(c&&d===todayISO)return JSON.parse(c);}catch(e){}return[];});
-  const [loading,setLoading]=useState(false);const [error,setError]=useState('');const [sheetUrl,setSheetUrl]=useState(SHEET_CSV_URL);const [showUrl,setShowUrl]=useState(false);
+  const [loading,setLoading]=useState(false);const [error,setError]=useState('');
+  const [sheetUrl,setSheetUrl]=useState(()=>{try{return localStorage.getItem('cp_sheet_url')||SHEET_CSV_URL;}catch(e){return SHEET_CSV_URL;}});
+  const [showUrl,setShowUrl]=useState(false);
   const [headers,setHeaders]=useState(()=>{try{const c=localStorage.getItem(CACHE_KEY),d=localStorage.getItem(CACHE_DATE_KEY);if(c&&d===todayISO){const p=JSON.parse(c);return p.length?Object.keys(p[0]):[];}}catch(e){}return[];});
-  const [tab,setTab]=useState('overview');const [searchQ,setSearchQ]=useState('');const [bankLogos,setBankLogos]=useState({});
-  useEffect(()=>{const K='cp_bank_logos';try{const c=localStorage.getItem(K);if(c){setBankLogos(JSON.parse(c));return;}}catch(e){}sbQ('GET','bank_logos',{select:'name,logo_url'}).then(rows=>{if(!rows?.length)return;const map={};rows.forEach(r=>{if(r.name&&r.logo_url)map[r.name]=r.logo_url;});setBankLogos(map);try{localStorage.setItem(K,JSON.stringify(map));}catch(e){}}).catch(()=>{});},[]);
-  function getBankLogo(name){if(!name)return null;if(bankLogos[name])return bankLogos[name];const lower=name.toLowerCase();const k=Object.keys(bankLogos).find(k=>lower.includes(k.toLowerCase())||k.toLowerCase().includes(lower));return k?bankLogos[k]:null;}
+  const [tab,setTab]=useState('overview');const [searchQ,setSearchQ]=useState('');
   const isCached=headers.length>0&&rows.length>0;
-  function getV(row,...keys){for(const k of keys){if(row[k]!==undefined&&row[k]!=='')return row[k];}for(const k of keys){const f=Object.keys(row).find(rk=>rk.trim().toLowerCase().includes(k.trim().toLowerCase()));if(f&&row[f]!==undefined&&row[f]!=='')return row[f];}return'';}
-  function normSales(name){if(!name)return name;return name.replace(/\s*\d+$/,'').trim();}
+
+  function getV(row,...keys){
+    for(const k of keys){if(row[k]!==undefined&&row[k]!=='')return row[k];}
+    for(const k of keys){const f=Object.keys(row).find(rk=>rk.trim().toLowerCase()===k.trim().toLowerCase());if(f&&row[f])return row[f];}
+    for(const k of keys){const f=Object.keys(row).find(rk=>rk.includes(k)||k.includes(rk));if(f&&row[f])return row[f];}
+    return'';
+  }
+  function normSales(n){if(!n)return n;return n.replace(/\s*\d+$/,'').trim();}
   const RELEASED=['ปล่อยรถแล้ว','ปล่อยแล้ว','ปล่อย'];const APPROVED=['อนุมัติรับรถ','อนุมัติ'];
-  const isReleased=st=>RELEASED.some(s=>st.includes(s));const isApproved=st=>APPROVED.some(s=>st.includes(s));
+  const isReleased=st=>RELEASED.some(s=>String(st).includes(s));
+  const isApproved=st=>APPROVED.some(s=>String(st).includes(s));
+
   async function fetchSheet(force=false){
     if(!force){try{if(localStorage.getItem(CACHE_DATE_KEY)===todayISO&&rows.length>0)return;}catch(e){}}
     setLoading(true);setError('');setRows([]);setHeaders([]);
-    try{const res=await fetch(sheetUrl+'&t='+Date.now());if(!res.ok)throw new Error('ดึงข้อมูลไม่ได้ — Sheet ต้องเป็น Public');const text=await res.text();const parsed=parseCSV(text);setRows(parsed);if(parsed.length>0)setHeaders(Object.keys(parsed[0]));try{localStorage.setItem(CACHE_KEY,JSON.stringify(parsed));localStorage.setItem(CACHE_DATE_KEY,todayISO);}catch(e){}}catch(e){setError(e.message||'เกิดข้อผิดพลาด');}
+    try{
+      const res=await fetch(sheetUrl+'&t='+Date.now());
+      if(!res.ok)throw new Error('ดึงข้อมูลไม่ได้ ('+res.status+') — Sheet ต้องเปิดเป็น Public');
+      const text=await res.text();
+      const{headers:hdrs,rows:parsed}=parseCSV(text);
+      if(!hdrs.length)throw new Error('ไม่พบ header — ลอง refresh หรือตรวจสอบ URL');
+      setRows(parsed);setHeaders(hdrs);
+      try{localStorage.setItem(CACHE_KEY,JSON.stringify(parsed));localStorage.setItem(CACHE_DATE_KEY,todayISO);}catch(e){}
+    }catch(e){setError(e.message||'เกิดข้อผิดพลาด');}
     setLoading(false);
   }
+
   const stats=rows.length?(()=>{
-    const byStatus={},bySales={},byBank={},bySource={},bySourceDetail={},byBrand={},byMonth={};
+    const byStatus={},bySales={},byBank={},bySource={},byBrand={},byMonth={};
     rows.forEach(r=>{
-      const st=(getV(r,'สถานะ','status')||'').trim();const sl=normSales((getV(r,'เซลล์','เซลส์','ชื่อเซลส์','sales','Sale')||'').trim());
-      const bk=(getV(r,'ธนาคาร','bank')||'').trim();const src=(getV(r,'แหล่งที่มา','source')||'').trim();const br=(getV(r,'ยี่ห้อ','brand')||'').trim();
-      const dateBook=normalizeDate(getV(r,'Date จอง','date จอง','วันที่จอง','จอง'));
+      const st=(getV(r,'สถานะ','status')||'').trim();
+      const sl=normSales((getV(r,'เซลล์','เซลส์','ชื่อเซลส์','sales','Sale')||'').trim());
+      const bk=(getV(r,'ธนาคาร','bank','Bank')||'').trim();
+      const src=(getV(r,'ประเภท','แหล่งที่มา','source')||'').trim();
+      const br=(getV(r,'ยี่ห้อรก','ยี่ห้อ','brand')||'').trim();
+      const dateBook=normalizeDate(getV(r,'Date จอง','date จอง','วันที่จอง'));
       if(dateBook){const mon=dateBook.slice(0,7);if(!byMonth[mon])byMonth[mon]={total:0,released:0};byMonth[mon].total++;if(isReleased(st))byMonth[mon].released++;}
       if(st)byStatus[st]=(byStatus[st]||0)+1;
       if(sl){if(!bySales[sl])bySales[sl]={total:0,released:0,approved:0,waiting:0,booked:0,lost:0};bySales[sl].total++;if(isReleased(st))bySales[sl].released++;else if(isApproved(st))bySales[sl].approved++;else if(['รอผล','รอเซ็นต์','รอเซ็น'].some(s=>st.includes(s)))bySales[sl].waiting++;else if(['ปิดเคส','รีเจค','ยกเลิก'].some(s=>st.includes(s)))bySales[sl].lost++;else bySales[sl].booked++;}
       if(bk){if(!byBank[bk])byBank[bk]={total:0,released:0,approved:0,waiting:0,lost:0};byBank[bk].total++;if(isReleased(st))byBank[bk].released++;else if(isApproved(st))byBank[bk].approved++;else if(['รอผล','รอเซ็นต์'].some(s=>st.includes(s)))byBank[bk].waiting++;else if(['ปิดเคส','รีเจค'].some(s=>st.includes(s)))byBank[bk].lost++;}
-      if(src){bySource[src]=(bySource[src]||0)+1;if(!bySourceDetail[src])bySourceDetail[src]={total:0,released:0,approved:0,waiting:0,lost:0};bySourceDetail[src].total++;if(isReleased(st))bySourceDetail[src].released++;else if(isApproved(st))bySourceDetail[src].approved++;else if(['รอผล','รอเซ็นต์'].some(s=>st.includes(s)))bySourceDetail[src].waiting++;else if(['ปิดเคส','รีเจค'].some(s=>st.includes(s)))bySourceDetail[src].lost++;}
+      if(src)bySource[src]=(bySource[src]||0)+1;
       if(br)byBrand[br]=(byBrand[br]||0)+1;
     });
-    let totalDays=0,cntDays=0;rows.forEach(r=>{const n1=normalizeDate(getV(r,'Date จอง','date จอง','วันที่จอง'));const n2=normalizeDate(getV(r,'Date วันปล่อย','date วันปล่อย','วันปล่อย'));if(n1&&n2){const diff=(new Date(n2)-new Date(n1))/86400000;if(diff>=0&&diff<365){totalDays+=diff;cntDays++;}}});
-    return{byStatus,bySales,byBank,bySource,bySourceDetail,byBrand,byMonth,total:rows.length,avgDays:cntDays>0?Math.round(totalDays/cntDays):null};
+    let totalDays=0,cntDays=0;rows.forEach(r=>{const n1=normalizeDate(getV(r,'Date จอง','date จอง'));const n2=normalizeDate(getV(r,'Date วันปล่อย','date วันปล่อย'));if(n1&&n2){const diff=(new Date(n2)-new Date(n1))/86400000;if(diff>=0&&diff<365){totalDays+=diff;cntDays++;}}});
+    return{byStatus,bySales,byBank,bySource,byBrand,byMonth,total:rows.length,avgDays:cntDays>0?Math.round(totalDays/cntDays):null};
   })():null;
+
   const filteredRows=rows.filter(r=>!searchQ||Object.values(r).some(v=>String(v).toLowerCase().includes(searchQ.toLowerCase())));
-  const TABS=[['overview','📊 ภาพรวม'],['sales','👤 รายเซลส์'],['bank','🏦 ธนาคาร'],['source','📌 แหล่งที่มา'],['brand','🚗 ยี่ห้อ'],['table','🗂 ตาราง']];
-  function StackBar({d,total}){const pR=Math.round((d.released||0)/total*100),pA=Math.round((d.approved||0)/total*100),pW=Math.round((d.waiting||0)/total*100),pL=Math.round((d.lost||0)/total*100),pO=Math.max(0,100-pR-pA-pW-pL);return<div style={{height:6,borderRadius:99,overflow:'hidden',display:'flex',background:'var(--bg3)'}}>{pR>0&&<div style={{width:`${pR}%`,background:'#3fb950'}}/>}{pA>0&&<div style={{width:`${pA}%`,background:'#00bcd4'}}/>}{pW>0&&<div style={{width:`${pW}%`,background:'#d29922'}}/>}{pL>0&&<div style={{width:`${pL}%`,background:'#f85149'}}/>}{pO>0&&<div style={{width:`${pO}%`,background:'#484f58'}}/>}</div>;}
+  const TABS=[['overview','📊 ภาพรวม'],['sales','👤 รายเซลส์'],['bank','🏦 ธนาคาร'],['source','📌 ประเภท'],['brand','🚗 ยี่ห้อ'],['table','🗂 ตาราง']];
+  function StackBar({d,total}){const t=total||1,pR=Math.round((d.released||0)/t*100),pA=Math.round((d.approved||0)/t*100),pW=Math.round((d.waiting||0)/t*100),pL=Math.round((d.lost||0)/t*100),pO=Math.max(0,100-pR-pA-pW-pL);return<div style={{height:6,borderRadius:99,overflow:'hidden',display:'flex',background:'var(--bg3)'}}>{pR>0&&<div style={{width:`${pR}%`,background:'#3fb950'}}/>}{pA>0&&<div style={{width:`${pA}%`,background:'#00bcd4'}}/>}{pW>0&&<div style={{width:`${pW}%`,background:'#d29922'}}/>}{pL>0&&<div style={{width:`${pL}%`,background:'#f85149'}}/>}{pO>0&&<div style={{width:`${pO}%`,background:'#484f58'}}/>}</div>;}
+
   return<div className="page">
     <div className="page-hd"><div><div className="page-title">📊 Sheet Analyzer</div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์ข้อมูลจาก Google Sheet</div></div><button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setShowUrl(v=>!v)}>⚙️ URL</button></div>
-    {showUrl&&<div className="card" style={{marginBottom:14}}><div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🔗 Sheet CSV URL</div><div style={{display:'flex',gap:8}}><input value={sheetUrl} onChange={e=>setSheetUrl(e.target.value)} style={{flex:1,fontSize:12}}/><button className="btn btn-primary" style={{fontSize:12,whiteSpace:'nowrap'}} onClick={()=>{setShowUrl(false);fetchSheet();}}>บันทึก</button></div></div>}
+    {showUrl&&<div className="card" style={{marginBottom:14}}>
+      <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>🔗 Google Sheet CSV URL</div>
+      <div style={{fontSize:11,color:'var(--text3)',marginBottom:8,lineHeight:1.6}}>Sheet ต้องแชร์เป็น Public (Share → Anyone with the link → Viewer)</div>
+      <div style={{display:'flex',gap:8}}><input value={sheetUrl} onChange={e=>setSheetUrl(e.target.value)} style={{flex:1,fontSize:12}}/><button className="btn btn-primary" style={{fontSize:12,whiteSpace:'nowrap'}} onClick={()=>{try{localStorage.setItem('cp_sheet_url',sheetUrl);}catch(e){}setShowUrl(false);fetchSheet(true);}}>บันทึก & ดึง</button></div>
+    </div>}
     <div style={{display:'flex',gap:8,marginBottom:14,alignItems:'center'}}>
       <button className="btn btn-primary" style={{flex:1,padding:'12px',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8}} onClick={()=>fetchSheet(false)} disabled={loading}>{loading?<><span className="spin" style={{width:18,height:18}}/> กำลังดึง...</>:isCached?'✅ ข้อมูลวันนี้พร้อมแล้ว':'🔄 ดึงข้อมูลจาก Google Sheet'}</button>
       {isCached&&<button className="btn btn-ghost" style={{fontSize:12,padding:'9px 14px',whiteSpace:'nowrap'}} onClick={()=>fetchSheet(true)} disabled={loading}>🔄 รีเฟรช</button>}
     </div>
-    {isCached&&!loading&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginBottom:10,marginTop:-8}}>📦 cache วันนี้ — กด รีเฟรช ถ้าต้องการดึงใหม่</div>}
-    {error&&<div style={{background:'rgba(248,81,73,.1)',border:'1px solid var(--red)',borderRadius:8,padding:'12px 16px',marginBottom:14,fontSize:13,color:'var(--red)'}}>{error}</div>}
+    {isCached&&!loading&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginBottom:10,marginTop:-8}}>📦 cache วันนี้ · {rows.length} แถว — กดรีเฟรชถ้าต้องการดึงใหม่</div>}
+    {error&&<div style={{background:'rgba(248,81,73,.1)',border:'1px solid var(--red)',borderRadius:8,padding:'12px 16px',marginBottom:14,fontSize:13,color:'var(--red)',lineHeight:1.7}}>❌ {error}<br/><span style={{fontSize:11,opacity:.8}}>แก้ไข: เปิด Sheet → Share → เปลี่ยนเป็น "Anyone with the link" → Viewer</span></div>}
     {rows.length>0&&stats&&<>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:8,marginBottom:14}}>
-        {[['📄 ทั้งหมด',stats.total,'var(--text)'],['🚗 ปล่อยรถแล้ว',Object.entries(stats.byStatus).filter(([k])=>isReleased(k)).reduce((s,[,v])=>s+v,0),'var(--green)'],['✅ อนุมัติ',Object.entries(stats.byStatus).filter(([k])=>isApproved(k)&&!isReleased(k)).reduce((s,[,v])=>s+v,0),'#00bcd4'],['⏳ รอผล',stats.byStatus['รอผล']||0,'var(--purple)'],['📋 จอง',stats.byStatus['จอง']||0,'var(--blue)'],['❌ ปิดเคส',stats.byStatus['ปิดเคส']||0,'var(--red)'],stats.avgDays!=null?['⏱ เฉลี่ยวันปล่อย',stats.avgDays+' วัน','var(--orange)']:null].filter(Boolean).map(([l,v,c])=><div key={l} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center'}}><div style={{fontSize:18,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:10,color:'var(--text3)',marginTop:3,lineHeight:1.3}}>{l}</div></div>)}
+        {[['📄 ทั้งหมด',stats.total,'var(--text)'],['🚗 ปล่อยรถ',Object.entries(stats.byStatus).filter(([k])=>isReleased(k)).reduce((s,[,v])=>s+v,0),'var(--green)'],['✅ อนุมัติ',Object.entries(stats.byStatus).filter(([k])=>isApproved(k)&&!isReleased(k)).reduce((s,[,v])=>s+v,0),'#00bcd4'],['⏳ รอผล',Object.entries(stats.byStatus).filter(([k])=>k.includes('รอผล')||k.includes('รอเซ็น')||k.includes('รอเซ็นต์')).reduce((s,[,v])=>s+v,0),'var(--purple)'],['📋 จอง',Object.entries(stats.byStatus).filter(([k])=>k==='จอง').reduce((s,[,v])=>s+v,0),'var(--blue)'],['❌ ปิด/รีเจค',Object.entries(stats.byStatus).filter(([k])=>k.includes('ปิดเคส')||k.includes('รีเจค')||k.includes('ยกเลิก')).reduce((s,[,v])=>s+v,0),'var(--red)'],stats.avgDays!=null?['⏱ เฉลี่ยวัน',stats.avgDays+' วัน','var(--orange)']:null].filter(Boolean).map(([l,v,c])=><div key={l} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center'}}><div style={{fontSize:18,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:10,color:'var(--text3)',marginTop:3,lineHeight:1.3}}>{l}</div></div>)}
       </div>
       <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto',paddingBottom:4}}>
         {TABS.map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{padding:'6px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)'}}>{l}</button>)}
       </div>
       {tab==='overview'&&<div style={{display:'grid',gap:14}}>
-        <div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📋 สถานะทั้งหมด</div>{Object.entries(stats.byStatus).sort((a,b)=>b[1]-a[1]).map(([st,cnt])=>{const pct=Math.round(cnt/stats.total*100);return<div key={st} style={{marginBottom:10}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><StatusBadge status={st}/><span style={{fontSize:13,fontWeight:700}}>{cnt} <span style={{fontSize:11,color:'var(--text3)'}}>({pct}%)</span></span></div><div style={{height:7,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:'var(--blue)',width:`${pct}%`}}/></div></div>;})}</div>
-        {Object.keys(stats.byMonth).length>0&&<div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📈 Trend รายเดือน</div>{Object.entries(stats.byMonth).sort((a,b)=>a[0].localeCompare(b[0])).slice(-6).map(([mon,d])=>{const[y,m]=mon.split('-');const label=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(m)-1]+' '+(parseInt(y)+543).toString().slice(-2);const wr=d.total>0?Math.round(d.released/d.total*100):0;const maxBar=Math.max(...Object.values(stats.byMonth).map(x=>x.total),1);return<div key={mon} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}><div style={{fontSize:12,color:'var(--text2)',width:56,flexShrink:0}}>{label}</div><div style={{flex:1,height:24,background:'var(--bg3)',borderRadius:5,overflow:'hidden',position:'relative'}}><div style={{height:'100%',width:`${Math.round(d.total/maxBar*100)}%`,background:'rgba(88,166,255,.4)',borderRadius:5}}/><div style={{position:'absolute',inset:0,height:'100%',width:`${Math.round(d.released/maxBar*100)}%`,background:'rgba(63,185,80,.7)',borderRadius:5}}/><div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',paddingLeft:8,fontSize:11,fontWeight:700,color:'var(--text)'}}>จอง {d.total} · ปล่อย {d.released} · <span style={{color:wr>=50?'var(--green)':'var(--yellow)',marginLeft:4}}>{wr}%</span></div></div></div>;})}
-        </div>}
+        <div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📋 สถานะทั้งหมด</div>{Object.entries(stats.byStatus).sort((a,b)=>b[1]-a[1]).map(([st,cnt])=>{const pct=Math.round(cnt/stats.total*100);return<div key={st} style={{marginBottom:10}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><StatusBadge status={st}/><span style={{fontSize:13,fontWeight:700}}>{cnt} <span style={{fontSize:11,color:'var(--text3)'}}>({pct}%)</span></span></div><div style={{height:7,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:'var(--blue)',width:`${pct}%`}}/></div></div>;})}
+        </div>
+        {Object.keys(stats.byMonth).length>0&&<div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📈 Trend รายเดือน</div>
+          {Object.entries(stats.byMonth).sort((a,b)=>a[0].localeCompare(b[0])).slice(-6).map(([mon,d])=>{const[y,m]=mon.split('-');const lbl=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(m)-1]+' '+(parseInt(y)+543).toString().slice(-2);const wr=d.total>0?Math.round(d.released/d.total*100):0;const mx=Math.max(...Object.values(stats.byMonth).map(x=>x.total),1);return<div key={mon} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}><div style={{fontSize:12,color:'var(--text2)',width:56,flexShrink:0}}>{lbl}</div><div style={{flex:1,height:24,background:'var(--bg3)',borderRadius:5,overflow:'hidden',position:'relative'}}><div style={{height:'100%',width:`${Math.round(d.total/mx*100)}%`,background:'rgba(88,166,255,.4)',borderRadius:5}}/><div style={{position:'absolute',inset:0,height:'100%',width:`${Math.round(d.released/mx*100)}%`,background:'rgba(63,185,80,.7)',borderRadius:5}}/><div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',paddingLeft:8,fontSize:11,fontWeight:700}}>จอง {d.total} · ปล่อย {d.released} · <span style={{color:wr>=50?'var(--green)':'var(--yellow)',marginLeft:4}}>{wr}%</span></div></div></div>;})}</div>}
       </div>}
       {tab==='sales'&&<div style={{display:'grid',gap:10}}>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:2}}>{[['#3fb950','ปล่อยรถ'],['#00bcd4','อนุมัติ'],['#d29922','รอผล'],['#f85149','ปิด'],['#484f58','อื่นๆ']].map(([c,l])=><div key={l} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--text3)'}}><div style={{width:8,height:8,borderRadius:'50%',background:c}}/>{l}</div>)}</div>
-        {Object.entries(stats.bySales).sort((a,b)=>b[1].released-a[1].released).map(([name,d],i)=>{const total=d.total||1;const wr=Math.round(d.released/total*100);return<div key={name} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}><div style={{width:24,height:24,borderRadius:'50%',background:i===0?'#3d2a00':i===1?'#1c1c2e':i===2?'#1a2a00':'var(--bg3)',color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>{i<3?['🥇','🥈','🥉'][i]:i+1}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{name}</div><div style={{fontSize:11,color:'var(--text3)'}}>{[d.released&&`✅${d.released}`,d.approved&&`🔵${d.approved}`,d.waiting&&`⏳${d.waiting}`,d.lost&&`❌${d.lost}`].filter(Boolean).join(' · ')}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:16,fontWeight:800,color:wr>=60?'#3fb950':wr>=30?'#d29922':'#f85149'}}>{wr}%</div><div style={{fontSize:10,color:'var(--text3)'}}>Win Rate</div></div></div><StackBar d={d} total={total}/></div>;})}
+        {Object.entries(stats.bySales).sort((a,b)=>b[1].released-a[1].released).map(([name,d],i)=>{const t=d.total||1;const wr=Math.round(d.released/t*100);return<div key={name} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}><div style={{width:24,height:24,borderRadius:'50%',background:i===0?'#3d2a00':i===1?'#1c1c2e':i===2?'#1a2a00':'var(--bg3)',color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>{i<3?['🥇','🥈','🥉'][i]:i+1}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{name}</div><div style={{fontSize:11,color:'var(--text3)'}}>{[d.released&&`✅${d.released}`,d.approved&&`🔵${d.approved}`,d.waiting&&`⏳${d.waiting}`,d.lost&&`❌${d.lost}`].filter(Boolean).join(' · ')}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:16,fontWeight:800,color:wr>=60?'#3fb950':wr>=30?'#d29922':'#f85149'}}>{wr}%</div><div style={{fontSize:10,color:'var(--text3)'}}>Win Rate</div></div></div><StackBar d={d} total={t}/></div>;})}
       </div>}
       {tab==='bank'&&<div style={{display:'grid',gap:10}}>
-        {Object.entries(stats.byBank).sort((a,b)=>b[1].total-a[1].total).map(([bk,d])=>{const total=d.total||1;const wr=Math.round(d.released/total*100);const logo=getBankLogo(bk);return<div key={bk} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}><div style={{width:38,height:38,borderRadius:8,background:'#fff',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,padding:2}}>{logo?<img src={logo} alt={bk} style={{width:'100%',height:'100%',objectFit:'contain'}} onError={e=>{e.target.style.display='none';}}/>:<span style={{fontSize:11,fontWeight:800,color:'var(--text3)'}}>{bk.slice(0,3)}</span>}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{bk}</div><div style={{fontSize:11,color:'var(--text3)'}}>{[d.released&&`✅${d.released}`,d.approved&&`🔵${d.approved}`,d.waiting&&`⏳${d.waiting}`,d.lost&&`❌${d.lost}`].filter(Boolean).join(' · ')}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:16,fontWeight:800,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149'}}>{d.total}</div><div style={{fontSize:10,color:'var(--text3)'}}>เคส</div></div></div><StackBar d={d} total={total}/><div style={{display:'flex',justifyContent:'flex-end',marginTop:4}}><span style={{fontSize:10,fontWeight:700,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149'}}>Win Rate {wr}%</span></div></div>;})}
+        {Object.entries(stats.byBank).sort((a,b)=>b[1].total-a[1].total).map(([bk,d])=>{const t=d.total||1;const wr=Math.round(d.released/t*100);return<div key={bk} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}><div style={{width:36,height:36,borderRadius:8,background:'#fff',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><span style={{fontSize:10,fontWeight:800,color:'#333',textAlign:'center',lineHeight:1.2}}>{bk.slice(0,6)}</span></div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{bk}</div><div style={{fontSize:11,color:'var(--text3)'}}>{[d.released&&`✅${d.released}`,d.approved&&`🔵${d.approved}`,d.waiting&&`⏳${d.waiting}`,d.lost&&`❌${d.lost}`].filter(Boolean).join(' · ')}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:16,fontWeight:800}}>{d.total}</div><div style={{fontSize:10,color:'var(--text3)'}}>เคส</div></div></div><StackBar d={d} total={t}/><div style={{display:'flex',justifyContent:'flex-end',marginTop:4}}><span style={{fontSize:10,fontWeight:700,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149'}}>Win Rate {wr}%</span></div></div>;})}
       </div>}
       {tab==='source'&&<div style={{display:'grid',gap:10}}>
-        {Object.entries(stats.bySourceDetail).sort((a,b)=>b[1].total-a[1].total).map(([src,d])=>{const total=d.total||1;const wr=Math.round(d.released/total*100);return<div key={src} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}><div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{src}</div><div style={{fontSize:11,color:'var(--text3)'}}>{[d.released&&`✅${d.released}`,d.approved&&`🔵${d.approved}`,d.waiting&&`⏳${d.waiting}`,d.lost&&`❌${d.lost}`].filter(Boolean).join(' · ')}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:16,fontWeight:800,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149'}}>{d.total}</div><div style={{fontSize:10,color:'var(--text3)'}}>คัน</div></div></div><StackBar d={d} total={total}/><div style={{display:'flex',justifyContent:'flex-end',marginTop:4}}><span style={{fontSize:10,fontWeight:700,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149'}}>Win Rate {wr}%</span></div></div>;})}
+        {Object.entries(stats.bySource).sort((a,b)=>b[1]-a[1]).map(([src,cnt])=>{const pct=Math.round(cnt/stats.total*100);return<div key={src} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><div style={{fontWeight:700,fontSize:14}}>{src}</div><span style={{fontWeight:700,color:'var(--blue)'}}>{cnt} คัน ({pct}%)</span></div><div style={{height:7,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:'rgba(88,166,255,.7)',width:`${pct}%`}}/></div></div>;})}
       </div>}
-      {tab==='brand'&&<div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:14}}>🚗 ยี่ห้อรถที่ขายบ่อย</div>{Object.entries(stats.byBrand).sort((a,b)=>b[1]-a[1]).map(([br,cnt])=>{const pct=Math.round(cnt/(Object.values(stats.byBrand).reduce((a,b)=>a+b,0))*100);return<div key={br} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{fontSize:13,fontWeight:600,width:80,flexShrink:0}}>{br}</div><div style={{flex:1,height:26,background:'var(--bg3)',borderRadius:6,overflow:'hidden',position:'relative'}}><div style={{height:'100%',background:'rgba(63,185,80,.6)',width:`${pct}%`,borderRadius:6}}/><div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',paddingLeft:10,fontSize:12,fontWeight:700}}>{cnt} คัน ({pct}%)</div></div></div>;})}</div>}
-      {tab==='table'&&<div className="card" style={{padding:0}}><div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',gap:10,alignItems:'center'}}><input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 ค้นหาในตาราง..." style={{flex:1,fontSize:13}}/><span style={{fontSize:12,color:'var(--text3)',flexShrink:0}}>{filteredRows.length} แถว</span></div><div className="table-wrap" style={{maxHeight:500,overflowY:'auto'}}><table><thead><tr><th>ยี่ห้อ</th><th>รุ่น</th><th>ทะเบียน</th><th>เซลส์</th><th>ธนาคาร</th><th>สถานะ</th><th>วันจอง</th></tr></thead><tbody>{filteredRows.slice(0,100).map((r,i)=><tr key={i}><td style={{fontWeight:600}}>{getV(r,'ยี่ห้อ','brand')}</td><td>{getV(r,'รุ่นรถ','รุ่น')}</td><td style={{color:'var(--blue)',fontWeight:600}}>{getV(r,'ทะเบียน','plate')}</td><td style={{color:'var(--purple)'}}>{getV(r,'เซลล์','เซลส์','sales')}</td><td style={{fontSize:12}}>{getV(r,'ธนาคาร','bank')}</td><td><StatusBadge status={getV(r,'สถานะ','status')}/></td><td style={{fontSize:11,color:'var(--text3)'}}>{getV(r,'date จอง','Date จอง')}</td></tr>)}</tbody></table>{filteredRows.length>100&&<div style={{padding:'8px 16px',fontSize:12,color:'var(--text3)',textAlign:'center'}}>แสดง 100/{filteredRows.length} แถว</div>}</div></div>}
+      {tab==='brand'&&<div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:14}}>🚗 ยี่ห้อรถที่ขายบ่อย</div>{Object.entries(stats.byBrand).sort((a,b)=>b[1]-a[1]).map(([br,cnt])=>{const tot=Object.values(stats.byBrand).reduce((a,b)=>a+b,0)||1;const pct=Math.round(cnt/tot*100);return<div key={br} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{fontSize:13,fontWeight:600,width:80,flexShrink:0,textTransform:'capitalize'}}>{br}</div><div style={{flex:1,height:26,background:'var(--bg3)',borderRadius:6,overflow:'hidden',position:'relative'}}><div style={{height:'100%',background:'rgba(63,185,80,.6)',width:`${pct}%`,borderRadius:6}}/><div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',paddingLeft:10,fontSize:12,fontWeight:700}}>{cnt} คัน ({pct}%)</div></div></div>;})}
+      </div>}
+      {tab==='table'&&<div className="card" style={{padding:0}}>
+        <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',gap:10,alignItems:'center'}}>
+          <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 ค้นหาในตาราง..." style={{flex:1,fontSize:13}}/>
+          <span style={{fontSize:12,color:'var(--text3)',flexShrink:0}}>{filteredRows.length} แถว</span>
+        </div>
+        <div className="table-wrap" style={{maxHeight:500,overflowY:'auto'}}>
+          <table><thead><tr><th>ยี่ห้อ</th><th>รุ่น</th><th>ทะเบียน</th><th>เซลส์</th><th>ธนาคาร</th><th>สถานะ</th><th>วันจอง</th></tr></thead>
+          <tbody>{filteredRows.slice(0,200).map((r,i)=><tr key={i}>
+            <td style={{fontWeight:600,textTransform:'capitalize'}}>{getV(r,'ยี่ห้อรก','ยี่ห้อ','brand')}</td>
+            <td>{getV(r,'รุ่นรถ','รุ่น','model')}</td>
+            <td style={{color:'var(--blue)',fontWeight:600}}>{getV(r,'ทะเบียน','plate')}</td>
+            <td style={{color:'var(--purple)'}}>{normSales(getV(r,'เซลล์','เซลส์','sales'))}</td>
+            <td style={{fontSize:12}}>{getV(r,'ธนาคาร','bank')}</td>
+            <td><StatusBadge status={getV(r,'สถานะ','status')}/></td>
+            <td style={{fontSize:11,color:'var(--text3)'}}>{getV(r,'Date จอง','date จอง')}</td>
+          </tr>)}</tbody></table>
+          {filteredRows.length>200&&<div style={{padding:'8px 16px',fontSize:12,color:'var(--text3)',textAlign:'center'}}>แสดง 200/{filteredRows.length} แถว</div>}
+        </div>
+      </div>}
     </>}
-    {!rows.length&&!loading&&!error&&<div style={{textAlign:'center',padding:'60px 20px',color:'var(--text2)'}}><div style={{fontSize:52,marginBottom:16}}>📊</div><div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ยังไม่มีข้อมูล</div><div style={{fontSize:13,color:'var(--text3)'}}>กด "ดึงข้อมูลจาก Google Sheet" เพื่อเริ่มต้น</div></div>}
+    {!rows.length&&!loading&&!error&&<div style={{textAlign:'center',padding:'60px 20px',color:'var(--text2)'}}><div style={{fontSize:52,marginBottom:16}}>📊</div><div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ยังไม่มีข้อมูล</div><div style={{fontSize:13,color:'var(--text3)',lineHeight:1.8}}>กด "ดึงข้อมูลจาก Google Sheet" เพื่อเริ่มต้น<br/>⚠️ Sheet ต้องแชร์เป็น Public ก่อนครับ</div></div>}
   </div>;
 }
+
+
 
 function AdminApp({currentUser,onLogout}){
   const [page,setPage]=useState('cases');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);
