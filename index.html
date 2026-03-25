@@ -287,7 +287,7 @@ async function sbApi(action,data){
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
     case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);return{success:true};}
-    case 'searchCases':{const rows=await sbQ('GET','cases',{or:`caseid.ilike.*${data.q}*,customername.ilike.*${data.q}*,contact.ilike.*${data.q}*`});return{success:true,data:rows||[]};}
+    case 'searchCases':{const q=String(data.q||'').trim();const rows=await sbQ('GET','cases',{or:`caseid.ilike.%25${q}%25,customername.ilike.%25${q}%25,contact.ilike.%25${q}%25`});return{success:true,data:rows||[]};}
     case 'getMarket':{const rows=await sbQ('GET','market',{poolstatus:'eq.เปิด'});let filtered=(rows||[]);if(data.sales)filtered=filtered.filter(r=>!r.expiredsales||!String(r.expiredsales).split(',').includes(data.sales));for(let i=filtered.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[filtered[i],filtered[j]]=[filtered[j],filtered[i]];}return{success:true,data:filtered.map(mapMarket)};}
     case 'sendToMarket':{const ex=await sbQ('GET','market',{id:`eq.${data.caseId}`});if(ex?.length){const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(',')});}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(!cr?.length)return{success:false,error:'ไม่พบเคส'};const c=cr[0];await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales,poolstatus:'เปิด'});}sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');return{success:true};}
     case 'closeMarketCase':{await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'ปิด'});await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,data.closedBy||'แอดมิน','ปิดเคส','ปิดเคสออกจากตลาด');return{success:true};}
@@ -777,12 +777,12 @@ function NotifPanel({user,onClose,onCountChange}){
 }
 
 function AdminCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});const [sortDir,setSortDir]=useState('desc');const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);const [showAddBook,setShowAddBook]=useState(false);const [showExportModal,setShowExportModal]=useState(false);
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{}).then(r=>{if(r.success)setCases(r.data||[]);setLoading(false);});},[]);
+  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});const [sortDir,setSortDir]=useState('desc');const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);const [showAddBook,setShowAddBook]=useState(false);const [showExportModal,setShowExportModal]=useState(false);const [showExport,setShowExport]=useState(false);const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
+  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{}).then(r=>{setCases(Array.isArray(r.data)?r.data:[]);setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[]);
   useEffect(()=>{load();},[load]);
-  async function search(){if(!filter.q){load();return;}setLoading(true);const r=await api('searchCases',{q:filter.q});if(r.success)setCases(r.data||[]);setLoading(false);}
+  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});setCases(Array.isArray(r.data)?r.data:[]);}catch(e){setCases([]);}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
-  const filtered=cases.filter(c=>{
+  const filtered=(Array.isArray(cases)?cases:[]).filter(c=>{
     if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
     if(filter.status&&c.status!==filter.status)return false;
     if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom))return false;}
@@ -790,8 +790,6 @@ function AdminCurrentCases({currentUser,users}){
     return true;
   }).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const salesList=users.filter(u=>u.role==='Sales');
-  const [showExport,setShowExport]=useState(false);
-  const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
 
   function doExport(rows,filename='cases'){
     // Format ตรงกับ Google Sheet — caseid, customername, contact, report, status, sales, createdat, updatedat, sent
