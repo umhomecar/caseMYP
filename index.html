@@ -102,12 +102,12 @@ tr.clickable{cursor:pointer;}
 .market-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;}
 .market-card:hover{border-color:var(--blue2);}
 .mk-page{display:flex;flex-direction:column;min-height:100vh;}
-.mk-hero{background:linear-gradient(135deg,#0d1b2a 0%,#1a2744 60%,#0f2233 100%);padding:24px 24px 0;border-bottom:1px solid var(--border);}
+.mk-hero{background:linear-gradient(135deg,#0d1b2a 0%,#1a2744 60%,#0f2233 100%);padding:24px 24px 0;border-bottom:1px solid var(--border);color:#e6edf3;}
 .mk-hero-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;}
 .mk-stats{display:flex;gap:4px;}
 .mk-stat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 20px;text-align:center;min-width:90px;}
 .mk-stat-num{font-size:26px;font-weight:800;line-height:1;}
-.mk-stat-lbl{font-size:11px;color:var(--text2);margin-top:3px;}
+.mk-stat-lbl{font-size:11px;color:rgba(230,237,243,.7);margin-top:3px;}
 .mk-body{display:flex;flex:1;gap:0;}
 .mk-cards-area{flex:1;padding:20px;min-width:0;}
 .mk-sidebar{width:280px;flex-shrink:0;border-left:1px solid var(--border);padding:16px;background:var(--bg2);}
@@ -1038,7 +1038,7 @@ function SalesMarket({currentUser}){
   function getDateBadge(c){const id=String(c.ID||'');if(id.length>=4){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
   const visibleCases=cases.filter(c=>!claimedIds.has(c.ID)&&!skippedIds.has(c.ID));const myStats=leaderboard.find(s=>s.name===currentUser.name)||{};const totalInMarket=visibleCases.length;const myClaimed=claimedCases.length+(claimedIds.size);const lbSorted=[...leaderboard].sort((a,b)=>(b.claimedCases||0)-(a.claimedCases||0));
   return <div className="mk-page">
-    <div className="mk-hero"><div className="mk-hero-top"><div><div style={{fontSize:20,fontWeight:800,display:'flex',alignItems:'center',gap:8}}>🎯 ตลาดเคส</div><div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ใครไวได้ก่อน</div></div><button className="btn btn-ghost" onClick={()=>load(false)} style={{fontSize:13}}>🔄</button></div><div className="mk-stats">{[['ว่างอยู่',totalInMarket,'var(--blue)'],['ของฉัน',myClaimed,'var(--green)']].map(([l,v,c])=><div key={l} className="mk-stat"><div className="mk-stat-num" style={{color:c}}>{v}</div><div className="mk-stat-lbl">{l}</div></div>)}</div></div>
+    <div className="mk-hero"><div className="mk-hero-top"><div><div style={{fontSize:20,fontWeight:800,display:'flex',alignItems:'center',gap:8,color:'#e6edf3'}}>🎯 ตลาดเคส</div><div style={{fontSize:13,color:'rgba(230,237,243,.7)',marginTop:4}}>ใครไวได้ก่อน</div></div><button className="btn btn-ghost" onClick={()=>load(false)} style={{fontSize:13}}>🔄</button></div><div className="mk-stats">{[['ว่างอยู่',totalInMarket,'var(--blue)'],['ของฉัน',myClaimed,'var(--green)']].map(([l,v,c])=><div key={l} className="mk-stat"><div className="mk-stat-num" style={{color:c}}>{v}</div><div className="mk-stat-lbl">{l}</div></div>)}</div></div>
     <div className="mk-body"><div className="mk-cards-area">
       {toast&&<div style={{background:toast.type==='ok'?'rgba(63,185,80,.12)':'rgba(248,81,73,.12)',border:`1px solid ${toast.type==='ok'?'var(--green)':'var(--red)'}`,padding:'10px 16px',borderRadius:8,marginBottom:14,fontSize:13,display:'flex',alignItems:'center',gap:8}}>{toast.msg}</div>}
       {loading?<SkeletonCards n={6}/>:visibleCases.length===0?<div style={{textAlign:'center',padding:60,color:'var(--text2)'}}><div style={{fontSize:48,marginBottom:12}}>📭</div><div style={{fontSize:16,fontWeight:600}}>ไม่มีเคสในตลาด</div></div>:<><div style={{fontSize:13,color:'var(--text2)',marginBottom:12}}>พบ {visibleCases.length} เคส</div><div className="mk-cards-grid">{visibleCases.map((c,i)=><div key={i} className="mkc"><div className="mkc-top"><span className="mkc-id">{c.ID}</span><span className="mkc-date">📅 {getDateBadge(c)}</span></div><div className="mkc-name">{c.name}</div><div className="mkc-badges"><StatusBadge status={c.status}/><span className="badge" style={{background:'rgba(255,166,87,.1)',color:'var(--orange)',border:'1px solid rgba(255,166,87,.3)',fontSize:11}}>จาก {c.old_sales||'-'}</span></div><div className="mkc-contact">📞 <span style={{filter:'blur(5px)',userSelect:'none',letterSpacing:1}}>••••••••••</span><span style={{fontSize:11,color:'var(--text3)'}}>(เห็นหลังรับเคส)</span></div>{c.report&&<div className="mkc-report">{String(c.report).slice(0,130)}{c.report.length>130?'...':''}</div>}<div className="mkc-actions"><button className="btn-claim" onClick={()=>claim(c.ID)}>รับเคสนี้ →</button><button onClick={()=>notInterested(c.ID)} style={{background:'rgba(248,81,73,.12)',color:'var(--red)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'10px 14px',fontSize:15,cursor:'pointer',transition:'all .15s',fontWeight:700,lineHeight:1}}>✕</button></div></div>)}</div></>}
@@ -1062,7 +1062,10 @@ function TodayFollowupBanner({currentUser}){
     }
     setItems(all.sort((a,b)=>a.date.localeCompare(b.date)));
   },[]);
-  if(!items.length)return null;
+  if(!items.length)return<div style={{background:'rgba(88,166,255,.06)',border:'1px dashed rgba(88,166,255,.25)',borderRadius:10,padding:'10px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:8}}>
+    <span style={{fontSize:16}}>📅</span>
+    <div style={{fontSize:12,color:'var(--text3)'}}>ไม่มีนัดวันนี้ — กดเข้าเคสแล้วตั้งนัด Follow-up ได้เลย</div>
+  </div>;
   const overdue=items.filter(f=>f.date<today);
   const todayItems=items.filter(f=>f.date===today);
   return<div style={{background:overdue.length?'rgba(248,81,73,.08)':'rgba(210,153,34,.08)',border:'1px solid '+(overdue.length?'rgba(248,81,73,.4)':'rgba(210,153,34,.4)'),borderRadius:10,padding:'12px 14px',marginBottom:14}}>
@@ -1193,9 +1196,11 @@ function parseCSV(text){
   if(lines.length<2)return{headers:[],rows:[]};
 
   // หา header row — แถวแรกที่มี >= 5 columns
+  // หา header row — ต้องมี column ที่ไม่ว่างจริงๆ >= 5 อัน (ไม่ใช่แค่ comma)
   let headerIdx=0;
   for(let i=0;i<Math.min(5,lines.length);i++){
-    const splitLen=lines[i].split(',').length;if(splitLen>=5||splitLen===Math.max(...lines.slice(0,5).map(l=>l.split(',').length))){headerIdx=i;break;}
+    const vals=lines[i].split(',').map(v=>v.replace(/"/g,'').trim()).filter(v=>v.length>0);
+    if(vals.length>=5){headerIdx=i;break;}
   }
 
   function parseLine(line){
@@ -1239,9 +1244,12 @@ function AdminDailyReport(){
     return'';
   }
   function normSales(n){if(!n)return n;return n.replace(/\s*\d+$/,'').trim();}
-  const RELEASED=['ปล่อยรถแล้ว','ปล่อยแล้ว','ปล่อย'];const APPROVED=['อนุมัติรับรถ','อนุมัติ'];
-  const isReleased=st=>RELEASED.some(s=>String(st).includes(s));
-  const isApproved=st=>APPROVED.some(s=>String(st).includes(s));
+  const RELEASED=['ปล่อยรถแล้ว','ปล่อยแล้ว','ปล่อย','ปล่อยรถ'];
+  const APPROVED=['อนุมัติรับรถ','อนุมัติ'];
+  const WAITING=['รอผล','รอเซ็นต์','รอเซ็น'];
+  const LOST=['ปิดเคส','รีเจค','ยกเลิก'];
+  const isReleased=st=>RELEASED.some(s=>String(st).trim().includes(s.trim()));
+  const isApproved=st=>APPROVED.some(s=>String(st).trim().includes(s.trim()));
 
   async function fetchSheet(force=false){
     if(!force){try{if(localStorage.getItem(CACHE_DATE_KEY)===todayISO&&rows.length>0)return;}catch(e){}}
@@ -1268,9 +1276,10 @@ function AdminDailyReport(){
       const br=(getV(r,'ยี่ห้อรก','ยี่ห้อ','brand','Brand')||'').toLowerCase().trim();
       const dateBook=normalizeDate(getV(r,'Date จอง','date จอง','วันที่จอง'));
       if(dateBook){const mon=dateBook.slice(0,7);if(!byMonth[mon])byMonth[mon]={total:0,released:0};byMonth[mon].total++;if(isReleased(st))byMonth[mon].released++;}
-      if(st)byStatus[st]=(byStatus[st]||0)+1;
-      if(sl){if(!bySales[sl])bySales[sl]={total:0,released:0,approved:0,waiting:0,booked:0,lost:0};bySales[sl].total++;if(isReleased(st))bySales[sl].released++;else if(isApproved(st))bySales[sl].approved++;else if(['รอผล','รอเซ็นต์','รอเซ็น'].some(s=>st.includes(s)))bySales[sl].waiting++;else if(['ปิดเคส','รีเจค','ยกเลิก'].some(s=>st.includes(s)))bySales[sl].lost++;else bySales[sl].booked++;}
-      if(bk){if(!byBank[bk])byBank[bk]={total:0,released:0,approved:0,waiting:0,lost:0};byBank[bk].total++;if(isReleased(st))byBank[bk].released++;else if(isApproved(st))byBank[bk].approved++;else if(['รอผล','รอเซ็นต์'].some(s=>st.includes(s)))byBank[bk].waiting++;else if(['ปิดเคส','รีเจค'].some(s=>st.includes(s)))byBank[bk].lost++;}
+      const stKey=st||'ไม่ระบุ';if(stKey)byStatus[stKey]=(byStatus[stKey]||0)+1;
+      const isW=WAITING.some(s=>st.includes(s.trim()));const isL=LOST.some(s=>st.includes(s.trim()));const isB=BOOKED.some(s=>st.includes(s.trim()));
+      if(sl){if(!bySales[sl])bySales[sl]={total:0,released:0,approved:0,waiting:0,booked:0,lost:0};bySales[sl].total++;if(isReleased(st))bySales[sl].released++;else if(isApproved(st))bySales[sl].approved++;else if(isW)bySales[sl].waiting++;else if(isL)bySales[sl].lost++;else bySales[sl].booked++;}
+      if(bk){if(!byBank[bk])byBank[bk]={total:0,released:0,approved:0,waiting:0,lost:0};byBank[bk].total++;if(isReleased(st))byBank[bk].released++;else if(isApproved(st))byBank[bk].approved++;else if(isW)byBank[bk].waiting++;else if(isL)byBank[bk].lost++;}
       if(src)bySource[src]=(bySource[src]||0)+1;
       if(br)byBrand[br]=(byBrand[br]||0)+1;
     });
