@@ -665,20 +665,53 @@ function NotifPanel({user,onClose,onCountChange}){
 }
 
 function AdminCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [filter,setFilter]=useState({sales:'all',status:'',q:''});const [sortDir,setSortDir]=useState('desc');const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);const [showAddBook,setShowAddBook]=useState(false);
+  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});const [sortDir,setSortDir]=useState('desc');const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);const [showAddBook,setShowAddBook]=useState(false);const [showExportModal,setShowExportModal]=useState(false);
   const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{}).then(r=>{if(r.success)setCases(r.data||[]);setLoading(false);});},[]);
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);const r=await api('searchCases',{q:filter.q});if(r.success)setCases(r.data||[]);setLoading(false);}
-  const filtered=cases.filter(c=>{if(filter.sales!=='all'&&c.sales!==filter.sales)return false;if(filter.status&&c.status!==filter.status)return false;return true;}).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
+  function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+  const filtered=cases.filter(c=>{
+    if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
+    if(filter.status&&c.status!==filter.status)return false;
+    if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom))return false;}
+    if(filter.dateTo){const d=parseD2(c.createdat);const to=new Date(filter.dateTo);to.setHours(23,59,59);if(!d||d>to)return false;}
+    return true;
+  }).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const salesList=users.filter(u=>u.role==='Sales');
-  function exportCSV(){
-    const cols=['รหัสเคส','ชื่อลูกค้า','ติดต่อ','สถานะ','เซลส์','อัปเดตล่าสุด'];
-    const rows=filtered.map(c=>[c.caseid,c.customername,c.contact||'',c.status,c.sales,String(c.updatedat||'').split(' ')[0]]);
-    const csv=[cols,...rows].map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
-    const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='cases_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  const [showExport,setShowExport]=useState(false);
+  const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
+
+  function doExport(rows,filename='cases'){
+    // Format ตรงกับ Google Sheet — caseid, customername, contact, report, status, sales, createdat, updatedat, sent
+    const cols=['caseid','customername','contact','report','status','sales','createdat','updatedat','sent','attachment'];
+    const thCols=['รหัสเคส','ชื่อลูกค้า','ช่องทางติดต่อ','รีพอร์ต','สถานะ','เซลส์','วันที่สร้าง','อัปเดตล่าสุด','ประเภทส่ง','ไฟล์แนบ'];
+    const data=rows.map(c=>[
+      c.caseid||'', c.customername||'', c.contact||'', (c.report||'').replace(/\n/g,' '),
+      c.status||'', c.sales||'', c.createdat||'', c.updatedat||'', c.sent||'ปกติ', c.attachment||''
+    ]);
+    const csv=[thCols,...data].map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a=document.createElement('a');
+    a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+    a.download=filename+'_'+new Date().toISOString().slice(0,10)+'.csv';
+    a.click();
+  }
+
+  function exportCSV(){setShowExport(true);}
+
+  function getExportRows(){
+    let rows=[...cases];
+    // filter เซลส์
+    if(exportFilter.salesFilter!=='all')rows=rows.filter(c=>c.sales===exportFilter.salesFilter);
+    // filter สถานะ
+    if(exportFilter.statusFilter)rows=rows.filter(c=>c.status===exportFilter.statusFilter);
+    // filter วันที่
+    function parseD(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+    if(exportFilter.dateFrom){const from=new Date(exportFilter.dateFrom);rows=rows.filter(c=>{const d=parseD(c.createdat);return d&&d>=from;});}
+    if(exportFilter.dateTo){const to=new Date(exportFilter.dateTo);to.setHours(23,59,59);rows=rows.filter(c=>{const d=parseD(c.createdat);return d&&d<=to;});}
+    return rows;
   }
   return <div className="page">
-    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13}} onClick={exportCSV}>📥 Export</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
@@ -695,8 +728,58 @@ function AdminCurrentCases({currentUser,users}){
       <button className="btn btn-ghost" style={{height:34,padding:'0 10px',fontSize:13}} onClick={()=>{cacheClear(['getCases','getDashboard']);load();}} title="ล้าง Cache แล้วโหลดใหม่">🔄</button>
       <span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>{filtered.length} เคส</span>
     </div>
+    {/* Date range filter row */}
+    <div style={{display:'flex',gap:6,marginBottom:10,alignItems:'center',flexWrap:'wrap'}}>
+      <span style={{fontSize:12,color:'var(--text2)',flexShrink:0}}>📅 สร้างระหว่าง:</span>
+      <input type="date" value={filter.dateFrom||''} onChange={e=>setFilter(f=>({...f,dateFrom:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
+      <span style={{fontSize:12,color:'var(--text3)'}}>—</span>
+      <input type="date" value={filter.dateTo||''} onChange={e=>setFilter(f=>({...f,dateTo:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
+      {(filter.dateFrom||filter.dateTo)&&<button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>setFilter(f=>({...f,dateFrom:'',dateTo:''}))}>✕ ล้างวันที่</button>}
+    </div>
     <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:filtered.length===0?<tr><td colSpan={6} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const cv=formatContact(c.contact||'');const isPhone=cv&&/^\d{9,10}$/.test(cv.replace(/\D/g,''));return<tr key={i} className="clickable" onClick={()=>setSel(c)}><td><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td style={{fontWeight:500}}>{c.customername}</td><td style={{fontSize:13}}><div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>{displayContact(c.contact)}</span>{isPhone&&<a href={`tel:${cv}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none',fontSize:11,padding:'2px 8px'}}><Ico.phone/>โทร</a>}{isPhone&&<a href={`https://line.me/ti/p/~${cv}`} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none',fontSize:11,padding:'2px 8px'}}>Line</a>}</div></td><td><div style={{display:'flex',gap:4,alignItems:'center'}}><StatusBadge status={c.status}/><ScoreBadge score={calculateCaseScore(c)}/></div></td><td><span style={{color:'var(--purple)'}}>{c.sales}</span></td><td style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td></tr>;})}</tbody></table></div></div>
     {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
+    {showExport&&<div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setShowExport(false);}}>
+      <div className="modal" style={{maxWidth:460,borderRadius:14}}>
+        <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:4,height:22,background:'var(--green)',borderRadius:2}}/>
+          <span style={{fontWeight:700,fontSize:15}}>📥 Export เคส</span>
+          <button className="btn btn-ghost" style={{padding:'4px 8px',marginLeft:'auto'}} onClick={()=>setShowExport(false)}><Ico.x/></button>
+        </div>
+        <div style={{padding:'20px'}}>
+          <div style={{fontSize:12,color:'var(--text2)',marginBottom:16,background:'var(--bg3)',borderRadius:8,padding:'10px 12px',lineHeight:1.7}}>
+            📊 Export ออกมาในรูปแบบ Google Sheet เลย<br/>
+            มีคอลัมน์: รหัสเคส, ชื่อลูกค้า, ติดต่อ, รีพอร์ต, สถานะ, เซลส์, วันสร้าง, อัปเดต, ประเภท
+          </div>
+          <div className="form-group">
+            <label>เซลส์</label>
+            <select value={exportFilter.salesFilter} onChange={e=>setExportFilter(f=>({...f,salesFilter:e.target.value}))}>
+              <option value="all">ทุกเซลส์</option>
+              {salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>สถานะ</label>
+            <select value={exportFilter.statusFilter} onChange={e=>setExportFilter(f=>({...f,statusFilter:e.target.value}))}>
+              <option value="">ทุกสถานะ</option>
+              {STATUSES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div className="form-group"><label>วันที่สร้าง (จาก)</label><input type="date" value={exportFilter.dateFrom} onChange={e=>setExportFilter(f=>({...f,dateFrom:e.target.value}))}/></div>
+            <div className="form-group" style={{marginBottom:0}}><label>วันที่สร้าง (ถึง)</label><input type="date" value={exportFilter.dateTo} onChange={e=>setExportFilter(f=>({...f,dateTo:e.target.value}))}/></div>
+          </div>
+          <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 14px',fontSize:13,color:'var(--text2)',marginBottom:16}}>
+            จะ Export <strong style={{color:'var(--blue)'}}>{getExportRows().length}</strong> แถว
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowExport(false)}>ยกเลิก</button>
+            <button className="btn btn-green" style={{flex:2,fontWeight:700}} onClick={()=>{doExport(getExportRows());setShowExport(false);}}>
+              📥 Download CSV ({getExportRows().length} แถว)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>}
     {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={load}/>}
     {showAddBook&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAddBook(false)} onAdded={()=>{}}/>}
   </div>;
