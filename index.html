@@ -1095,41 +1095,48 @@ const SHEET_ID = '1bcnrlBDACCWqavQb8qqdhP6bj94RNpO6KKVr4s25v2w';
 const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 
 function parseCSV(text){
+  if(!text||text.trim().startsWith('<!DOCTYPE')||text.trim().startsWith('<html')){
+    throw new Error('ได้รับ HTML แทน CSV — Sheet ต้องแชร์เป็น Public');
+  }
+
+  // strip HTML tags + decode entities
+  function stripHtml(s){
+    if(!s)return'';
+    s=s.replace(/<[^>]*>/g,'');
+    s=s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ');
+    return s.trim();
+  }
+
   const lines=text.split(/\r?\n/).filter(l=>l.trim());
   if(lines.length<2)return{headers:[],rows:[]};
 
-  // หา header row — หา row แรกที่มีข้อมูลหลาย column และไม่ใช่ title
+  // หา header row — แถวแรกที่มี >= 5 columns
   let headerIdx=0;
   for(let i=0;i<Math.min(5,lines.length);i++){
-    const cols=lines[i].split(',').length;
-    if(cols>=5){headerIdx=i;break;}
+    if(lines[i].split(',').length>=5){headerIdx=i;break;}
   }
 
   function parseLine(line){
     const vals=[];let cur='',inQ=false;
     for(let i=0;i<line.length;i++){
       const ch=line[i];
-      if(ch==='"'){inQ=!inQ;}
-      else if(ch===','&&!inQ){vals.push(cur.trim().replace(/^"|"$/g,''));cur='';}
+      if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+      else if(ch===','&&!inQ){vals.push(stripHtml(cur));cur='';}
       else cur+=ch;
     }
-    vals.push(cur.trim().replace(/^"|"$/g,''));
+    vals.push(stripHtml(cur));
     return vals;
   }
 
-  const headerVals=parseLine(lines[headerIdx]);
-  const headers=headerVals.map(h=>h.trim());
-
+  const headers=parseLine(lines[headerIdx]).map(h=>stripHtml(h));
   const rows=lines.slice(headerIdx+1).map(line=>{
     const vals=parseLine(line);
     const row={};
-    headers.forEach((h,i)=>{row[h]=(vals[i]||'').trim();});
+    headers.forEach((h,i)=>{row[h]=vals[i]||'';});
     return row;
-  }).filter(r=>headers.some(h=>r[h]&&r[h].trim()!=''));
-
+  }).filter(r=>headers.some(h=>r[h]&&r[h]!=''));
   return{headers,rows};
 }
-
 function normalizeDate(d){if(!d)return null;const m=String(d).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return null;let[,dd,mo,yy]=m;if(yy.length===2)yy='25'+yy;const yr=parseInt(yy)>2500?parseInt(yy)-543:parseInt(yy);return`${yr}-${String(mo).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
 
 function AdminDailyReport(){
