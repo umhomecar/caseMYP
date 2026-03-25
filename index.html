@@ -242,12 +242,25 @@ async function api(action,data={}){
 function nowTH(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;}
 
 async function sbQ(method,table,q={},body=null){
-  const url=new URL(`${SUPA_URL}/rest/v1/${table}`);
-  Object.entries(q).forEach(([k,v])=>url.searchParams.set(k,String(v)));
+  // แยก raw params (ที่มี % อยู่แล้ว) ออกจาก normal params
+  const baseUrl=`${SUPA_URL}/rest/v1/${table}`;
+  const normalParams=[];const rawParts=[];
+  Object.entries(q).forEach(([k,v])=>{
+    const s=String(v);
+    if(s.includes('%25')||s.includes('%20')){
+      // ถ้ามี encoded chars ให้ใส่ตรงๆ ใน URL โดยไม่ encode ซ้ำ
+      rawParts.push(encodeURIComponent(k)+'='+s);
+    } else {
+      normalParams.push([k,s]);
+    }
+  });
+  const url=new URL(baseUrl);
+  normalParams.forEach(([k,v])=>url.searchParams.set(k,v));
+  const finalUrl=rawParts.length>0?url.toString()+(url.search?'&':'?')+rawParts.join('&'):url.toString();
   const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Range':'0-4999'};
   if(method!=='GET')h['Prefer']='return=representation';
   const opts={method,headers:h};if(body!==null)opts.body=JSON.stringify(body);
-  const r=await fetch(url.toString(),opts);
+  const r=await fetch(finalUrl,opts);
   if(r.status===204)return[];const t=await r.text();try{return JSON.parse(t);}catch(e){return[];}
 }
 
