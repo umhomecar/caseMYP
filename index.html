@@ -185,11 +185,11 @@ const {useState,useEffect,useCallback,useRef,createContext,useContext} = React;
 // ============================================================
 // ⚙️ CONFIG
 // ============================================================
-const SUPA_URL = 'https://hjcogqfkwivezpqivwoz.supabase.co';
+const SUPA_URL = 'https://lhmycnzarbcmweavhnxh.supabase.co';
 
 // ── FCM Push Notification Setup ──
 const FCM_VAPID = 'BDE3zFoypE16kiLHPFXlF5maeVfvwbp7cnRFdIgxcsi1xVuZmRazyl9ZxsVyTXTdTFVrFXTPpaFQrYht0xM6io0';
-const FCM_EDGE_URL = 'https://hjcogqfkwivezpqivwoz.supabase.co/functions/v1/send-fcm';
+const FCM_EDGE_URL = 'https://lhmycnzarbcmweavhnxh.supabase.co/functions/v1/send-fcm';
 const FB_CONFIG = {
   apiKey: "AIzaSyC1bnlkqxibYxA4T_giYeN7dyZHcSN5Dek",
   authDomain: "casepool-11685.firebaseapp.com",
@@ -241,7 +241,7 @@ async function pushNotif(salesName,title,body,data={}){
     });
   }catch(e){console.warn('Push failed:',e);}
 }
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqY29ncWZrd2l2ZXpwcWl2d296Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDc4NDgsImV4cCI6MjA4OTUyMzg0OH0.-2BrFbaRL3lJ5Gukf7rB3dSF7Ju4qj3RuLJyNJT-3QI';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobXljbnphcmJjbXdlYXZobnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNzk5NTQsImV4cCI6MjA4OTY1NTk1NH0.t7nbVArhxbsTBYXnAPwNQKfu6xxid2G4bDdAVVZHB9s';
 const API_URL  = SUPA_URL;
 
 // ── ✅ FIX: Anthropic Key helpers ──
@@ -1520,7 +1520,8 @@ function SalesCurrentCases({currentUser,users}){
   useEffect(()=>{load();},[load]);
   // ซ่อนเคสที่อยู่ในตลาดออกจากรายการหลัก (แต่ถ้ากด "แสดงเคสปิดแล้ว" จะเห็น)
   const filtered=cases.filter(c=>{
-    if(!showClosed&&marketIds.has(String(c.caseid)))return false; // ซ่อนเคสในตลาดif(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
+    if(!showClosed&&marketIds.has(String(c.caseid)))return false;
+    if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   function formatDate(d){const s=String(d||'');if(s.includes('T')){const dt=new Date(s);if(!isNaN(dt)){return`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getFullYear()).slice(-2)} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;}}const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m)return`${m[1]}/${m[2]}/${String(m[3]).slice(-2)} ${m[4]}:${m[5]}`;return s.split(' ')[0]||'-';}
   return <div className="page">
