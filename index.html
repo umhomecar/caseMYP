@@ -639,6 +639,7 @@ function AdminAnalytics({currentUser}){
 
 function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   const [status,setStatus]=useState(caseData.status||caseData.newstatus||'รอข้อมูล');
+  const [sentType,setSentType]=useState(caseData.sent||'ปกติ');
   const [report,setReport]=useState(caseData.report||'');
   const [editReport,setEditReport]=useState(false);
   const [showHistory,setShowHistory]=useState(false);
@@ -679,7 +680,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   async function save(){
     const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:editReport?report:caseData.report,sales:(isAdmin&&newSales)?newSales:caseData.sales};
     onUpdated(optimisticData);onClose();
-    try{if(isClaimed){await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});}else{const upd={caseid:caseId,status,changedBy:currentUser.name,detail:'เปลี่ยนสถานะเป็น '+status};if(editReport)upd.report=report;await api('updateCase',upd);if(isAdmin&&newSales&&newSales!==caseData.sales)await api('adminChangeSales',{caseId,newSales});}}catch(e){}
+    try{if(isClaimed){await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});}else{const upd={caseid:caseId,status,sent:sentType,changedBy:currentUser.name,detail:'เปลี่ยนสถานะเป็น '+status};if(editReport)upd.report=report;await api('updateCase',upd);if(isAdmin&&newSales&&newSales!==caseData.sales)await api('adminChangeSales',{caseId,newSales});}}catch(e){}
   }
   async function saveReport(){if(!report.trim())return;setEditReport(false);onUpdated({...caseData,report});onClose();try{await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});}catch(e){}}
   async function doDelete(){onClose();const r=await api('deleteCase',{caseId,caseid:caseId,deletedBy:currentUser.name});cacheClear(['getCases','getMarket','getDashboard','getClaimedCases','getHistory','getNotifications']);if(r.success){onUpdated();}else{alert('เกิดข้อผิดพลาด: '+(r.error||'ไม่สามารถลบได้'));}}
@@ -694,7 +695,17 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
             <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ชื่อลูกค้า: </span><span style={{fontWeight:600}}>{caseData.customername||caseData.name||'-'}</span>{(caseData.customername||caseData.name)&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseData.customername||caseData.name||'')}>Copy</button>}</div>
             <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ติดต่อ: </span>{isQR?<div style={{marginTop:6,width:'100%'}}><img src={contactRaw} alt="QR" style={{maxWidth:'100%',maxHeight:220,borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',display:'block'}} onError={e=>{e.target.style.display='none';}}/></div>:<><span style={{fontWeight:600}}>{contactVal||'-'}</span>{contactVal&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(contactVal)}>Copy</button>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`tel:${contactVal}`} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`https://line.me/ti/p/~${contactVal}`} target="_blank" rel="noopener" className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none'}}>💬 Line</a>}</>}</div>
           </div>
-          <div className="form-group"><label>สถานะ:</label><select value={status} onChange={e=>setStatus(e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
+          <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10}}>
+            <div className="form-group"><label>สถานะ:</label><select value={status} onChange={e=>setStatus(e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
+            <div className="form-group"><label>การส่ง:</label>
+              <div style={{display:'flex',gap:6}}>
+                {SENT_TYPES.map(t=><button key={t} type="button"
+                  onClick={()=>setSentType(t)}
+                  style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,borderRadius:8,cursor:'pointer',border:'2px solid '+(sentType===t?(t==='ส่วนตัว'?'var(--purple)':'var(--green)'):'var(--border)'),background:sentType===t?(t==='ส่วนตัว'?'rgba(188,140,255,.15)':'rgba(63,185,80,.12)'):'var(--bg3)',color:sentType===t?(t==='ส่วนตัว'?'var(--purple)':'var(--green)'):'var(--text2)',transition:'all .15s'}}
+                >{t==='ส่วนตัว'?'🔒 ส่วนตัว':'📤 ปกติ'}</button>)}
+              </div>
+            </div>
+          </div>
           <div className="form-group"><label>เซลส์:</label>{isAdmin&&!isClaimed?<select value={newSales} onChange={e=>setNewSales(e.target.value)}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>:<div style={{display:'flex',gap:8,alignItems:'center'}}><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:14,flex:1}}>{caseData.sales||caseData.sale||currentUser.name}</div>{!isClaimed&&currentUser.role==='Sales'&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px',whiteSpace:'nowrap',color:'var(--orange)'}} onClick={()=>setShowTransfer(v=>!v)}>↔ โอนเคส</button>}</div>}</div>
           {showTransfer&&!isAdmin&&!isClaimed&&<div style={{background:'rgba(255,166,87,.08)',border:'1px solid rgba(255,166,87,.3)',borderRadius:8,padding:'12px',marginTop:-8,marginBottom:8}}><div style={{fontWeight:600,fontSize:13,marginBottom:8,color:'var(--orange)'}}>↔ โอนเคสให้เพื่อน</div><div style={{display:'flex',gap:8}}><select value={transferTo} onChange={e=>setTransferTo(e.target.value)} style={{flex:1,fontSize:13}}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales'&&u.name!==currentUser.name).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" style={{fontSize:12,padding:'0 12px',whiteSpace:'nowrap',background:'var(--orange)'}} disabled={!transferTo||transferring} onClick={doTransfer}>{transferring?'กำลังโอน...':'โอนเลย'}</button></div></div>}
           {/* Case Intelligence */}
