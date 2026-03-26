@@ -203,7 +203,9 @@ let _fbApp=null,_fbMsg=null;
 function getFBMessaging(){
   if(_fbMsg)return _fbMsg;
   try{
-    _fbApp=firebase.apps.length?firebase.app():firebase.initializeApp(FB_CONFIG);
+    if(typeof firebase==='undefined'){console.warn('Firebase SDK not loaded');return null;}
+    _fbApp=firebase.apps&&firebase.apps.length?firebase.app():firebase.initializeApp(FB_CONFIG);
+    if(!firebase.messaging){console.warn('Firebase messaging not available');return null;}
     _fbMsg=firebase.messaging(_fbApp);
     return _fbMsg;
   }catch(e){console.warn('FCM init error:',e);return null;}
