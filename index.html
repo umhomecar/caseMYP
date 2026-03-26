@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>ระบบจัดการเคส</title>
+<title>CasePool — ระบบจัดการเคส</title>
 <meta name="theme-color" content="#161b22"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -223,6 +223,7 @@ const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V'
 
 function getStatusClass(s){const m={'รอข้อมูล':'s-wait','ไปต่อได้':'s-go','เคสเลี้ยง':'s-nurse','เคสวัด 50/50':'s-half','ติดต่อไม่ได้':'s-cant','ยังไม่สะดวก':'s-later','จอง':'s-book','รอเซ็นต์':'s-sign','รอผล':'s-wait2','อนุมัติ':'s-approve','ปิดเคส':'s-close','รีเจค':'s-reject','ปล่อยแล้ว':'s-release','ได้รถจากที่อื่น':'s-other','โยนเคส':'s-throw','จองแล้ว':'s-book'};return m[s]||'s-wait';}
 function safeArray(x){return Array.isArray(x)?x:[];}
+function getData(res){return Array.isArray(res?.data)?res.data:[];}
 function displayContact(contact){if(!contact&&contact!==0)return '-';const s=String(contact).trim();if(s.startsWith('data:image')||s.startsWith('https://drive.google.com'))return '📷 QR Code';return formatContact(s)||'-';}
 function formatContact(contact){if(!contact&&contact!==0)return '';const s=String(contact).trim();if(s.startsWith('http')||s.startsWith('data:'))return s;if(/^\d{9}$/.test(s))return '0'+s;if(/^\d{8}$/.test(s))return '0'+s;return s;}
 
@@ -305,7 +306,8 @@ async function sbApi(action,data){
       const q=String(data.q||'').trim();
       if(!q)return{success:true,data:[]};
       // สร้าง URL ตรงๆ โดยไม่ผ่าน sbQ เพื่อหลีกเลี่ยง double-encode
-      const searchUrl=SUPA_URL+'/rest/v1/cases?or=caseid.ilike.%'+q+'%,customername.ilike.%'+q+'%,contact.ilike.%'+q+'%';
+      const qEnc=encodeURIComponent(q);
+      const searchUrl=SUPA_URL+'/rest/v1/cases?or=caseid.ilike.%25'+qEnc+'%25,customername.ilike.%25'+qEnc+'%25,contact.ilike.%25'+qEnc+'%25';
       const sh={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Range':'0-4999'};
       try{
         const sr=await fetch(searchUrl,{method:'GET',headers:sh});
@@ -806,7 +808,7 @@ function AdminCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});const [sortDir,setSortDir]=useState('desc');const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);const [showAddBook,setShowAddBook]=useState(false);const [showExportModal,setShowExportModal]=useState(false);const [showExport,setShowExport]=useState(false);const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
   const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{}).then(r=>{setCases(safeArray(r.data));setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[]);
   useEffect(()=>{load();},[load]);
-  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});setCases(safeArray(r.data));}catch(e){setCases([]);}setLoading(false);}
+  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=getData(r);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
   const filtered=safeArray(cases).filter(c=>{
     if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
