@@ -186,6 +186,59 @@ const {useState,useEffect,useCallback,useRef,createContext,useContext} = React;
 // ⚙️ CONFIG
 // ============================================================
 const SUPA_URL = 'https://hjcogqfkwivezpqivwoz.supabase.co';
+
+// ── FCM Push Notification Setup ──
+const FCM_VAPID = 'BDE3zFoypE16kiLHPFXlF5maeVfvwbp7cnRFdIgxcsi1xVuZmRazyl9ZxsVyTXTdTFVrFXTPpaFQrYht0xM6io0';
+const FCM_EDGE_URL = 'https://hjcogqfkwivezpqivwoz.supabase.co/functions/v1/send-fcm';
+const FB_CONFIG = {
+  apiKey: "AIzaSyC1bnlkqxibYxA4T_giYeN7dyZHcSN5Dek",
+  authDomain: "casepool-11685.firebaseapp.com",
+  projectId: "casepool-11685",
+  storageBucket: "casepool-11685.firebasestorage.app",
+  messagingSenderId: "755729743792",
+  appId: "1:755729743792:web:327d192340509e4c036075",
+};
+
+let _fbApp=null,_fbMsg=null;
+function getFBMessaging(){
+  if(_fbMsg)return _fbMsg;
+  try{
+    _fbApp=firebase.apps.length?firebase.app():firebase.initializeApp(FB_CONFIG);
+    _fbMsg=firebase.messaging(_fbApp);
+    return _fbMsg;
+  }catch(e){console.warn('FCM init error:',e);return null;}
+}
+
+async function initFCM(salesName,userId){
+  try{
+    if(!('Notification' in window))return;
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted')return;
+    const sw=await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    const msg=getFBMessaging();
+    if(!msg)return;
+    const token=await msg.getToken({vapidKey:FCM_VAPID,serviceWorkerRegistration:sw});
+    if(!token)return;
+    // บันทึก token ลง Supabase
+    const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'};
+    await fetch(SUPA_URL+'/rest/v1/fcm_tokens',{
+      method:'POST',headers:h,
+      body:JSON.stringify({userid:userId,sales_name:salesName,token,platform:'web',updated_at:new Date().toISOString()}),
+    });
+    console.log('FCM token saved ✅');
+  }catch(e){console.warn('FCM init failed:',e);}
+}
+
+// ── ส่ง Push Notification ผ่าน Edge Function ──
+async function pushNotif(salesName,title,body,data={}){
+  try{
+    await fetch(FCM_EDGE_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
+      body:JSON.stringify({sales_name:salesName,title,body,data}),
+    });
+  }catch(e){console.warn('Push failed:',e);}
+}
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqY29ncWZrd2l2ZXpwcWl2d296Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDc4NDgsImV4cCI6MjA4OTUyMzg0OH0.-2BrFbaRL3lJ5Gukf7rB3dSF7Ju4qj3RuLJyNJT-3QI';
 const API_URL  = SUPA_URL;
 
@@ -301,7 +354,12 @@ async function sbApi(action,data){
     case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
-    case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);return{success:true};}
+    case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);
+      // Push notification ถ้าเปลี่ยน sales (assign)
+      if(data.sales&&data.sales!==data.changedBy){
+        sbNotif(data.sales,data.caseid,'📋 ได้รับมอบหมายเคส '+data.caseid+' ('+(data.customername||'')+')');
+      }
+      return{success:true};}
     case 'searchCases':{
       const q=String(data.q||'').trim().toLowerCase();
       if(!q)return{success:true,data:[]};
@@ -342,6 +400,10 @@ async function sbApi(action,data){
         await sbQ('POST','notifications',{},{sales:s,caseid:'',message:'📢 '+data.message,createdat:nowTH(),status:'unread'});
       }
       cacheClear(['getNotifications']);
+      // Push FCM notification ทุก target
+      for(const s of targets){
+        await sbNotif(s,'',data.message);
+      }
       return{success:true,sent:targets.length};
     }
 
@@ -1909,7 +1971,7 @@ function App(){
   const [user,setUser]=useState(()=>{try{const s=sessionStorage.getItem('casepool_user');return s?JSON.parse(s):null;}catch{return null;}});
   const [showLogoutConfirm,setShowLogoutConfirm]=useState(false);
   useEffect(()=>{const el=document.getElementById('app-loader');if(el){el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>{el.style.display='none';},300);}},[]);
-  function handleLogin(u){sessionStorage.setItem('casepool_user',JSON.stringify(u));setUser(u);}
+  function handleLogin(u){sessionStorage.setItem('casepool_user',JSON.stringify(u));setUser(u);setTimeout(()=>initFCM(u.name,u.userId),2000);}
   function handleLogout(){sessionStorage.removeItem('casepool_user');Object.keys(_cache).forEach(k=>delete _cache[k]);setUser(null);setShowLogoutConfirm(false);}
   if(!user)return <LoginPage onLogin={handleLogin}/>;
   const logoutConfirmModal=showLogoutConfirm&&<div className="overlay" style={{zIndex:9999}}><div className="modal" style={{maxWidth:320}}><div className="modal-bd" style={{textAlign:'center',padding:'32px 24px'}}><div style={{fontSize:40,marginBottom:12}}>👋</div><div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ออกจากระบบ?</div><div style={{fontSize:13,color:'var(--text2)',marginBottom:24}}>{user.name} · {user.role}</div><div style={{display:'flex',gap:10}}><button className="btn btn-ghost" style={{flex:1,padding:'10px'}} onClick={()=>setShowLogoutConfirm(false)}>ยกเลิก</button><button className="btn btn-danger" style={{flex:1,padding:'10px'}} onClick={handleLogout}>ออกจากระบบ</button></div></div></div></div>;
