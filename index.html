@@ -222,6 +222,7 @@ const SENT_TYPES = ['ปกติ','ส่วนตัว'];
 const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V','CR-V','Accord','Mobilio'],Toyota:['Yaris','Vios','Altis','Revo','VIGO','Fortuner','Cross','C-HR','Camry','Veloz','Alphard','Sienta','Avanza','Prius','Innova'],Isuzu:['D-Max','MU-X','MU-7','X-Series'],Mazda:['2','3','CX-3','CX-30','BT-50'],MG:['3','5','ZS'],Nissan:['Navara','Almera','Note','March','Sylphy','Teana','Juke'],Mitsubishi:['Triton','Mirage','Attrage','Xpander','Pajero'],Suzuki:['Swift','Ciaz','Carry']};
 
 function getStatusClass(s){const m={'รอข้อมูล':'s-wait','ไปต่อได้':'s-go','เคสเลี้ยง':'s-nurse','เคสวัด 50/50':'s-half','ติดต่อไม่ได้':'s-cant','ยังไม่สะดวก':'s-later','จอง':'s-book','รอเซ็นต์':'s-sign','รอผล':'s-wait2','อนุมัติ':'s-approve','ปิดเคส':'s-close','รีเจค':'s-reject','ปล่อยแล้ว':'s-release','ได้รถจากที่อื่น':'s-other','โยนเคส':'s-throw','จองแล้ว':'s-book'};return m[s]||'s-wait';}
+function safeArray(x){return Array.isArray(x)?x:[];}
 function displayContact(contact){if(!contact&&contact!==0)return '-';const s=String(contact).trim();if(s.startsWith('data:image')||s.startsWith('https://drive.google.com'))return '📷 QR Code';return formatContact(s)||'-';}
 function formatContact(contact){if(!contact&&contact!==0)return '';const s=String(contact).trim();if(s.startsWith('http')||s.startsWith('data:'))return s;if(/^\d{9}$/.test(s))return '0'+s;if(/^\d{8}$/.test(s))return '0'+s;return s;}
 
@@ -300,7 +301,19 @@ async function sbApi(action,data){
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
     case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);return{success:true};}
-    case 'searchCases':{const q=String(data.q||'').trim();const rows=await sbQ('GET','cases',{or:`caseid.ilike.%25${q}%25,customername.ilike.%25${q}%25,contact.ilike.%25${q}%25`});return{success:true,data:rows||[]};}
+    case 'searchCases':{
+      const q=String(data.q||'').trim();
+      if(!q)return{success:true,data:[]};
+      // สร้าง URL ตรงๆ โดยไม่ผ่าน sbQ เพื่อหลีกเลี่ยง double-encode
+      const searchUrl=SUPA_URL+'/rest/v1/cases?or=caseid.ilike.%'+q+'%,customername.ilike.%'+q+'%,contact.ilike.%'+q+'%';
+      const sh={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Range':'0-4999'};
+      try{
+        const sr=await fetch(searchUrl,{method:'GET',headers:sh});
+        const st=await sr.text();
+        const sd=JSON.parse(st);
+        return{success:true,data:Array.isArray(sd)?sd:[]};
+      }catch(e){return{success:true,data:[]};}
+    }
     case 'getMarket':{const rows=await sbQ('GET','market',{poolstatus:'eq.เปิด'});let filtered=(rows||[]);if(data.sales)filtered=filtered.filter(r=>!r.expiredsales||!String(r.expiredsales).split(',').includes(data.sales));for(let i=filtered.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[filtered[i],filtered[j]]=[filtered[j],filtered[i]];}return{success:true,data:filtered.map(mapMarket)};}
     case 'sendToMarket':{const ex=await sbQ('GET','market',{id:`eq.${data.caseId}`});if(ex?.length){const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(',')});}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(!cr?.length)return{success:false,error:'ไม่พบเคส'};const c=cr[0];await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales,poolstatus:'เปิด'});}sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');return{success:true};}
     case 'closeMarketCase':{await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'ปิด'});await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,data.closedBy||'แอดมิน','ปิดเคส','ปิดเคสออกจากตลาด');return{success:true};}
@@ -791,11 +804,11 @@ function NotifPanel({user,onClose,onCountChange}){
 
 function AdminCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});const [sortDir,setSortDir]=useState('desc');const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);const [showAddBook,setShowAddBook]=useState(false);const [showExportModal,setShowExportModal]=useState(false);const [showExport,setShowExport]=useState(false);const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{}).then(r=>{setCases(Array.isArray(r.data)?r.data:[]);setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[]);
+  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{}).then(r=>{setCases(safeArray(r.data));setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[]);
   useEffect(()=>{load();},[load]);
-  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});setCases(Array.isArray(r.data)?r.data:[]);}catch(e){setCases([]);}setLoading(false);}
+  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});setCases(safeArray(r.data));}catch(e){setCases([]);}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
-  const filtered=(Array.isArray(cases)?cases:[]).filter(c=>{
+  const filtered=safeArray(cases).filter(c=>{
     if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
     if(filter.status&&c.status!==filter.status)return false;
     if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom))return false;}
@@ -934,7 +947,7 @@ function DonutChart({id,labels,values,colors}){const ref=useRef();const inst=use
 
 function AdminDashboard({currentUser}){
   const [data,setData]=useState(null);const [allCases,setAllCases]=useState([]);const [loading,setLoading]=useState(true);const [tab,setTab]=useState('overview');
-  const load=useCallback(()=>{cacheClear(['getDashboard','getCases']);Promise.all([api('getDashboard',{role:'Admin'}),api('getCases',{all:'true'})]).then(([dr,cr])=>{if(dr.success)setData(dr.data);if(cr.success)setAllCases(cr.data||[]);setLoading(false);});},[]);
+  const load=useCallback(()=>{cacheClear(['getDashboard','getCases']);Promise.all([api('getDashboard',{role:'Admin'}),api('getCases',{all:'true'})]).then(([dr,cr])=>{if(dr.success)setData(dr.data);if(cr.success)setAllCases(safeArray(cr.data));setLoading(false);});},[]);
   useEffect(()=>{load();},[load]);
   if(loading)return <div className="page"><Loading/></div>;if(!data)return <div className="page"><p>ไม่พบข้อมูล</p></div>;
   const salesList=data.sales||[];const totalCases=data.total?.cases||0;const totalSold=salesList.reduce((s,x)=>s+(x.sold||0),0);const totalClaimed=salesList.reduce((s,x)=>s+(x.claimedCases||0),0);
@@ -948,7 +961,7 @@ function AdminDashboard({currentUser}){
     {/* Hot Cases Summary */}
     {allCases.length>0&&(()=>{
       const CLOSED_ST=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-      const active=allCases.filter(c=>!CLOSED_ST.includes(c.status));
+      const active=safeArray(allCases).filter(c=>!CLOSED_ST.includes(c.status));
       const hot=active.filter(c=>calculateCaseScore(c)>=80);
       const warm=active.filter(c=>calculateCaseScore(c)>=50&&calculateCaseScore(c)<80);
       const cold=active.filter(c=>calculateCaseScore(c)<50);
@@ -1261,7 +1274,7 @@ function AIAdvisorPage({currentUser}){
 // ── remaining Sales pages (unchanged) ──
 function DailyFocusPage({currentUser,onNavigate}){
   const [myCases,setMyCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [marketCount,setMarketCount]=useState(0);const [loading,setLoading]=useState(true);const [selCase,setSelCase]=useState(null);const now=Date.now();
-  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name}),api('getMarket',{sales:currentUser.name})]).then(([cr,ccr,mr])=>{if(cr.success)setMyCases(cr.data||[]);if(ccr.success)setClaimedCases(ccr.data||[]);if(mr.success)setMarketCount((mr.data||[]).filter(c=>c.old_sales!==currentUser.name).length);setLoading(false);});},[currentUser.name]);
+  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name}),api('getMarket',{sales:currentUser.name})]).then(([cr,ccr,mr])=>{if(cr.success)setMyCases(safeArray(cr.data));if(ccr.success)setClaimedCases(ccr.data||[]);if(mr.success)setMarketCount(safeArray(mr.data).filter(c=>c.old_sales!==currentUser.name).length);setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   function parseDate(d){const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
@@ -1321,7 +1334,7 @@ function GlobalSearch({currentUser,onClose,onNavigate}){
 function SalesMarket({currentUser}){
   const [cases,setCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [loading,setLoading]=useState(true);const [claimedIds,setClaimedIds]=useState(new Set());const [skippedIds,setSkippedIds]=useState(new Set());const [toast,setToast]=useState(null);const [leaderboard,setLeaderboard]=useState([]);
   const showToast=(msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);};
-  const load=useCallback((silent=false)=>{if(!silent)setLoading(true);Promise.all([api('getMarket',{sales:currentUser.name}),api('getClaimedCases',{sales:currentUser.name}),api('getDashboard',{role:'Admin'})]).then(([mr,cr,dr])=>{if(mr.success)setCases((mr.data||[]).filter(c=>c.old_sales!==currentUser.name));if(cr.success)setClaimedCases(cr.data||[]);if(dr.success)setLeaderboard(dr.data?.sales||[]);setLoading(false);setClaimedIds(new Set());setSkippedIds(new Set());});},[currentUser.name]);
+  const load=useCallback((silent=false)=>{if(!silent)setLoading(true);Promise.all([api('getMarket',{sales:currentUser.name}),api('getClaimedCases',{sales:currentUser.name}),api('getDashboard',{role:'Admin'})]).then(([mr,cr,dr])=>{if(mr.success)setCases(safeArray(mr.data).filter(c=>c.old_sales!==currentUser.name));if(cr.success)setClaimedCases(cr.data||[]);if(dr.success)setLeaderboard(dr.data?.sales||[]);setLoading(false);setClaimedIds(new Set());setSkippedIds(new Set());});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   async function claim(caseId){setClaimedIds(prev=>new Set([...prev,caseId]));setClaimedCases(prev=>[...prev,{caseID:caseId,sale:currentUser.name}]);showToast('✅ รับเคส '+caseId+' สำเร็จ!','ok');const r=await api('claimCase',{caseId,sales:currentUser.name});if(!r.success){setClaimedIds(prev=>{const s=new Set(prev);s.delete(caseId);return s;});setClaimedCases(prev=>prev.filter(c=>c.caseID!==caseId));showToast('❌ '+(r.error||'รับเคสไม่สำเร็จ'),'err');}else{setTimeout(()=>load(true),2000);}}
   async function notInterested(caseId){setSkippedIds(prev=>new Set([...prev,caseId]));await api('returnCase',{caseId,sales:'_skip_'+currentUser.name});setTimeout(()=>load(true),1000);}
@@ -1374,7 +1387,7 @@ function TodayFollowupBanner({currentUser}){
 function SalesCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
   const CLOSED_STATUSES=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'];
-  const load=useCallback(()=>{setLoading(true);api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{if(r.success)setCases(r.data||[]);setLoading(false);});},[currentUser.name]);
+  const load=useCallback(()=>{setLoading(true);api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   const filtered=cases.filter(c=>{if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
@@ -1413,7 +1426,7 @@ function SalesCurrentCases({currentUser,users}){
 
 function SalesClaimedCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [confirm,setConfirm]=useState(null);const [now,setNow]=useState(Date.now());
-  const load=useCallback(()=>{setLoading(true);api('getClaimedCases',{sales:currentUser.name}).then(r=>{if(r.success)setCases(r.data||[]);setLoading(false);});},[currentUser.name]);
+  const load=useCallback(()=>{setLoading(true);api('getClaimedCases',{sales:currentUser.name}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(t);},[]);
   function parseAssignedAt(s){if(!s)return null;const m=String(s).match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
   function canReturn(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return true;return(now-dt.getTime())>=24*3600*1000;}
@@ -1442,7 +1455,7 @@ function SalesDashboard({currentUser}){
   const TARGET_KEY='cp_target_'+currentUser.userId;
   function getTarget(){try{return parseInt(localStorage.getItem(TARGET_KEY))||0;}catch(e){return 0;}}
   function saveTarget(){const t=parseInt(targetInput);if(t>0){try{localStorage.setItem(TARGET_KEY,String(t));}catch(e){}setEditTarget(false);}}
-  const load=useCallback(()=>{cacheClear(['getDashboard']);setTargetInput(String(getTarget()||''));Promise.all([api('getDashboard',{role:'Sales',sales:currentUser.name}),api('getCases',{sales:currentUser.name,all:'true'})]).then(([dr,cr])=>{if(dr.success)setData(dr.data);if(cr.success)setAllCases(cr.data||[]);setLoading(false);});},[currentUser.name]);
+  const load=useCallback(()=>{cacheClear(['getDashboard']);setTargetInput(String(getTarget()||''));Promise.all([api('getDashboard',{role:'Sales',sales:currentUser.name}),api('getCases',{sales:currentUser.name,all:'true'})]).then(([dr,cr])=>{if(dr.success)setData(dr.data);if(cr.success)setAllCases(safeArray(cr.data));setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   if(loading)return <div className="page"><Loading/></div>;if(!data)return <div className="page"><p>ไม่พบข้อมูล</p></div>;
   function parseStartDate(startdate){if(!startdate&&startdate!==0)return null;const s=String(startdate).trim();if(!s)return null;if(/^\d{4,6}$/.test(s)){const d=new Date((parseInt(s)-25569)*86400000);if(!isNaN(d))return d;}if(s.includes('/')){const p=s.split('/');if(p.length>=3){const p0=parseInt(p[0]),p1=parseInt(p[1]),p2=parseInt(p[2]);if(p[2].length===4){const d=new Date(p2,p1-1,p0);if(!isNaN(d))return d;}const d2=new Date(p2,p0-1,p1);if(!isNaN(d2))return d2;}}const d=new Date(s);return isNaN(d)?null:d;}
@@ -1736,7 +1749,7 @@ function AdminTargets({users,currentUser}){
   const monthLabel=MONTH_NAMES[d.getMonth()]+' 25'+String(d.getFullYear()).slice(-2);
 
   const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
-  useEffect(()=>{api('getCases',{}).then(r=>{if(r.success)setCases(r.data||[]);setLoading(false);});},[]);
+  useEffect(()=>{api('getCases',{}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[]);
 
   function setTarget(name,val){
     const upd={...targets,[monthKey+'_'+name]:parseInt(val)||0};
