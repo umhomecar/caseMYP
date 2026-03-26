@@ -298,23 +298,23 @@ async function sbApi(action,data){
     case 'login':{const rows=await sbQ('GET','users',{username:`eq.${data.username}`,password:`eq.${data.password}`,status:'eq.active'});if(!rows?.length)return{success:false,error:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'};const u=rows[0];return{success:true,user:{userId:u.userid,username:u.username,name:u.name,role:u.role,avatar:u.avatar||'',startdate:u.startdate||''}};}
     case 'getUsers':{const rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate',order:'userid.asc'});return{success:true,data:(rows||[]).map(u=>({userId:u.userid,username:u.username,name:u.name,role:u.role,status:u.status,avatar:u.avatar||'',startdate:u.startdate||''}))};}
     case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbQ('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
-    case 'updateUser':{const upd={};['name','password','status','avatar'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
+    case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
     case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);return{success:true};}
     case 'searchCases':{
-      const q=String(data.q||'').trim();
+      const q=String(data.q||'').trim().toLowerCase();
       if(!q)return{success:true,data:[]};
-      // สร้าง URL ตรงๆ โดยไม่ผ่าน sbQ เพื่อหลีกเลี่ยง double-encode
-      const qEnc=encodeURIComponent(q);
-      const searchUrl=SUPA_URL+'/rest/v1/cases?or=caseid.ilike.%25'+qEnc+'%25,customername.ilike.%25'+qEnc+'%25,contact.ilike.%25'+qEnc+'%25';
-      const sh={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Range':'0-4999'};
-      try{
-        const sr=await fetch(searchUrl,{method:'GET',headers:sh});
-        const st=await sr.text();
-        const sd=JSON.parse(st);
-        return{success:true,data:Array.isArray(sd)?sd:[]};
-      }catch(e){return{success:true,data:[]};}
+      // ดึงเคสทั้งหมดแล้ว filter ใน JS — หลีกเลี่ยงปัญหา URL encoding
+      const allRows=await sbQ('GET','cases',{order:'caseid.desc'});
+      if(!Array.isArray(allRows))return{success:true,data:[]};
+      const results=allRows.filter(c=>
+        String(c.caseid||'').toLowerCase().includes(q)||
+        String(c.customername||'').toLowerCase().includes(q)||
+        String(c.contact||'').toLowerCase().includes(q)||
+        String(c.report||'').toLowerCase().includes(q)
+      );
+      return{success:true,data:results};
     }
     case 'getMarket':{const rows=await sbQ('GET','market',{poolstatus:'eq.เปิด'});let filtered=(rows||[]);if(data.sales)filtered=filtered.filter(r=>!r.expiredsales||!String(r.expiredsales).split(',').includes(data.sales));for(let i=filtered.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[filtered[i],filtered[j]]=[filtered[j],filtered[i]];}return{success:true,data:filtered.map(mapMarket)};}
     case 'sendToMarket':{const ex=await sbQ('GET','market',{id:`eq.${data.caseId}`});if(ex?.length){const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(',')});}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(!cr?.length)return{success:false,error:'ไม่พบเคส'};const c=cr[0];await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales,poolstatus:'เปิด'});}sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');return{success:true};}
@@ -1018,12 +1018,13 @@ function AdminUsers({currentUser}){
   const load=()=>{setLoading(true);api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);setLoading(false);});};
   useEffect(()=>{load();},[]);
   async function addUser(){if(!form.username||!form.name)return alert('กรอกชื่อและ username');await api('addUser',form);load();setShowAdd(false);setForm({username:'',password:'1234',name:'',role:'Sales'});}
-  function openEdit(u){setEditUser(u);setEditForm({name:u.name,password:'',status:u.status,role:u.role});}
+  function openEdit(u){setEditUser(u);setEditForm({name:u.name||'',password:'',status:u.status||'active',role:u.role||'Sales',avatar:u.avatar||'',startdate:u.startdate||''});}
   async function saveEdit(){
     if(!editForm.name)return alert('กรุณากรอกชื่อ');
     setSaving(true);
-    const upd={name:editForm.name,status:editForm.status,role:editForm.role};
+    const upd={name:editForm.name,status:editForm.status,role:editForm.role,avatar:editForm.avatar||''};
     if(editForm.password.trim())upd.password=editForm.password.trim();
+    if(editForm.startdate)upd.startdate=editForm.startdate;
     await api('updateUser',{userId:editUser.userId,...upd});
     setSaving(false);setEditUser(null);load();
   }
@@ -1036,7 +1037,7 @@ function AdminUsers({currentUser}){
     <div className="page-hd"><div className="page-title">👥 จัดการผู้ใช้</div><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มผู้ใช้</button></div>
     <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>ID</th><th>Username</th><th>ชื่อ</th><th>Role</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:users.map((u,i)=><tr key={i}>
       <td style={{fontSize:12,color:'var(--text2)'}}>{u.userId}</td>
-      <td style={{fontWeight:600}}>{u.username}</td>
+      <td><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:32,height:32,borderRadius:'50%',background:'var(--bg3)',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:'👤'}</div><span style={{fontWeight:600}}>{u.username}</span></div></td>
       <td>{u.name}</td>
       <td><span className={`badge ${u.role==='Admin'?'s-approve':'s-book'}`}>{u.role}</span></td>
       <td><span className={`badge ${u.status==='active'?'s-go':'s-reject'}`}>{u.status}</span></td>
@@ -1059,26 +1060,28 @@ function AdminUsers({currentUser}){
     {/* Edit User Modal */}
     {editUser&&<Modal title={`✏️ แก้ไข — ${editUser.username}`} onClose={()=>setEditUser(null)} footer={<><button className="btn btn-ghost" onClick={()=>setEditUser(null)}>ยกเลิก</button><button className="btn btn-primary" onClick={saveEdit} disabled={saving}>{saving?'กำลังบันทึก...':'💾 บันทึก'}</button></>}>
       <div style={{display:'grid',gap:12}}>
-        <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 14px',fontSize:13}}>
-          <span style={{color:'var(--text2)'}}>Username: </span><strong>{editUser.username}</strong>
-          <span style={{color:'var(--text2)',marginLeft:16}}>ID: </span><strong style={{color:'var(--blue)'}}>{editUser.userId}</strong>
+        <div style={{display:'flex',alignItems:'center',gap:16,background:'var(--bg3)',borderRadius:10,padding:'12px 14px'}}>
+          <div style={{width:64,height:64,borderRadius:'50%',background:'var(--bg2)',border:'2px solid var(--border)',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>
+            {editForm.avatar?<img src={editForm.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:'👤'}
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:700}}>{editUser.name}</div>
+            <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>@{editUser.username} · {editUser.userId}</div>
+            <button className="btn btn-ghost" style={{fontSize:11,padding:'3px 10px',marginTop:6}} onClick={()=>{const url=window.prompt('วาง URL รูปภาพ:',editForm.avatar||'');if(url!==null)setE('avatar',url);}}>📷 เปลี่ยนรูป</button>
+            {editForm.avatar&&<button className="btn btn-ghost" style={{fontSize:11,padding:'3px 8px',marginTop:6,marginLeft:6,color:'var(--red)'}} onClick={()=>setE('avatar','')}>🗑 ลบรูป</button>}
+          </div>
         </div>
-        <div className="form-group"><label>ชื่อที่แสดง</label><input value={editForm.name} onChange={e=>setE('name',e.target.value)}/></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div className="form-group"><label>ชื่อที่แสดง *</label><input value={editForm.name} onChange={e=>setE('name',e.target.value)}/></div>
+          <div className="form-group"><label>📅 วันเริ่มงาน</label><input type="date" value={editForm.startdate||''} onChange={e=>setE('startdate',e.target.value)}/></div>
+        </div>
         <div className="form-group">
           <label>รหัสผ่านใหม่ <span style={{fontSize:11,color:'var(--text3)'}}>(ถ้าไม่เปลี่ยน ปล่อยว่างไว้)</span></label>
           <input type="text" value={editForm.password} onChange={e=>setE('password',e.target.value)} placeholder="กรอกรหัสใหม่ หรือปล่อยว่าง"/>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-          <div className="form-group"><label>Role</label>
-            <select value={editForm.role} onChange={e=>setE('role',e.target.value)}>
-              <option>Sales</option><option>Admin</option>
-            </select>
-          </div>
-          <div className="form-group"><label>สถานะ</label>
-            <select value={editForm.status} onChange={e=>setE('status',e.target.value)}>
-              <option value="active">active</option><option value="inactive">inactive</option>
-            </select>
-          </div>
+          <div className="form-group"><label>Role</label><select value={editForm.role} onChange={e=>setE('role',e.target.value)}><option>Sales</option><option>Admin</option></select></div>
+          <div className="form-group"><label>สถานะ</label><select value={editForm.status} onChange={e=>setE('status',e.target.value)}><option value="active">✅ Active</option><option value="inactive">🔒 Inactive</option></select></div>
         </div>
       </div>
     </Modal>}
