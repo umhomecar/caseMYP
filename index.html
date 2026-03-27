@@ -398,20 +398,37 @@ async function sbApi(action,data){
   if(ex?.length){
     const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];
     if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);
-    await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(',')});
+    const patchRes=await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(',')});
+    // ตรวจสอบว่า PATCH ทำงานจริง
+    if(patchRes&&!Array.isArray(patchRes)&&patchRes.code){
+      return{success:false,error:'แก้ไข market ไม่สำเร็จ: '+(patchRes.message||patchRes.code)};
+    }
+    if(Array.isArray(patchRes)&&patchRes.length===0){
+      return{success:false,error:'แก้ไข market ไม่สำเร็จ — ไม่พบ record หรือ Supabase RLS บล็อก (PATCH 0 rows)'};
+    }
   }else{
     const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
-    if(!cr?.length)return{success:false,error:'ไม่พบเคส'};
+    if(!cr?.length)return{success:false,error:'ไม่พบเคส '+data.caseId+' ในระบบ'};
     const c=cr[0];
     const postRes=await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales,poolstatus:'เปิด'});
     // ตรวจสอบ error จาก Supabase (เช่น RLS, duplicate key)
     if(postRes&&!Array.isArray(postRes)&&postRes.code){
-      return{success:false,error:'บันทึกไม่สำเร็จ: '+(postRes.message||postRes.code)};
+      return{success:false,error:'บันทึก market ไม่สำเร็จ: '+(postRes.message||postRes.code)+' (ตรวจสอบ Supabase RLS → market table → INSERT policy)'};
+    }
+    if(Array.isArray(postRes)&&postRes.length===0){
+      return{success:false,error:'บันทึก market ไม่สำเร็จ — Supabase RLS อาจบล็อก INSERT (กลับมา 0 rows) ตรวจสอบ Policy ที่ market table'};
     }
   }
+  // ✅ รอให้ Supabase commit ข้อมูลก่อน verify (ป้องกัน read replica lag)
+  await new Promise(r=>setTimeout(r,400));
   // ✅ ยืนยันว่าเขียนจริง ก่อน return success
-  const verify=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});
-  if(!verify?.length)return{success:false,error:'ส่งตลาดไม่สำเร็จ — ตรวจสอบ Supabase RLS หรือสิทธิ์การเขียน'};
+  let verify=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});
+  // retry 1 ครั้งถ้าไม่เจอ (กรณี eventual consistency)
+  if(!verify?.length){
+    await new Promise(r=>setTimeout(r,600));
+    verify=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});
+  }
+  if(!verify?.length)return{success:false,error:'ส่งตลาดไม่สำเร็จ — ตรวจสอบ Supabase RLS policy สำหรับตาราง market (anon INSERT/PATCH)'};
   sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');
   return{success:true};
 }
@@ -938,41 +955,38 @@ function AdminCurrentCases({currentUser,users}){
 async function sendToMarketDirect(caseId,salesName){
   if(!window.confirm('ส่งเคส '+caseId+' เข้าตลาดทันที?'))return;
   setSending(caseId);
-  const caseIdStr = String(caseId);
-  
-  // Optimistic update - อัปเดต UI ทันที
-  setMarketIds(prev=>new Set([...prev, caseIdStr]));
 
   const r = await api('sendToMarket',{caseId,sales:salesName});
-  
+
   if(!r.success){
-    // ❌ ถ้าล้มเหลว → rollback badge
-    setMarketIds(prev=>{const s=new Set(prev);s.delete(caseIdStr);return s;});
-    alert('ส่งตลาดไม่สำเร็จ: '+(r.error||''));
-  } else {
-    // ✅ ถ้าสำเร็จ → re-fetch ข้อมูลใหม่จากฐานข้อมูล
-    cacheClear(['getCases','getMarketIds']);
-    
-    try {
-      const [casesRes, marketRes] = await Promise.all([
-        api('getCases',{}),
-        api('getMarketIds',{})
-      ]);
-      
-      // อัปเดต state ด้วยข้อมูลจากฐานข้อมูล
-      if(casesRes.success) {
-        setCases(safeArray(casesRes.data));
-      }
-      if(marketRes.success) {
-        setMarketIds(new Set(safeArray(marketRes.data)));
-      }
-    } catch(err) {
-      console.error('Re-fetch failed:', err);
-      // ถ้า re-fetch ล้มเหลว ให้ load() ใหม่
-      load();
-    }
+    setSending(null);
+    const toast=document.createElement('div');
+    toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(218,54,51,.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;max-width:90vw;text-align:center;line-height:1.5;';
+    toast.textContent='❌ ส่งตลาดไม่สำเร็จ: '+(r.error||'ไม่ทราบสาเหตุ');
+    document.body.appendChild(toast);
+    setTimeout(()=>{toast.style.opacity='0';toast.style.transition='opacity .3s';setTimeout(()=>toast.remove(),400);},6000);
+    return;
   }
-  
+
+  // ✅ สำเร็จ — อัปเดตจากฐานข้อมูลจริง
+  cacheClear(['getCases','getMarket','getMarketIds','getDashboard']);
+  try {
+    const [casesRes, marketRes] = await Promise.all([
+      api('getCases',{}),
+      api('getMarketIds',{})
+    ]);
+    if(casesRes.success) setCases(safeArray(casesRes.data));
+    if(marketRes.success) setMarketIds(new Set(safeArray(marketRes.data)));
+    const toast=document.createElement('div');
+    toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(35,134,54,.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;';
+    toast.textContent='✅ ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!';
+    document.body.appendChild(toast);
+    setTimeout(()=>{toast.style.opacity='0';toast.style.transition='opacity .3s';setTimeout(()=>toast.remove(),400);},2500);
+  } catch(err) {
+    console.error('Re-fetch failed:', err);
+    load();
+  }
+
   setSending(null);
 }
   useEffect(()=>{load();},[load]);
@@ -1046,8 +1060,10 @@ async function sendToMarketDirect(caseId,salesName){
           <td onClick={e=>e.stopPropagation()}>
             {marketIds.has(String(c.caseid))?
               <span style={{fontSize:11,fontWeight:700,color:'var(--purple)',background:'rgba(188,140,255,.15)',border:'1px solid rgba(188,140,255,.4)',borderRadius:20,padding:'2px 8px',whiteSpace:'nowrap'}}>🏪 ในตลาด</span>:
-              <button className="btn btn-ghost" style={{fontSize:11,padding:'3px 8px',whiteSpace:'nowrap',color:'var(--orange)',border:'1px solid rgba(255,166,87,.4)'}} disabled={sending===c.caseid} onClick={()=>sendToMarketDirect(c.caseid,c.sales)}>
-                {sending===c.caseid?'กำลังส่ง...':'📤 ส่งตลาด'}
+              sending===c.caseid?
+              <span style={{fontSize:11,fontWeight:700,color:'var(--yellow)',background:'rgba(210,153,34,.12)',border:'1px solid rgba(210,153,34,.4)',borderRadius:20,padding:'2px 10px',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:4}}><span className="spin" style={{width:10,height:10,borderWidth:2,marginRight:0,display:'inline-block'}}/>กำลังส่ง...</span>:
+              <button className="btn btn-ghost" style={{fontSize:11,padding:'3px 8px',whiteSpace:'nowrap',color:'var(--orange)',border:'1px solid rgba(255,166,87,.4)'}} onClick={()=>sendToMarketDirect(c.caseid,c.sales)}>
+                📤 ส่งตลาด
               </button>
             }
           </td></tr>;})}}</tbody></table></div></div>
