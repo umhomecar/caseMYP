@@ -393,7 +393,28 @@ async function sbApi(action,data){
       for(let i=older.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[older[i],older[j]]=[older[j],older[i]];}
       return{success:true,data:[...recent,...older].map(mapMarket)};
     }
-    case 'sendToMarket':{const ex=await sbQ('GET','market',{id:`eq.${data.caseId}`});if(ex?.length){const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(',')});}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(!cr?.length)return{success:false,error:'ไม่พบเคส'};const c=cr[0];await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales,poolstatus:'เปิด'});}sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');return{success:true};}
+    case 'sendToMarket':{
+  const ex=await sbQ('GET','market',{id:`eq.${data.caseId}`});
+  if(ex?.length){
+    const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];
+    if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);
+    await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(',')});
+  }else{
+    const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
+    if(!cr?.length)return{success:false,error:'ไม่พบเคส'};
+    const c=cr[0];
+    const postRes=await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales,poolstatus:'เปิด'});
+    // ตรวจสอบ error จาก Supabase (เช่น RLS, duplicate key)
+    if(postRes&&!Array.isArray(postRes)&&postRes.code){
+      return{success:false,error:'บันทึกไม่สำเร็จ: '+(postRes.message||postRes.code)};
+    }
+  }
+  // ✅ ยืนยันว่าเขียนจริง ก่อน return success
+  const verify=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});
+  if(!verify?.length)return{success:false,error:'ส่งตลาดไม่สำเร็จ — ตรวจสอบ Supabase RLS หรือสิทธิ์การเขียน'};
+  sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');
+  return{success:true};
+}
     case 'getMarketIds':{
       const rows=await sbQ('GET','market',{poolstatus:'eq.เปิด',select:'id'});
       return{success:true,data:safeArray(rows).map(r=>String(r.id))};
@@ -918,19 +939,15 @@ async function sendToMarketDirect(caseId,salesName){
   if(!window.confirm('ส่งเคส '+caseId+' เข้าตลาดทันที?'))return;
   setSending(caseId);
   const caseIdStr = String(caseId);
-  setMarketIds(prev=>new Set([...prev, caseIdStr])); // optimistic ทันที
-  
+  setMarketIds(prev=>new Set([...prev, caseIdStr]));
+
   const r = await api('sendToMarket',{caseId,sales:salesName});
   if(!r.success){
-    setMarketIds(prev=>{const s=new Set(prev);s.delete(caseIdStr);return s;}); // rollback
+    // sbApi ยืนยันแล้วว่าเขียนไม่ได้ → rollback badge
+    setMarketIds(prev=>{const s=new Set(prev);s.delete(caseIdStr);return s;});
     alert('ส่งตลาดไม่สำเร็จ: '+(r.error||''));
-  } else {
-    cacheClear(['getCases','getMarket','getMarketIds','getDashboard']);
-    setTimeout(async()=>{                    // ✅ รอ 2 วิก่อน
-      const mr = await api('getMarketIds',{});
-      if(mr.success) setMarketIds(new Set(safeArray(mr.data)));
-    }, 2000);
   }
+  // ✅ ไม่ต้อง re-fetch — sbApi verify แล้วว่าข้อมูลอยู่ใน Supabase จริง
   setSending(null);
 }
   useEffect(()=>{load();},[load]);
