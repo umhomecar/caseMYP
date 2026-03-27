@@ -288,8 +288,8 @@ function cacheGet(action,data){const k=cacheKey(action,data);const c=_cache[k];i
 function cacheSet(action,data,result){_cache[cacheKey(action,data)]={data:result,ts:Date.now()};}
 function cacheClear(patterns){(patterns||[]).forEach(p=>{Object.keys(_cache).forEach(k=>{if(k.startsWith(p))delete _cache[k];});});}
 
-const CACHEABLE=['getCases','getMarket','getUsers','getBookings','getDashboard','getNotifications','getClaimedCases'];
-const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard'],sendToMarket:['getCases','getMarket','getDashboard'],claimCase:['getMarket','getClaimedCases','getDashboard'],returnCase:['getMarket','getClaimedCases'],updateClaimed:['getClaimedCases'],closeMarketCase:['getMarket','getCases'],adminChangeSales:['getCases'],adminPullCase:['getCases'],deleteCase:['getCases','getMarket','getDashboard'],addBooking:['getBookings'],updateBooking:['getBookings']};
+const CACHEABLE=['getCases','getMarket','getMarketIds','getUsers','getBookings','getDashboard','getNotifications','getClaimedCases'];
+const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard'],sendToMarket:['getCases','getMarket','getDashboard','getMarketIds'],claimCase:['getMarket','getClaimedCases','getDashboard'],returnCase:['getMarket','getClaimedCases'],updateClaimed:['getClaimedCases'],closeMarketCase:['getMarket','getCases'],adminChangeSales:['getCases'],adminPullCase:['getCases'],deleteCase:['getCases','getMarket','getDashboard'],addBooking:['getBookings'],updateBooking:['getBookings']};
 
 async function api(action,data={}){
   if(CACHEABLE.includes(action)){const cached=cacheGet(action,data);if(cached)return cached;}
@@ -914,17 +914,25 @@ function AdminCurrentCases({currentUser,users}){
   const [marketIds,setMarketIds]=useState(new Set());
   const [sending,setSending]=useState(null); // caseid ที่กำลังส่งตลาด
   const load=useCallback(()=>{setLoading(true);cacheClear(['getCases','getMarketIds']);Promise.all([api('getCases',{}),api('getMarketIds',{})]).then(([r,mr])=>{setCases(safeArray(r.data));setMarketIds(new Set(safeArray(mr.data)));setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[]);
-  async function sendToMarketDirect(caseId,salesName){
-    if(!window.confirm('ส่งเคส '+caseId+' เข้าตลาดทันที?'))return;
-    setSending(caseId);
-    // Optimistic update — เปลี่ยน badge ทันทีก่อน load
-    setMarketIds(prev=>new Set([...prev, String(caseId)]));
-    await api('sendToMarket',{caseId,sales:salesName});
-    cacheClear(['getCases','getMarket','getMarketIds']);
-    // โหลด marketIds ใหม่เพื่อความถูกต้อง
-    api('getMarketIds',{}).then(mr=>setMarketIds(new Set(safeArray(mr.data))));
-    setSending(null);
+async function sendToMarketDirect(caseId,salesName){
+  if(!window.confirm('ส่งเคส '+caseId+' เข้าตลาดทันที?'))return;
+  setSending(caseId);
+  const caseIdStr = String(caseId);
+  setMarketIds(prev=>new Set([...prev, caseIdStr])); // optimistic ทันที
+  
+  const r = await api('sendToMarket',{caseId,sales:salesName});
+  if(!r.success){
+    setMarketIds(prev=>{const s=new Set(prev);s.delete(caseIdStr);return s;}); // rollback
+    alert('ส่งตลาดไม่สำเร็จ: '+(r.error||''));
+  } else {
+    cacheClear(['getCases','getMarket','getMarketIds','getDashboard']);
+    setTimeout(async()=>{                    // ✅ รอ 2 วิก่อน
+      const mr = await api('getMarketIds',{});
+      if(mr.success) setMarketIds(new Set(safeArray(mr.data)));
+    }, 2000);
   }
+  setSending(null);
+}
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=getData(r);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
