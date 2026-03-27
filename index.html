@@ -747,6 +747,9 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     if(r.success){
       // บันทึก history ว่าโอนจากใครไปใคร
       await api('updateCase',{caseid:caseId,sales:transferTo,changedBy:currentUser.name,detail:'โอนเคสจาก '+currentUser.name+' → '+transferTo});
+      // แจ้งเตือนคนรับเคส
+      sbNotif(transferTo,caseId,'🔄 '+currentUser.name+' โอนเคส '+caseId+' ('+(caseData.customername||caseData.name||'')+') มาให้คุณ');
+      pushNotif(transferTo,'🔄 ได้รับเคสโอน','เคส '+caseId+' จาก '+currentUser.name);
       onUpdated();onClose();
     }else{alert('โอนเคสไม่สำเร็จ: '+(r.error||''));setTransferring(false);}
   }
