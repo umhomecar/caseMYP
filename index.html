@@ -939,15 +939,40 @@ async function sendToMarketDirect(caseId,salesName){
   if(!window.confirm('ส่งเคส '+caseId+' เข้าตลาดทันที?'))return;
   setSending(caseId);
   const caseIdStr = String(caseId);
+  
+  // Optimistic update - อัปเดต UI ทันที
   setMarketIds(prev=>new Set([...prev, caseIdStr]));
 
   const r = await api('sendToMarket',{caseId,sales:salesName});
+  
   if(!r.success){
-    // sbApi ยืนยันแล้วว่าเขียนไม่ได้ → rollback badge
+    // ❌ ถ้าล้มเหลว → rollback badge
     setMarketIds(prev=>{const s=new Set(prev);s.delete(caseIdStr);return s;});
     alert('ส่งตลาดไม่สำเร็จ: '+(r.error||''));
+  } else {
+    // ✅ ถ้าสำเร็จ → re-fetch ข้อมูลใหม่จากฐานข้อมูล
+    cacheClear(['getCases','getMarketIds']);
+    
+    try {
+      const [casesRes, marketRes] = await Promise.all([
+        api('getCases',{}),
+        api('getMarketIds',{})
+      ]);
+      
+      // อัปเดต state ด้วยข้อมูลจากฐานข้อมูล
+      if(casesRes.success) {
+        setCases(safeArray(casesRes.data));
+      }
+      if(marketRes.success) {
+        setMarketIds(new Set(safeArray(marketRes.data)));
+      }
+    } catch(err) {
+      console.error('Re-fetch failed:', err);
+      // ถ้า re-fetch ล้มเหลว ให้ load() ใหม่
+      load();
+    }
   }
-  // ✅ ไม่ต้อง re-fetch — sbApi verify แล้วว่าข้อมูลอยู่ใน Supabase จริง
+  
   setSending(null);
 }
   useEffect(()=>{load();},[load]);
