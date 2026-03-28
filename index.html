@@ -1005,7 +1005,29 @@ async function sendToMarketDirect(caseId,salesName){
     return;
   }
 
-  // ✅ สำเร็จ — อัปเดตจากฐานข้อมูลจริง
+  // ✅ สำเร็จ — อัปเดท marketIds ทันที
+  setMarketIds(prev => {
+    const newSet = new Set(prev);
+    newSet.add(String(caseId));
+    // บันทึกลง localStorage ทันที
+    try {
+      localStorage.setItem('marketIds', JSON.stringify(Array.from(newSet)));
+    } catch(e) {
+      console.error('Error saving marketIds:', e);
+    }
+    return newSet;
+  });
+
+  // แสดง toast ทันที
+  const toast=document.createElement('div');
+  toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(35,134,54,.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;';
+  toast.textContent='✅ ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!';
+  document.body.appendChild(toast);
+  setTimeout(()=>{toast.style.opacity='0';toast.style.transition='opacity .3s';setTimeout(()=>toast.remove(),400);},2500);
+
+  setSending(null);
+
+  // ✅ รีเฟรชข้อมูลจากฐานข้อมูล (background)
   cacheClear(['getCases','getMarket','getMarketIds','getDashboard']);
   try {
     const [casesRes, marketRes] = await Promise.all([
@@ -1015,7 +1037,6 @@ async function sendToMarketDirect(caseId,salesName){
     if(casesRes.success) {
       const updatedCases = safeArray(casesRes.data);
       setCases(updatedCases);
-      // ✅ บันทึกลง localStorage
       try {
         localStorage.setItem('cases', JSON.stringify(updatedCases));
       } catch(e) {
@@ -1025,24 +1046,16 @@ async function sendToMarketDirect(caseId,salesName){
     if(marketRes.success) {
       const marketData = safeArray(marketRes.data);
       setMarketIds(new Set(marketData));
-      // ✅ บันทึก marketIds ลง localStorage
       try {
         localStorage.setItem('marketIds', JSON.stringify(marketData));
       } catch(e) {
         console.error('Error saving marketIds to localStorage:', e);
       }
     }
-    const toast=document.createElement('div');
-    toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(35,134,54,.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;';
-    toast.textContent='✅ ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!';
-    document.body.appendChild(toast);
-    setTimeout(()=>{toast.style.opacity='0';toast.style.transition='opacity .3s';setTimeout(()=>toast.remove(),400);},2500);
   } catch(err) {
     console.error('Re-fetch failed:', err);
     load();
   }
-
-  setSending(null);
 }
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=getData(r);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
