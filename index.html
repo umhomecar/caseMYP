@@ -948,10 +948,47 @@ function NotifPanel({user,onClose,onCountChange}){
 }
 
 function AdminCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});const [sortDir,setSortDir]=useState('desc');const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);const [showAddBook,setShowAddBook]=useState(false);const [showExportModal,setShowExportModal]=useState(false);const [showExport,setShowExport]=useState(false);const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
-  const [marketIds,setMarketIds]=useState(new Set());
+  // ✅ โหลดข้อมูลจาก localStorage ตอนเริ่มต้น
+  const [cases,setCases]=useState(()=>{
+    try {
+      const saved = localStorage.getItem('cases');
+      return saved ? JSON.parse(saved) : [];
+    } catch(e) {
+      return [];
+    }
+  });
+  const [loading,setLoading]=useState(true);
+  const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
+  const [sortDir,setSortDir]=useState('desc');
+  const [sel,setSel]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [showAddBook,setShowAddBook]=useState(false);
+  const [showExportModal,setShowExportModal]=useState(false);
+  const [showExport,setShowExport]=useState(false);
+  const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
+  const [marketIds,setMarketIds]=useState(()=>{
+    try {
+      const saved = localStorage.getItem('marketIds');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch(e) {
+      return new Set();
+    }
+  });
   const [sending,setSending]=useState(null); // caseid ที่กำลังส่งตลาด
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases','getMarketIds']);Promise.all([api('getCases',{}),api('getMarketIds',{})]).then(([r,mr])=>{setCases(safeArray(r.data));setMarketIds(new Set(safeArray(mr.data)));setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[]);
+  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases','getMarketIds']);Promise.all([api('getCases',{}),api('getMarketIds',{})]).then(([r,mr])=>{
+    const casesData = safeArray(r.data);
+    const marketData = safeArray(mr.data);
+    setCases(casesData);
+    setMarketIds(new Set(marketData));
+    // ✅ บันทึกลง localStorage
+    try {
+      localStorage.setItem('cases', JSON.stringify(casesData));
+      localStorage.setItem('marketIds', JSON.stringify(Array.from(marketData)));
+    } catch(e) {
+      console.error('Error saving to localStorage:', e);
+    }
+    setLoading(false);
+  }).catch(()=>{setCases([]);setLoading(false);});},[]);
 async function sendToMarketDirect(caseId,salesName){
   if(!window.confirm('ส่งเคส '+caseId+' เข้าตลาดทันที?'))return;
   setSending(caseId);
@@ -975,8 +1012,26 @@ async function sendToMarketDirect(caseId,salesName){
       api('getCases',{}),
       api('getMarketIds',{})
     ]);
-    if(casesRes.success) setCases(safeArray(casesRes.data));
-    if(marketRes.success) setMarketIds(new Set(safeArray(marketRes.data)));
+    if(casesRes.success) {
+      const updatedCases = safeArray(casesRes.data);
+      setCases(updatedCases);
+      // ✅ บันทึกลง localStorage
+      try {
+        localStorage.setItem('cases', JSON.stringify(updatedCases));
+      } catch(e) {
+        console.error('Error saving to localStorage:', e);
+      }
+    }
+    if(marketRes.success) {
+      const marketData = safeArray(marketRes.data);
+      setMarketIds(new Set(marketData));
+      // ✅ บันทึก marketIds ลง localStorage
+      try {
+        localStorage.setItem('marketIds', JSON.stringify(marketData));
+      } catch(e) {
+        console.error('Error saving marketIds to localStorage:', e);
+      }
+    }
     const toast=document.createElement('div');
     toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(35,134,54,.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;';
     toast.textContent='✅ ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!';
@@ -1116,8 +1171,42 @@ async function sendToMarketDirect(caseId,salesName){
 }
 
 function AdminMarket({currentUser,users}){
-  const [cases,setCases]=useState([]);const [allCases,setAllCases]=useState([]);const [loading,setLoading]=useState(true);const [confirm,setConfirm]=useState(null);const [dashboard,setDashboard]=useState(null);const [filterSales,setFilterSales]=useState('all');const [searchQ,setSearchQ]=useState('');
-  const load=useCallback(()=>{setLoading(true);Promise.all([api('getMarket',{}),api('getDashboard',{role:'Admin'})]).then(([mr,dr])=>{if(mr.success){setCases(mr.data||[]);setAllCases(mr.data||[]);}if(dr.success)setDashboard(dr.data);setLoading(false);});},[]);
+  const [cases,setCases]=useState(()=>{
+    try {
+      const saved = localStorage.getItem('marketCases');
+      return saved ? JSON.parse(saved) : [];
+    } catch(e) {
+      return [];
+    }
+  });
+  const [allCases,setAllCases]=useState(()=>{
+    try {
+      const saved = localStorage.getItem('marketCases');
+      return saved ? JSON.parse(saved) : [];
+    } catch(e) {
+      return [];
+    }
+  });
+  const [loading,setLoading]=useState(true);
+  const [confirm,setConfirm]=useState(null);
+  const [dashboard,setDashboard]=useState(null);
+  const [filterSales,setFilterSales]=useState('all');
+  const [searchQ,setSearchQ]=useState('');
+  const load=useCallback(()=>{setLoading(true);Promise.all([api('getMarket',{}),api('getDashboard',{role:'Admin'})]).then(([mr,dr])=>{
+    if(mr.success){
+      const marketData = mr.data||[];
+      setCases(marketData);
+      setAllCases(marketData);
+      // ✅ บันทึกลง localStorage
+      try {
+        localStorage.setItem('marketCases', JSON.stringify(marketData));
+      } catch(e) {
+        console.error('Error saving market to localStorage:', e);
+      }
+    }
+    if(dr.success)setDashboard(dr.data);
+    setLoading(false);
+  });},[]);
   useEffect(()=>{load();},[load]);
   async function closeCase(caseId){await api('closeMarketCase',{caseId,closedBy:currentUser.name});load();}
   const filtered=(filterSales==='all'?cases:cases.filter(c=>c.old_sales===filterSales)).filter(c=>{
