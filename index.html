@@ -314,6 +314,35 @@ async function sbQ(method,table,q={},body=null){
   const url=new URL(baseUrl);
   normalParams.forEach(([k,v])=>url.searchParams.set(k,v));
   const finalUrl=rawParts.length>0?url.toString()+(url.search?'&':'?')+rawParts.join('&'):url.toString();
+  
+  // ✅ ถ้าเป็น GET และมี limit มากกว่า 1000 ให้ใช้ pagination
+  const limit = q.limit ? parseInt(q.limit) : 1000;
+  const needsPagination = method === 'GET' && limit > 1000;
+  
+  if (needsPagination) {
+    // ดึงข้อมูลทีละ 1000 rows
+    const allData = [];
+    let offset = 0;
+    const pageSize = 1000;
+    
+    while (offset < limit) {
+      const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Range':`${offset}-${offset+pageSize-1}`};
+      const opts={method:'GET',headers:h};
+      const r=await fetch(finalUrl,opts);
+      if(r.status===204)break;
+      const t=await r.text();
+      try{
+        const pageData=JSON.parse(t);
+        if(!Array.isArray(pageData) || pageData.length===0)break;
+        allData.push(...pageData);
+        if(pageData.length<pageSize)break; // ไม่มีข้อมูลเพิ่มแล้ว
+        offset+=pageSize;
+      }catch(e){break;}
+    }
+    return allData;
+  }
+  
+  // ✅ กรณีปกติ (ไม่ใช่ pagination)
   const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Range':'0-4999'};
   if(method!=='GET')h['Prefer']='return=representation';
   const opts={method,headers:h};if(body!==null)opts.body=JSON.stringify(body);
@@ -377,7 +406,8 @@ async function sbApi(action,data){
       return{success:true,data:results};
     }
     case 'getMarket':{
-      const rows=await sbQ('GET','market',{poolstatus:'eq.เปิด'});
+      // ✅ ดึงข้อมูลทั้งหมดโดยไม่จำกัด (ใช้ pagination อัตโนมัติ)
+      const rows=await sbQ('GET','market',{poolstatus:'eq.เปิด',limit:'10000'});
       let filtered=safeArray(rows);
       if(data.sales)filtered=filtered.filter(r=>!r.expiredsales||!String(r.expiredsales).split(',').includes(data.sales));
       // แยกเคสปีนี้กับเคสเก่า
