@@ -639,42 +639,94 @@ function HistoryModal({caseId,onClose}){
 // ============================================================
 function calculateCaseScore(c){
   let score=0;
-  const STATUS_SCORE={'ไปต่อได้':80,'จอง':90,'รอเซ็นต์':85,'รอผล':75,'อนุมัติ':88,'เคสวัด 50/50':60,'เคสเลี้ยง':40,'รอข้อมูล':30,'ยังไม่สะดวก':20,'ติดต่อไม่ได้':10};
+  // ── 1) คะแนนจากสถานะ ──
+  const STATUS_SCORE={'ไปต่อได้':75,'จอง':88,'รอเซ็นต์':82,'รอผล':72,'อนุมัติ':85,'เคสวัด 50/50':55,'เคสเลี้ยง':38,'รอข้อมูล':25,'ยังไม่สะดวก':18,'ติดต่อไม่ได้':8};
   score += STATUS_SCORE[c.status]||0;
+  // ── 2) คะแนนจากความสดใหม่ (updatedat) ──
   const parseD=d=>{const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));};
   const upd=parseD(c.updatedat);
-  if(upd){const hrs=(Date.now()-upd.getTime())/3600000;if(hrs<2)score+=20;else if(hrs<12)score+=12;else if(hrs<24)score+=6;}
-  if(c.report&&c.report.length>20)score+=10;
-  return Math.min(score,100);
+  if(upd){const hrs=(Date.now()-upd.getTime())/3600000;if(hrs<2)score+=12;else if(hrs<12)score+=8;else if(hrs<24)score+=4;else if(hrs>72)score-=8;}
+  // ── 3) คะแนนจากรีพอร์ต (keyword analysis) ──
+  const rp=String(c.report||'').toLowerCase();
+  if(rp.length>15){
+    // positive signals
+    const POS=[['นัด',8],['มาดูรถ',10],['ดาวน์',7],['เงินดาวน์',8],['รายได้',6],['อนุมัติ',12],['โอน',8],['เซ็น',8],['สนใจ',5],['ชอบ',5],['งบ',6],['ยืนยัน',9],['พร้อม',7],['ok',6],['โอเค',6],['ตกลง',8],['จะมา',9],['จะซื้อ',12],['จอง',10],['ผ่อน',6],['ทดลองขับ',8],['เข้ามาดู',9]];
+    // negative signals
+    const NEG=[['ไม่สนใจ',-15],['ปฏิเสธ',-12],['ยกเลิก',-10],['ไม่ผ่าน',-12],['รีเจค',-12],['ไม่ได้',-5],['เต็มแล้ว',-8],['ซื้อไปแล้ว',-15],['ซื้อแล้ว',-12],['ได้ที่อื่น',-15],['ขอคิด',-3],['ยังไม่',-3],['โทรไม่รับ',-4]];
+    POS.forEach(([kw,pt])=>{if(rp.includes(kw))score+=pt;});
+    NEG.forEach(([kw,pt])=>{if(rp.includes(kw))score+=pt;});
+    // รีพอร์ตมีข้อมูล income/down payment ครบ = เคสมีคุณภาพ
+    const hasIncome=rp.includes('รายได้')||rp.includes('เงินเดือน')||rp.includes('บาท');
+    const hasDown=rp.includes('ดาวน์')||rp.includes('วางดาวน์');
+    if(hasIncome&&hasDown)score+=8;
+  }
+  return Math.max(0,Math.min(score,100));
 }
 
 function getCaseAlert(c){
   const parseD=d=>{const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));};
   const upd=parseD(c.updatedat);
   const hrs=upd?(Date.now()-upd.getTime())/3600000:999;
+  const rp=String(c.report||'').toLowerCase();
+  // เช็ค report สัญญาณบวก
+  const hasAppointment=rp.includes('นัด')||rp.includes('มาดูรถ')||rp.includes('จะมา')||rp.includes('เข้ามาดู');
+  const hasConfirm=rp.includes('ตกลง')||rp.includes('จะซื้อ')||rp.includes('จอง')||rp.includes('ยืนยัน')||rp.includes('โอน');
+  const hasNeg=rp.includes('ไม่สนใจ')||rp.includes('ปฏิเสธ')||rp.includes('ซื้อแล้ว')||rp.includes('ได้ที่อื่น');
+  // เคสร้อนมาก = สถานะดี + มีนัด/ยืนยัน + ยังไม่เกิน 4 ชม
+  if(['ไปต่อได้','จอง','รอเซ็นต์','อนุมัติ'].includes(c.status)&&(hasConfirm||hasAppointment)&&hrs<=4)return{msg:'🔥 ลูกค้าพร้อมมาก! รีบดำเนินการ',color:'var(--red)'};
+  // เคสร้อน = สถานะดี + ค้างนาน
   if(['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'].includes(c.status)&&hrs>4)return{msg:'🔥 รีบโทร! ลูกค้าร้อน',color:'var(--red)'};
+  // รีพอร์ตมีสัญญาณลบ
+  if(hasNeg)return{msg:'💭 ลูกค้าลังเล — ลองเสนอทางเลือกใหม่',color:'var(--orange)'};
   if(c.status==='ติดต่อไม่ได้')return{msg:'📞 เปลี่ยนช่องทางติดต่อ',color:'var(--orange)'};
-  if(hrs>48)return{msg:'❄️ เคสเย็นมาก — รีบตาม',color:'var(--text3)'};
-  if(hrs>24)return{msg:'⚠️ เคสเริ่มเย็น',color:'var(--yellow)'};
+  // มีนัดแล้วแต่ค้างนาน = ควรยืนยัน
+  if(hasAppointment&&hrs>12)return{msg:'📅 มีนัดรออยู่ — ยืนยันนัดด้วย',color:'var(--blue)'};
+  if(hrs>72)return{msg:'❄️ เคสเย็นมาก — รีบตาม',color:'var(--text3)'};
+  if(hrs>48)return{msg:'⚠️ เคสเริ่มเย็น — ควร follow up',color:'var(--yellow)'};
   return null;
 }
 
 function getCaseSuggestion(c){
-  if(c.status==='ไปต่อได้')return'📞 โทรปิดทันที อย่ารอ!';
+  const rp=String(c.report||'').toLowerCase();
+  const hasDown=rp.includes('ดาวน์')||rp.includes('วางดาวน์');
+  const hasIncome=rp.includes('รายได้')||rp.includes('เงินเดือน');
+  const hasAppointment=rp.includes('นัด')||rp.includes('มาดูรถ')||rp.includes('จะมา');
+  const hasConfirm=rp.includes('ตกลง')||rp.includes('จะซื้อ')||rp.includes('ยืนยัน');
+  const noReport=!c.report||c.report.length<15;
+  if(c.status==='ไปต่อได้'){
+    if(hasConfirm)return'🚀 ลูกค้าพร้อมแล้ว! นัดเซ็นสัญญาเลย';
+    if(hasAppointment)return'📞 มีนัดอยู่แล้ว — โทรยืนยันก่อนวันนัด';
+    return'📞 โทรปิดทันที อย่ารอ!';
+  }
   if(c.status==='จอง'||c.status==='รอเซ็นต์')return'📄 เตรียมเอกสาร + ยืนยันนัด';
   if(c.status==='รอผล'||c.status==='อนุมัติ')return'⏳ รอธนาคาร — อัปเดตลูกค้าทุกวัน';
-  if(c.status==='เคสวัด 50/50')return'💬 ทักไลน์ + ส่งโปรโมชั่น';
-  if(c.status==='เคสเลี้ยง')return'🤝 นัดให้มาดูรถจริง';
-  if(c.status==='ติดต่อไม่ได้')return'📱 ลองโทร/ไลน์/ช่องทางอื่น';
-  if(c.status==='ยังไม่สะดวก')return'⏰ ตั้ง Follow-up ตามนัด';
-  return'📝 อัปเดตรีพอร์ต + หาข้อมูลเพิ่ม';
+  if(c.status==='เคสวัด 50/50'){
+    if(!hasDown)return'💰 ถามเรื่องเงินดาวน์ + ส่งโปรโมชั่น';
+    if(!hasIncome)return'📋 ขอข้อมูลรายได้เพิ่มเติม';
+    return'💬 ทักไลน์ + ส่งโปรโมชั่นปิดการขาย';
+  }
+  if(c.status==='เคสเลี้ยง'){
+    if(noReport)return'📝 อัปเดตรีพอร์ตก่อน + นัดดูรถ';
+    return'🤝 นัดให้มาดูรถจริง หรือส่งรูปรถที่สนใจ';
+  }
+  if(c.status==='ติดต่อไม่ได้'){
+    const tryCount=(rp.match(/โทร.*ครั้ง|ครั้ง.*โทร/)||[]).length;
+    if(tryCount>2||rp.includes('หลายครั้ง'))return'📱 ลองทักไลน์หรือ FB แทนการโทร';
+    return'📱 ลองโทร/ไลน์/ช่องทางอื่น';
+  }
+  if(c.status==='ยังไม่สะดวก'){
+    if(hasAppointment)return'📅 มีนัดแล้ว — อย่าลืมยืนยันก่อนวันนัด';
+    return'⏰ ตั้ง Follow-up + ทักแจ้งโปรโมชั่นใหม่';
+  }
+  if(noReport)return'📝 กรอกรีพอร์ตข้อมูลลูกค้าก่อนเลย';
+  return'📝 อัปเดตสถานะ + รีพอร์ตให้ครบถ้วน';
 }
 
 function ScoreBadge({score}){
-  const cfg=score>=80?{bg:'rgba(248,81,73,.15)',color:'var(--red)',label:'🔥 ร้อน'}:
-            score>=50?{bg:'rgba(210,153,34,.15)',color:'var(--yellow)',label:'⚠️ ตาม'}:
-                      {bg:'rgba(139,148,158,.12)',color:'var(--text3)',label:'❄️ เย็น'};
-  return<span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:20,background:cfg.bg,color:cfg.color,flexShrink:0}}>{cfg.label}</span>;
+  const cfg=score>=80?{bg:'rgba(248,81,73,.18)',color:'var(--red)',label:'🔥 ร้อน',pulse:true}:
+            score>=55?{bg:'rgba(210,153,34,.18)',color:'var(--yellow)',label:'⚡ ตาม',pulse:false}:
+                      {bg:'rgba(139,148,158,.12)',color:'var(--text3)',label:'❄️ เย็น',pulse:false};
+  return<span title={`คะแนน: ${score}/100`} style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,background:cfg.bg,color:cfg.color,flexShrink:0,letterSpacing:.3}}>{cfg.label}</span>;
 }
 
 
@@ -1009,14 +1061,12 @@ function AdminCurrentCases({currentUser,users}){
     const casesData = safeArray(r.data);
     const marketData = safeArray(mr.data);
     setCases(casesData);
-    setMarketIds(new Set(marketData));
-    // ✅ บันทึกลง localStorage
-    try {
-      localStorage.setItem('cases', JSON.stringify(casesData));
-      localStorage.setItem('marketIds', JSON.stringify(Array.from(marketData)));
-    } catch(e) {
-      console.error('Error saving to localStorage:', e);
-    }
+    // MERGE server data กับ localStorage เพื่อไม่ให้ปุ่มเด้งกลับ
+    setMarketIds(prev => {
+      const merged = new Set([...marketData, ...prev]);
+      try { localStorage.setItem('marketIds', JSON.stringify(Array.from(merged))); } catch(e) {}
+      return merged;
+    });
     setLoading(false);
   }).catch(()=>{setCases([]);setLoading(false);});},[]);
 async function sendToMarketDirect(caseId,salesName){
@@ -1035,20 +1085,16 @@ async function sendToMarketDirect(caseId,salesName){
     return;
   }
 
-  // ✅ สำเร็จ — อัปเดท marketIds ทันที
+  // ✅ สำเร็จ — อัปเดท marketIds ทันที (optimistic)
+  const caseIdStr = String(caseId);
   setMarketIds(prev => {
     const newSet = new Set(prev);
-    newSet.add(String(caseId));
-    // บันทึกลง localStorage ทันที
-    try {
-      localStorage.setItem('marketIds', JSON.stringify(Array.from(newSet)));
-    } catch(e) {
-      console.error('Error saving marketIds:', e);
-    }
+    newSet.add(caseIdStr);
+    try { localStorage.setItem('marketIds', JSON.stringify(Array.from(newSet))); } catch(e) {}
     return newSet;
   });
 
-  // แสดง toast ทันที
+  // แสดง toast
   const toast=document.createElement('div');
   toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(35,134,54,.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;';
   toast.textContent='✅ ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!';
@@ -1057,7 +1103,7 @@ async function sendToMarketDirect(caseId,salesName){
 
   setSending(null);
 
-  // ✅ รีเฟรชข้อมูลจากฐานข้อมูล (background)
+  // ✅ รีเฟรชข้อมูล background — MERGE ไม่ใช่ replace เพื่อป้องกันปุ่มเด้งกลับ
   cacheClear(['getCases','getMarket','getMarketIds','getDashboard']);
   try {
     const [casesRes, marketRes] = await Promise.all([
@@ -1065,22 +1111,15 @@ async function sendToMarketDirect(caseId,salesName){
       api('getMarketIds',{})
     ]);
     if(casesRes.success) {
-      const updatedCases = safeArray(casesRes.data);
-      setCases(updatedCases);
-      try {
-        localStorage.setItem('cases', JSON.stringify(updatedCases));
-      } catch(e) {
-        console.error('Error saving to localStorage:', e);
-      }
+      setCases(safeArray(casesRes.data));
     }
     if(marketRes.success) {
-      const marketData = safeArray(marketRes.data);
-      setMarketIds(new Set(marketData));
-      try {
-        localStorage.setItem('marketIds', JSON.stringify(marketData));
-      } catch(e) {
-        console.error('Error saving marketIds to localStorage:', e);
-      }
+      // MERGE: รวม server data กับ caseId ที่เพิ่งส่ง (กัน race condition)
+      setMarketIds(prev => {
+        const merged = new Set([...safeArray(marketRes.data), ...prev]);
+        try { localStorage.setItem('marketIds', JSON.stringify(Array.from(merged))); } catch(e) {}
+        return merged;
+      });
     }
   } catch(err) {
     console.error('Re-fetch failed:', err);
@@ -1674,18 +1713,28 @@ function GlobalSearch({currentUser,onClose,onNavigate}){
 
 function SalesMarket({currentUser}){
   const [cases,setCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [loading,setLoading]=useState(true);const [claimedIds,setClaimedIds]=useState(new Set());const [skippedIds,setSkippedIds]=useState(new Set());const [toast,setToast]=useState(null);const [leaderboard,setLeaderboard]=useState([]);
+  const PAGE_SIZE=24;
+  const [page,setPage]=useState(1); // pagination
   const showToast=(msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);};
-  const load=useCallback((silent=false)=>{if(!silent)setLoading(true);Promise.all([api('getMarket',{sales:currentUser.name}),api('getClaimedCases',{sales:currentUser.name}),api('getDashboard',{role:'Admin'})]).then(([mr,cr,dr])=>{if(mr.success)setCases(safeArray(mr.data).filter(c=>c.old_sales!==currentUser.name));if(cr.success)setClaimedCases(cr.data||[]);if(dr.success)setLeaderboard(dr.data?.sales||[]);setLoading(false);setClaimedIds(new Set());setSkippedIds(new Set());});},[currentUser.name]);
+  const load=useCallback((silent=false)=>{if(!silent){setLoading(true);setPage(1);}Promise.all([api('getMarket',{sales:currentUser.name}),api('getClaimedCases',{sales:currentUser.name}),api('getDashboard',{role:'Admin'})]).then(([mr,cr,dr])=>{if(mr.success)setCases(safeArray(mr.data).filter(c=>c.old_sales!==currentUser.name));if(cr.success)setClaimedCases(cr.data||[]);if(dr.success)setLeaderboard(dr.data?.sales||[]);setLoading(false);setClaimedIds(new Set());setSkippedIds(new Set());});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   async function claim(caseId){setClaimedIds(prev=>new Set([...prev,caseId]));setClaimedCases(prev=>[...prev,{caseID:caseId,sale:currentUser.name}]);showToast('✅ รับเคส '+caseId+' สำเร็จ!','ok');const r=await api('claimCase',{caseId,sales:currentUser.name});if(!r.success){setClaimedIds(prev=>{const s=new Set(prev);s.delete(caseId);return s;});setClaimedCases(prev=>prev.filter(c=>c.caseID!==caseId));showToast('❌ '+(r.error||'รับเคสไม่สำเร็จ'),'err');}else{setTimeout(()=>load(true),2000);}}
   async function notInterested(caseId){setSkippedIds(prev=>new Set([...prev,caseId]));await api('returnCase',{caseId,sales:'_skip_'+currentUser.name});setTimeout(()=>load(true),1000);}
   function getDateBadge(c){const id=String(c.ID||'');if(id.length>=4){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
-  const visibleCases=cases.filter(c=>!claimedIds.has(c.ID)&&!skippedIds.has(c.ID));const myStats=leaderboard.find(s=>s.name===currentUser.name)||{};const totalInMarket=visibleCases.length;const myClaimed=claimedCases.length+(claimedIds.size);const lbSorted=[...leaderboard].sort((a,b)=>(b.claimedCases||0)-(a.claimedCases||0));
+  const visibleCases=cases.filter(c=>!claimedIds.has(c.ID)&&!skippedIds.has(c.ID));
+  const totalInMarket=visibleCases.length;const myClaimed=claimedCases.length+(claimedIds.size);const lbSorted=[...leaderboard].sort((a,b)=>(b.claimedCases||0)-(a.claimedCases||0));
+  // Pagination: แสดงทีละ PAGE_SIZE ไพ่
+  const pagedCases=visibleCases.slice(0,page*PAGE_SIZE);
+  const hasMore=visibleCases.length>page*PAGE_SIZE;
   return <div className="mk-page">
     <div className="mk-hero"><div className="mk-hero-top"><div><div style={{fontSize:20,fontWeight:800,display:'flex',alignItems:'center',gap:8,color:'#e6edf3'}}>🎯 ตลาดเคส</div><div style={{fontSize:13,color:'rgba(230,237,243,.7)',marginTop:4}}>ใครไวได้ก่อน</div></div><button className="btn btn-ghost" onClick={()=>load(false)} style={{fontSize:13}}>🔄</button></div><div className="mk-stats">{[['ว่างอยู่',totalInMarket,'var(--blue)'],['ของฉัน',myClaimed,'var(--green)']].map(([l,v,c])=><div key={l} className="mk-stat"><div className="mk-stat-num" style={{color:c}}>{v}</div><div className="mk-stat-lbl">{l}</div></div>)}</div></div>
     <div className="mk-body"><div className="mk-cards-area">
       {toast&&<div style={{background:toast.type==='ok'?'rgba(63,185,80,.12)':'rgba(248,81,73,.12)',border:`1px solid ${toast.type==='ok'?'var(--green)':'var(--red)'}`,padding:'10px 16px',borderRadius:8,marginBottom:14,fontSize:13,display:'flex',alignItems:'center',gap:8}}>{toast.msg}</div>}
-      {loading?<SkeletonCards n={6}/>:visibleCases.length===0?<div style={{textAlign:'center',padding:60,color:'var(--text2)'}}><div style={{fontSize:48,marginBottom:12}}>📭</div><div style={{fontSize:16,fontWeight:600}}>ไม่มีเคสในตลาด</div></div>:<><div style={{fontSize:13,color:'var(--text2)',marginBottom:12}}>พบ {visibleCases.length} เคส</div><div className="mk-cards-grid">{visibleCases.map((c,i)=><div key={i} className="mkc"><div className="mkc-top"><span className="mkc-id">{c.ID}</span><span className="mkc-date">📅 {getDateBadge(c)}</span></div><div className="mkc-name">{c.name}</div><div className="mkc-badges"><StatusBadge status={c.status}/><span className="badge" style={{background:'rgba(255,166,87,.1)',color:'var(--orange)',border:'1px solid rgba(255,166,87,.3)',fontSize:11}}>จาก {c.old_sales||'-'}</span></div><div className="mkc-contact">📞 <span style={{filter:'blur(5px)',userSelect:'none',letterSpacing:1}}>••••••••••</span><span style={{fontSize:11,color:'var(--text3)'}}>(เห็นหลังรับเคส)</span></div>{c.report&&<div className="mkc-report">{String(c.report).slice(0,130)}{c.report.length>130?'...':''}</div>}<div className="mkc-actions"><button className="btn-claim" onClick={()=>claim(c.ID)}>รับเคสนี้ →</button><button onClick={()=>notInterested(c.ID)} style={{background:'rgba(248,81,73,.12)',color:'var(--red)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'10px 14px',fontSize:15,cursor:'pointer',transition:'all .15s',fontWeight:700,lineHeight:1}}>✕</button></div></div>)}</div></>}
+      {loading?<SkeletonCards n={6}/>:visibleCases.length===0?<div style={{textAlign:'center',padding:60,color:'var(--text2)'}}><div style={{fontSize:48,marginBottom:12}}>📭</div><div style={{fontSize:16,fontWeight:600}}>ไม่มีเคสในตลาด</div></div>:<>
+        <div style={{fontSize:13,color:'var(--text2)',marginBottom:12}}>แสดง {pagedCases.length} จาก {visibleCases.length} เคส</div>
+        <div className="mk-cards-grid">{pagedCases.map((c,i)=><div key={i} className="mkc"><div className="mkc-top"><span className="mkc-id">{c.ID}</span><span className="mkc-date">📅 {getDateBadge(c)}</span></div><div className="mkc-name">{c.name}</div><div className="mkc-badges"><StatusBadge status={c.status}/><span className="badge" style={{background:'rgba(255,166,87,.1)',color:'var(--orange)',border:'1px solid rgba(255,166,87,.3)',fontSize:11}}>จาก {c.old_sales||'-'}</span></div><div className="mkc-contact">📞 <span style={{filter:'blur(5px)',userSelect:'none',letterSpacing:1}}>••••••••••</span><span style={{fontSize:11,color:'var(--text3)'}}>(เห็นหลังรับเคส)</span></div>{c.report&&<div className="mkc-report">{String(c.report).slice(0,130)}{c.report.length>130?'...':''}</div>}<div className="mkc-actions"><button className="btn-claim" onClick={()=>claim(c.ID)}>รับเคสนี้ →</button><button onClick={()=>notInterested(c.ID)} style={{background:'rgba(248,81,73,.12)',color:'var(--red)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'10px 14px',fontSize:15,cursor:'pointer',transition:'all .15s',fontWeight:700,lineHeight:1}}>✕</button></div></div>)}</div>
+        {hasMore&&<div style={{textAlign:'center',padding:'16px 0'}}><button className="btn btn-ghost" style={{fontSize:13,padding:'10px 32px',borderRadius:20}} onClick={()=>setPage(p=>p+1)}>โหลดเพิ่มอีก {Math.min(PAGE_SIZE,visibleCases.length-page*PAGE_SIZE)} เคส ↓</button></div>}
+      </>}
     </div>
     <div className="mk-sidebar"><div className="mk-sb-section"><div className="mk-sb-title">🏆 Leaderboard</div>{lbSorted.map((s,i)=><div key={i} className="lb-row"><div className="lb-rank" style={{background:i===0?'#3d2a00':i===1?'#1c1c2e':i===2?'#1a2a00':'var(--bg3)',color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text2)'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div style={{flex:1}}><div style={{fontWeight:s.name===currentUser.name?700:500,fontSize:13,color:s.name===currentUser.name?'var(--blue)':'var(--text)'}}>{s.name}{s.name===currentUser.name?' (ฉัน)':''}</div></div><span style={{fontWeight:700,color:'var(--blue)',fontSize:14}}>{s.claimedCases||0}</span></div>)}</div></div></div>
   </div>;
