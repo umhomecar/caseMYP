@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" style="background:#0d1117;">
 <head>
 <meta charset="UTF-8"/>
+<style>html,body{background:#0d1117!important;color:#e6edf3;}#root{min-height:100vh;background:#0d1117;}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>CasePool — ระบบจัดการเคส</title>
 <meta name="theme-color" content="#0d1117"/>
@@ -1906,7 +1907,21 @@ function DailyFocusPage({currentUser,onNavigate}){
   function hText(h){if(h<1)return'เมื่อกี้';if(h<24)return`${Math.floor(h)} ชม.ที่แล้ว`;return`${Math.floor(h/24)} วันที่แล้ว`;}
   const active=myCases.filter(c=>!CLOSED.includes(c.status));const autoSendSoon=active.filter(c=>hoursAgo(c.updatedat)>=60);const critical=active.filter(c=>hoursAgo(c.updatedat)>=48&&hoursAgo(c.updatedat)<60);const warn=active.filter(c=>hoursAgo(c.updatedat)>=12&&hoursAgo(c.updatedat)<48);const hotStatuses=['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'];const hot=active.filter(c=>hotStatuses.includes(c.status));
   const h=new Date().getHours();const greeting=h<12?'🌅 อรุณสวัสดิ์':h<17?'☀️ สวัสดีตอนบ่าย':'🌆 สวัสดีตอนเย็น';const allClear=autoSendSoon.length===0&&critical.length===0&&warn.length===0;
-  const FocusBlock=({color,borderColor,bg,title,items,extra=null})=><div className="focus-block" style={{background:bg,border:`1px solid ${borderColor}`}}><div style={{fontWeight:700,color,marginBottom:8,fontSize:13}}>{title}</div>{items.slice(0,5).map((c,i)=><div key={i} onClick={()=>setSelCase(c)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',borderRadius:7,background:'rgba(255,255,255,.03)',marginBottom:i<items.length-1?4:0,cursor:'pointer',transition:'background .1s'}} onMouseOver={e=>e.currentTarget.style.background='rgba(88,166,255,.1)'} onMouseOut={e=>e.currentTarget.style.background='rgba(255,255,255,.03)'}><div style={{display:'flex',alignItems:'center',gap:6,minWidth:0,flex:1}}><span style={{color:'#58a6ff',fontWeight:700,fontSize:12,flexShrink:0}}>{c.caseid}</span><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--text)'}}>{c.customername}</span><StatusBadge status={c.status}/></div><span style={{fontSize:11,color,flexShrink:0,marginLeft:8}}>{hText(hoursAgo(c.updatedat))}</span></div>)}{items.length>5&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginTop:4}}>+{items.length-5} รายการ</div>}{extra}</div>;
+  const [expandBlock,setExpandBlock]=useState(null);
+  const pressRef=useRef(null);
+  function startPress(title,items){pressRef.current=setTimeout(()=>setExpandBlock({title,items}),500);}
+  function endPress(){if(pressRef.current)clearTimeout(pressRef.current);}
+  const FocusBlock=({color,borderColor,bg,title,items,extra=null})=><div className="focus-block" style={{background:bg,border:`1px solid ${borderColor}`,cursor:'pointer',userSelect:'none'}}
+    onTouchStart={()=>startPress(title,items)} onTouchEnd={endPress} onTouchMove={endPress}
+    onMouseDown={()=>startPress(title,items)} onMouseUp={endPress} onMouseLeave={endPress}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+      <div style={{fontWeight:700,color,fontSize:13}}>{title}</div>
+      {items.length>5&&<button onClick={e=>{e.stopPropagation();setExpandBlock({title,items});}} style={{background:'none',border:`1px solid ${color}50`,borderRadius:20,color,fontSize:10,padding:'2px 8px',cursor:'pointer',fontWeight:700}}>ดูทั้งหมด →</button>}
+    </div>
+    {items.slice(0,5).map((c,i)=><div key={i} onClick={()=>setSelCase(c)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',borderRadius:7,background:'rgba(255,255,255,.03)',marginBottom:i<items.length-1?4:0,cursor:'pointer',transition:'background .1s'}} onMouseOver={e=>e.currentTarget.style.background='rgba(88,166,255,.1)'} onMouseOut={e=>e.currentTarget.style.background='rgba(255,255,255,.03)'}><div style={{display:'flex',alignItems:'center',gap:6,minWidth:0,flex:1}}><span style={{color:'#58a6ff',fontWeight:700,fontSize:12,flexShrink:0}}>{c.caseid}</span><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--text)'}}>{c.customername}</span><StatusBadge status={c.status}/></div><span style={{fontSize:11,color,flexShrink:0,marginLeft:8}}>{hText(hoursAgo(c.updatedat))}</span></div>)}
+    {items.length>5&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginTop:4}}>กดค้างหรือกด "ดูทั้งหมด" เพื่อดู +{items.length-5} รายการ</div>}
+    {extra}
+  </div>;
   return <div className="page">
     <div style={{background:'linear-gradient(135deg,#1a2a4a 0%,#0f2233 100%)',border:'1px solid rgba(88,166,255,.2)',borderRadius:14,padding:'20px 22px',marginBottom:18}}><div style={{fontSize:12,color:'rgba(88,166,255,.9)',marginBottom:3}}>{greeting}</div><div style={{fontSize:20,fontWeight:800,marginBottom:4}}>{currentUser.name} 👋</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><div style={{fontSize:12,color:'rgba(230,237,243,.7)'}}>{new Date().toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div><button className="btn btn-ghost" style={{fontSize:11,padding:'3px 10px',borderRadius:20,border:'1px solid rgba(88,166,255,.3)',color:'var(--blue)'}} onClick={load}>🔄</button></div></div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>{[['📋 เคส Active',active.length,'var(--blue)','cases'],['🏪 ตลาดว่าง',marketCount,'var(--green)','market'],['📥 รับแล้ว',claimedCases.length,'var(--purple)','claimed']].map(([l,v,c,key])=><div key={key} onClick={()=>onNavigate(key)} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center',cursor:'pointer'}} onMouseOver={e=>e.currentTarget.style.borderColor=c} onMouseOut={e=>e.currentTarget.style.borderColor='var(--border)'}><div style={{fontSize:12,color:c,opacity:.7,marginBottom:4}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:c}}>{loading?'—':v}</div></div>)}</div>
@@ -1917,6 +1932,27 @@ function DailyFocusPage({currentUser,onNavigate}){
       <div style={{marginLeft:'auto',fontSize:22,color:'var(--purple)'}}>›</div>
     </div>}
     <button className="btn btn-ghost" style={{marginTop:8,width:'100%',fontSize:13}} onClick={load}>🔄 รีเฟรช</button>
+    {/* Expand All Modal */}
+    {expandBlock&&<div className="overlay" style={{zIndex:200}} onClick={()=>setExpandBlock(null)}>
+      <div className="modal" style={{maxWidth:480}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-hd">
+          <span style={{fontWeight:700,fontSize:15}}>{expandBlock.title}</span>
+          <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={()=>setExpandBlock(null)}><Ico.x/></button>
+        </div>
+        <div className="modal-bd" style={{padding:'8px 16px',maxHeight:'70vh',overflowY:'auto'}}>
+          {expandBlock.items.map((c,i)=><div key={i} onClick={()=>{setExpandBlock(null);setSelCase(c);}} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 10px',borderRadius:8,background:'var(--bg3)',marginBottom:6,cursor:'pointer',transition:'all .15s'}}
+            onMouseOver={e=>e.currentTarget.style.background='rgba(88,166,255,.1)'}
+            onMouseOut={e=>e.currentTarget.style.background='var(--bg3)'}>
+            <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0,flex:1}}>
+              <span style={{color:'var(--blue)',fontWeight:700,fontSize:13,flexShrink:0}}>{c.caseid}</span>
+              <span style={{fontSize:14,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.customername}</span>
+              <StatusBadge status={c.status}/>
+            </div>
+            <span style={{fontSize:11,color:'var(--text3)',flexShrink:0,marginLeft:8}}>{hText(hoursAgo(c.updatedat))}</span>
+          </div>)}
+        </div>
+      </div>
+    </div>}
     {selCase&&<CaseModal caseData={selCase} users={[]} currentUser={currentUser} onClose={()=>setSelCase(null)} onUpdated={()=>{setSelCase(null);load();}}/>}
   </div>;
 }
@@ -2112,10 +2148,51 @@ function SalesDashboard({currentUser}){
 
 function OnboardingTour({currentUser,onDone}){
   const [step,setStep]=useState(0);
-  const steps=[{icon:'🎉',title:'ยินดีต้อนรับสู่ CasePool!',desc:'ระบบจัดการเคสลูกค้าที่ช่วยให้คุณทำงานเป็นระบบ',tip:null},{icon:'📊',title:'วันนี้ฉันต้องทำอะไร',desc:'หน้า "วันนี้" บอกทุกอย่างที่ต้องทำ',tip:'💡 เช็คทุกเช้าก่อนเริ่มงาน!'},{icon:'🏪',title:'ตลาดเคส',desc:'เคสจากลูกค้าที่รอคนดูแล',tip:'⚡ ใครไวได้ก่อน!'},{icon:'📋',title:'เคสของฉัน',desc:'เคสที่ได้รับมอบหมาย อัปเดตสถานะทุกวัน',tip:'⚠️ ไม่อัปเดต 3 วัน ระบบส่งตลาดอัตโนมัติ!'},{icon:'📥',title:'รับจากตลาด',desc:'เคสที่คุณรับมาเอง',tip:'🔒 ต้องรอ 24 ชม. หลังรับเคสถึงจะคืนได้'},{icon:'🧠',title:'AI แนะนำ',desc:'ใช้ AI วิเคราะห์เคสและให้คำแนะนำ',tip:'🔑 ต้องมี Anthropic API Key ใส่ครั้งเดียวจำไว้เลย'}];
+  const [animDir,setAnimDir]=useState('in'); // in | out-left | out-right
+  const steps=[
+    {icon:'🎉',title:'ยินดีต้อนรับสู่ CasePool!',desc:'ระบบจัดการเคสลูกค้าที่ช่วยให้คุณทำงานเป็นระบบ',tip:null,color:'#00f5ff'},
+    {icon:'📊',title:'หน้าวันนี้',desc:'บอกทุกอย่างที่ต้องทำ — เคสค้าง, นัดหมาย, โอกาสปิดขาย',tip:'💡 เช็คทุกเช้าก่อนเริ่มงาน!',color:'#ffd700'},
+    {icon:'🏪',title:'ตลาดเคส',desc:'เคสจากลูกค้าที่รอคนดูแล ใครไวได้ก่อน',tip:'⚡ กดรับเคสได้เลยทันที!',color:'#a855f7'},
+    {icon:'📋',title:'เคสของฉัน',desc:'เคสที่ได้รับมอบหมาย อัปเดตสถานะทุกวัน',tip:'⚠️ ไม่อัปเดต 3 วัน ระบบส่งตลาดอัตโนมัติ!',color:'#ff2d78'},
+    {icon:'📥',title:'รับจากตลาด',desc:'เคสที่คุณรับมาเอง มีเวลา 24 ชั่วโมงก่อนคืน',tip:'🔒 ต้องรอ 24 ชม. หลังรับเคสถึงจะคืนได้',color:'#34d399'},
+    {icon:'🧠',title:'AI แนะนำ',desc:'ใช้ AI วิเคราะห์เคสและให้คำแนะนำส่วนตัว',tip:'🔑 ต้องมี Anthropic API Key',color:'#60a5fa'},
+  ];
   function finish(){try{localStorage.setItem('cp_onboarded_'+currentUser.userId,'1');}catch(e){}onDone();}
+  function goNext(){setAnimDir('out-left');setTimeout(()=>{setStep(s=>s+1);setAnimDir('in');},180);}
+  function goPrev(){setAnimDir('out-right');setTimeout(()=>{setStep(s=>s-1);setAnimDir('in');},180);}
   const s=steps[step];const isLast=step===steps.length-1;
-  return <div className="overlay" style={{zIndex:9999,background:'rgba(0,0,0,.88)'}}><div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:18,width:'100%',maxWidth:380,padding:'32px 28px',textAlign:'center',boxShadow:'0 24px 64px rgba(0,0,0,.6)',margin:'0 16px'}}><div style={{display:'flex',justifyContent:'center',gap:5,marginBottom:24}}>{steps.map((_,i)=><div key={i} className="onboard-progress-dot" style={{width:i===step?22:6,background:i<=step?'var(--blue)':'var(--bg4)'}}/>)}</div><div style={{fontSize:52,marginBottom:16}}>{s.icon}</div><div style={{fontWeight:800,fontSize:17,marginBottom:10}}>{s.title}</div><div style={{fontSize:14,color:'var(--text2)',lineHeight:1.75,marginBottom:14}}>{s.desc}</div>{s.tip&&<div style={{background:'rgba(88,166,255,.08)',border:'1px solid rgba(88,166,255,.2)',borderRadius:8,padding:'10px 14px',fontSize:13,color:'var(--blue)',marginBottom:18}}>{s.tip}</div>}<div style={{display:'flex',gap:10,marginTop:8}}>{step>0&&<button className="btn btn-ghost" style={{flex:1,padding:'10px'}} onClick={()=>setStep(s=>s-1)}>← ก่อน</button>}<button className="btn btn-primary" style={{flex:2,padding:'10px',fontWeight:700}} onClick={()=>isLast?finish():setStep(s=>s+1)}>{isLast?'🚀 เริ่มใช้งาน!':'ถัดไป →'}</button></div><button onClick={finish} style={{background:'none',border:'none',color:'var(--text3)',fontSize:12,cursor:'pointer',marginTop:12,padding:'4px 8px'}}>ข้ามการแนะนำ</button></div></div>;
+  const animStyle=animDir==='in'?{animation:'onboardIn .3s cubic-bezier(.16,1,.3,1)'}:animDir==='out-left'?{animation:'onboardOutLeft .18s ease forwards'}:{animation:'onboardOutRight .18s ease forwards'};
+  return <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.92)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    <style>{`
+      @keyframes onboardIn{from{opacity:0;transform:scale(.9) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}
+      @keyframes onboardOutLeft{to{opacity:0;transform:scale(.95) translateX(-30px)}}
+      @keyframes onboardOutRight{to{opacity:0;transform:scale(.95) translateX(30px)}}
+      @keyframes iconBounce{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+    `}</style>
+    <div style={{width:'100%',maxWidth:400,margin:'0 16px'}}>
+      {/* Progress dots */}
+      <div style={{display:'flex',justifyContent:'center',gap:6,marginBottom:20}}>
+        {steps.map((_,i)=><div key={i} style={{height:4,borderRadius:2,background:i===step?s.color:i<step?s.color+'60':'rgba(255,255,255,.15)',width:i===step?28:8,transition:'all .3s'}}/>)}
+      </div>
+      {/* Card */}
+      <div style={{background:'linear-gradient(135deg,#0f1117,#161b27)',border:`1px solid ${s.color}30`,borderRadius:24,padding:'36px 28px',textAlign:'center',boxShadow:`0 0 60px ${s.color}15,0 24px 64px rgba(0,0,0,.6)`,...animStyle}}>
+        {/* Corner accents */}
+        <div style={{position:'absolute',top:12,left:12,width:14,height:14,borderTop:`2px solid ${s.color}`,borderLeft:`2px solid ${s.color}`,borderRadius:'14px 0 0 0'}}/>
+        <div style={{position:'absolute',top:12,right:12,width:14,height:14,borderTop:`2px solid ${s.color}`,borderRight:`2px solid ${s.color}`,borderRadius:'0 14px 0 0'}}/>
+        <div style={{fontSize:60,marginBottom:16,display:'block',animation:'iconBounce 2s ease-in-out infinite'}}>{s.icon}</div>
+        <div style={{fontSize:11,color:`${s.color}80`,letterSpacing:2,textTransform:'uppercase',marginBottom:8}}>ขั้นตอน {step+1} / {steps.length}</div>
+        <div style={{fontWeight:900,fontSize:20,marginBottom:12,color:'#fff',letterSpacing:.3}}>{s.title}</div>
+        <div style={{fontSize:14,color:'rgba(255,255,255,.6)',lineHeight:1.8,marginBottom:s.tip?16:20}}>{s.desc}</div>
+        {s.tip&&<div style={{background:`${s.color}12`,border:`1px solid ${s.color}30`,borderRadius:10,padding:'10px 14px',fontSize:13,color:s.color,marginBottom:20,textShadow:`0 0 10px ${s.color}40`}}>{s.tip}</div>}
+        <div style={{height:1,background:`linear-gradient(90deg,transparent,${s.color}40,transparent)`,marginBottom:20}}/>
+        <div style={{display:'flex',gap:10}}>
+          {step>0&&<button onClick={goPrev} style={{flex:1,padding:'12px',background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.12)',borderRadius:12,color:'rgba(255,255,255,.6)',cursor:'pointer',fontSize:14,fontWeight:600}}>← ก่อน</button>}
+          <button onClick={isLast?finish:goNext} style={{flex:2,padding:'12px',background:`linear-gradient(135deg,${s.color}cc,${s.color})`,border:'none',borderRadius:12,color:'#000',cursor:'pointer',fontSize:14,fontWeight:800,boxShadow:`0 0 20px ${s.color}50`}}>{isLast?'🚀 เริ่มใช้งาน!':'ถัดไป →'}</button>
+        </div>
+        <button onClick={finish} style={{background:'none',border:'none',color:'rgba(255,255,255,.25)',fontSize:12,cursor:'pointer',marginTop:14,padding:'4px 8px'}}>ข้ามการแนะนำ</button>
+      </div>
+    </div>
+  </div>;
 }
 
 function LoginPage({onLogin}){
