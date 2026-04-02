@@ -931,11 +931,21 @@ function ImageUploader({value,onChange,caseId='',label='📷',accept='image/*',m
 function QrUploader({value,onChange,caseId=''}){return <ImageUploader value={value} onChange={onChange} caseId={caseId} label="📷" maxMB={10}/>;}
 
 function AddCaseModal({users,currentUser,onClose,onAdded}){
-  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:'ปกติ'});
+  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:'ปกติ',clipad:''});
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   useEffect(()=>{const d=new Date();const pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');api('getCases',{all:'true'}).then(r=>{if(r.success){const max=(r.data||[]).filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[]);
-  async function submit(){if(!form.customername||!form.sales)return alert('กรุณากรอกชื่อลูกค้าและเลือกเซลส์');setLoading(true);const r=await api('addCase',{...form});setLoading(false);if(r.success){onAdded();onClose();}else alert(r.error||'เกิดข้อผิดพลาด');}
+  async function submit(){
+    if(!form.customername||!form.sales)return alert('กรุณากรอกชื่อลูกค้าและเลือกเซลส์');
+    setLoading(true);
+    const submitData={...form};
+    // เก็บ clipad ใน attachment field โดย prefix [CLIP:...]
+    if(submitData.clipad){submitData.attachment='[CLIP:'+submitData.clipad+']';}
+    delete submitData.clipad;
+    const r=await api('addCase',submitData);
+    setLoading(false);
+    if(r.success){onAdded();onClose();}else alert(r.error||'เกิดข้อผิดพลาด');
+  }
   return <Modal title="➕ เพิ่มข้อมูลลูกค้า" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
@@ -945,6 +955,10 @@ function AddCaseModal({users,currentUser,onClose,onAdded}){
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
       <div className="form-group"><label>ส่ง</label><select value={form.sent} onChange={e=>set('sent',e.target.value)}>{SENT_TYPES.map(s=><option key={s}>{s}</option>)}</select></div>
       {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>}
+      {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1',background:'rgba(210,153,34,.06)',border:'1px solid rgba(210,153,34,.25)',borderRadius:8,padding:'10px 12px'}}>
+        <label style={{display:'flex',alignItems:'center',gap:6,color:'var(--yellow)',marginBottom:6}}>🎬 ข้อมูลคลิปแอด <span style={{fontSize:11,fontWeight:400,color:'var(--text3)'}}>เห็นเฉพาะ Admin</span></label>
+        <input value={form.clipad} onChange={e=>set('clipad',e.target.value)} placeholder="ชื่อแอด / แคมเปญ / คลิป URL..."/>
+      </div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รีพอร์ต</label><textarea rows={4} value={form.report} onChange={e=>set('report',e.target.value)} placeholder="ข้อมูลลูกค้า..."/></div>
     </div>
   </Modal>;
