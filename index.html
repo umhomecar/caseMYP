@@ -1428,6 +1428,7 @@ function AdminMarket({currentUser,users}){
       const marketData = mr.data||[];
       setCases(marketData);
       setAllCases(marketData);
+      // ✅ บันทึกลง localStorage
       try {
         localStorage.setItem('marketCases', JSON.stringify(marketData));
       } catch(e) {
@@ -1445,140 +1446,21 @@ function AdminMarket({currentUser,users}){
     return String(c.ID||'').toLowerCase().includes(q)||String(c.name||'').toLowerCase().includes(q)||String(c.contact||'').toLowerCase().includes(q)||String(c.report||'').toLowerCase().includes(q);
   });
   const salesList=users.filter(u=>u.role==='Sales');
-  const total=allCases.length;
-  const owned=allCases.filter(c=>c.PoolStatus==='ปิด').length;
-  
-  function getDateBadge(c){
-    const id=String(c.ID||'');
-    if(id.length>=6){
-      const yy=id.slice(0,2),mm=id.slice(2,4);
-      const year=2000+parseInt(yy);
-      const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-      const monthName=monthNames[parseInt(mm)-1]||mm;
-      return`${monthName} ${year}`;
-    }
-    return '';
-  }
-  
-  function renderContactInfo(contact){
-    const ct=contact||'';
-    if(!ct||ct==='-'){
-      return <span style={{color:'var(--text3)'}}>-</span>;
-    }
-    if(ct.startsWith('data:image')||ct.startsWith('https://drive')){
-      return <span style={{color:'var(--blue)',fontSize:12}}>📷 QR</span>;
-    }
-    const disp=ct.slice(0,25)+(ct.length>25?'...':'');
-    return <span>{disp}<button style={{border:'none',background:'none',color:'var(--blue)',cursor:'pointer',fontSize:11,marginLeft:4}} onClick={()=>copyText(ct)}>คัดลอก</button></span>;
-  }
-  
-  function renderCasesList(){
-    const PAGE=50;
-    const displayCases=filtered.slice(0,PAGE);
-    
-    return <>
-      <div style={{fontSize:13,color:'var(--text2)',marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span>แสดง {Math.min(PAGE,filtered.length)} จาก {filtered.length} เคส</span>
-        {filtered.length>PAGE && (
-          <span style={{fontSize:11,color:'var(--yellow)'}}>⚠️ มีเคสเกิน {PAGE} ใช้ search กรองก่อน</span>
-        )}
-      </div>
-      <div className="mk-cards-grid">
-        {displayCases.map((c,i)=>(
-          <div key={i} className="mkc">
-            <div className="mkc-top">
-              <span className="mkc-id">{c.ID}</span>
-              <span className="mkc-date">📅 {getDateBadge(c)}</span>
-            </div>
-            <div className="mkc-name">{c.name}</div>
-            <div className="mkc-badges">
-              <StatusBadge status={c.status}/>
-              <span className="badge" style={{background:'rgba(255,166,87,.1)',color:'var(--orange)',border:'1px solid rgba(255,166,87,.3)'}}>
-                จาก {c.old_sales||'-'}
-              </span>
-            </div>
-            <div className="mkc-contact">📞 {renderContactInfo(c.contact)}</div>
-            {c.report && (
-              <div className="mkc-report">
-                {String(c.report).slice(0,120)}{c.report.length>120?'...':''}
-              </div>
-            )}
-            <button className="btn btn-danger" style={{width:'100%',padding:'9px',fontSize:13}} onClick={()=>setConfirm(c.ID)}>
-              🗑 ปิดเคส
-            </button>
-          </div>
-        ))}
-      </div>
-    </>;
-  }
-  
+  const total=allCases.length;const owned=allCases.filter(c=>c.PoolStatus==='ปิด').length;
+  function getDateBadge(c){const id=String(c.ID||'');if(id.length>=6){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
   return <div className="mk-page">
-    <div className="mk-hero">
-      <div className="mk-hero-top">
-        <div>
-          <div style={{fontSize:22,fontWeight:800,display:'flex',alignItems:'center',gap:8}}>
-            🏪 ตลาดเคส <span style={{fontSize:13,fontWeight:400,color:'var(--text2)'}}>Admin View</span>
+    <div className="mk-hero"><div className="mk-hero-top"><div><div style={{fontSize:22,fontWeight:800,display:'flex',alignItems:'center',gap:8}}>🏪 ตลาดเคส <span style={{fontSize:13,fontWeight:400,color:'var(--text2)'}}>Admin View</span></div><div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ภาพรวมเคสทั้งหมดในตลาด</div></div><div style={{display:'flex',gap:8,alignItems:'center'}}><div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <div style={{position:'relative'}}>
+            <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'rgba(230,237,243,.5)',pointerEvents:'none'}}>🔍</span>
+            <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="ค้นหาเคส ชื่อ เบอร์..." style={{paddingLeft:28,fontSize:13,height:34,background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.15)',borderRadius:8,color:'#e6edf3',width:180}}/>
+            {searchQ&&<button onClick={()=>setSearchQ('')} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(230,237,243,.5)',cursor:'pointer',fontSize:14}}>✕</button>}
           </div>
-          <div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ภาพรวมเคสทั้งหมดในตลาด</div>
-        </div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            <div style={{position:'relative'}}>
-              <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'rgba(230,237,243,.5)',pointerEvents:'none'}}>🔍</span>
-              <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="ค้นหาเคส ชื่อ เบอร์..." style={{paddingLeft:28,fontSize:13,height:34,background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.15)',borderRadius:8,color:'#e6edf3',width:180}}/>
-              {searchQ&&<button onClick={()=>setSearchQ('')} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(230,237,243,.5)',cursor:'pointer',fontSize:14}}>✕</button>}
-            </div>
-            <select value={filterSales} onChange={e=>setFilterSales(e.target.value)} style={{minWidth:120,fontSize:13}}>
-              <option value="all">ทุกเซลส์</option>
-              {salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
-            </select>
-            <button className="btn btn-ghost" onClick={load} style={{fontSize:13}}>🔄</button>
-          </div>
-        </div>
-      </div>
-      <div className="mk-stats">
-        {[['ว่างอยู่',total-owned,'var(--blue)'],['มีเจ้าของ',owned,'var(--orange)'],['ทั้งหมด',total,'var(--text)']].map(([l,v,c])=>(
-          <div key={l} className="mk-stat">
-            <div className="mk-stat-num" style={{color:c}}>{v}</div>
-            <div className="mk-stat-lbl">{l}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-    <div className="mk-body">
-      <div className="mk-cards-area">
-        {loading && <SkeletonCards n={6}/>}
-        {!loading && filtered.length===0 && (
-          <div style={{textAlign:'center',padding:60,color:'var(--text2)'}}>
-            <div style={{fontSize:40,marginBottom:12}}>📭</div>
-            <div>ไม่มีเคสในตลาด</div>
-          </div>
-        )}
-        {!loading && filtered.length>0 && renderCasesList()}
-      </div>
-      <div className="mk-sidebar">
-        <div className="mk-sb-section">
-          <div className="mk-sb-title">🏆 เคสในตลาดแต่ละเซลส์</div>
-          {salesList.map((u,i)=>{
-            const cnt=allCases.filter(c=>c.old_sales===u.name).length;
-            return (
-              <div key={i} className="lb-row">
-                <div className="lb-rank" style={{
-                  background:i===0?'#3d2a00':i===1?'#1c1c2e':i===2?'#1a2a00':'var(--bg3)',
-                  color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text2)'
-                }}>
-                  {i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}
-                </div>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:600,fontSize:13}}>{u.name}</div>
-                </div>
-                <span style={{fontWeight:700,color:'var(--blue)'}}>{cnt}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+          <select value={filterSales} onChange={e=>setFilterSales(e.target.value)} style={{minWidth:120,fontSize:13}}><option value="all">ทุกเซลส์</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>
+          <button className="btn btn-ghost" onClick={load} style={{fontSize:13}}>🔄</button>
+        </div></div></div>
+    <div className="mk-stats">{[['ว่างอยู่',total-owned,'var(--blue)'],['มีเจ้าของ',owned,'var(--orange)'],['ทั้งหมด',total,'var(--text)']].map(([l,v,c])=><div key={l} className="mk-stat"><div className="mk-stat-num" style={{color:c}}>{v}</div><div className="mk-stat-lbl">{l}</div></div>)}</div></div>
+    <div className="mk-body"><div className="mk-cards-area">{loading?<SkeletonCards n={6}/>:filtered.length===0?<div style={{textAlign:'center',padding:60,color:'var(--text2)'}}><div style={{fontSize:40,marginBottom:12}}>📭</div><div>ไม่มีเคสในตลาด</div></div>:<div><div style={{fontSize:13,color:'var(--text2)',marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>แสดง {Math.min(50,filtered.length)} จาก {filtered.length} เคส</span>{filtered.length>50&&<span style={{fontSize:11,color:'var(--yellow)'}}>⚠️ ใช้ search กรองให้เหลือน้อยกว่า 50 ก่อน</span>}</div><div className="mk-cards-grid">{filtered.slice(0,50).map((c,i)=><div key={i} className="mkc"><div className="mkc-top"><span className="mkc-id">{c.ID}</span><span className="mkc-date">📅 {getDateBadge(c)}</span></div><div className="mkc-name">{c.name}</div><div className="mkc-badges"><StatusBadge status={c.status}/><span className="badge" style={{background:'rgba(255,166,87,.1)',color:'var(--orange)',border:'1px solid rgba(255,166,87,.3)'}}>จาก {c.old_sales||'-'}</span></div><div className="mkc-contact">📞 <span style={{color:'var(--text2)',fontSize:12}}>{(c.contact||'').startsWith('data:image')?'📷 QR':(c.contact||'-').slice(0,25)}</span>{c.contact&&!c.contact.startsWith('data:')&&<button style={{border:'none',background:'none',color:'var(--blue)',cursor:'pointer',fontSize:11,marginLeft:4}} onClick={()=>copyText(c.contact)}>คัดลอก</button>}</div>{c.report&&<div className="mkc-report">{String(c.report).slice(0,120)}{c.report.length>120?'...':''}</div>}<button className="btn btn-danger" style={{width:'100%',padding:'9px',fontSize:13}} onClick={()=>setConfirm(c.ID)}>🗑 ปิดเคส</button></div>)}</div></div>} </div>
+    <div className="mk-sidebar"><div className="mk-sb-section"><div className="mk-sb-title">🏆 เคสในตลาดแต่ละเซลส์</div>{salesList.map((u,i)=>{const cnt=allCases.filter(c=>c.old_sales===u.name).length;return <div key={i} className="lb-row"><div className="lb-rank" style={{background:i===0?'#3d2a00':i===1?'#1c1c2e':i===2?'#1a2a00':'var(--bg3)',color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text2)'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{u.name}</div></div><span style={{fontWeight:700,color:'var(--blue)'}}>{cnt}</span></div>;})}</div></div></div>
     {confirm&&<Confirm msg={`ปิดเคส ${confirm} ออกจากตลาด?`} onOk={()=>{closeCase(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>}
   </div>;
 }
