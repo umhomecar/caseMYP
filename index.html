@@ -173,8 +173,8 @@ tr.clickable{cursor:pointer;}
 .mk-cards-area{flex:1;padding:20px;min-width:0;}
 .mk-sidebar{width:280px;flex-shrink:0;border-left:1px solid var(--border);padding:16px;background:var(--bg2);}
 .mk-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
-.mkc{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;transition:all .2s;cursor:default;}
-.mkc:hover{border-color:var(--blue2);box-shadow:0 4px 20px rgba(31,111,235,.15);}
+.mkc{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;transition:border-color .2s,box-shadow .2s,transform .2s;cursor:default;animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);}
+.mkc:hover{border-color:var(--blue2);box-shadow:0 4px 20px rgba(31,111,235,.15);transform:translateY(-2px);}
 .mkc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
 .mkc-id{font-size:15px;font-weight:800;color:var(--blue);}
 .mkc-date{font-size:11px;background:#2d2000;color:var(--yellow);padding:3px 8px;border-radius:20px;border:1px solid #4a3500;}
@@ -195,17 +195,14 @@ tr.clickable{cursor:pointer;}
 .sb-stat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg3);border-radius:8px;margin-bottom:6px;}
 @media(max-width:900px){.mk-sidebar{display:none;}}
 @media(max-width:600px){.mk-cards-grid{grid-template-columns:1fr;}.mk-hero{padding:16px 16px 0;}.mk-cards-area{padding:12px;}.mk-stats{flex-wrap:wrap;gap:6px;}.mk-stat{min-width:70px;padding:10px 12px;}}
-.focus-block{border-radius:10px;padding:14px 16px;margin-bottom:12px;}
+.focus-block{border-radius:10px;padding:14px 16px;margin-bottom:12px;animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);}
 .fab{display:none;position:fixed;bottom:76px;right:16px;width:52px;height:52px;border-radius:50%;background:var(--blue2);color:#fff;border:none;cursor:pointer;font-size:24px;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(31,111,235,.5);z-index:90;transition:transform .15s;}
 .fab:active{transform:scale(.93);}
 @media(max-width:768px){.fab{display:flex;}}
 /* ── Fix SVG icon color ── */
-.nav-item svg,.sidebar svg,.bottom-nav-item svg,.admin-topbar svg,.admin-bottom-nav svg{
-  fill:none;stroke:currentColor;display:inline-block;vertical-align:middle;flex-shrink:0;
-  width:18px;height:18px;
-}
+.nav-item svg,.bottom-nav-item svg,.admin-topbar svg,.admin-bottom-nav svg{display:inline-block;vertical-align:middle;flex-shrink:0;width:18px;height:18px;}
 .nav-item{color:var(--text2);}
-.nav-item.active{color:var(--blue);background:rgba(31,111,235,.13);border-left:3px solid var(--blue);}
+.nav-item.active{color:var(--blue);}
 .bottom-nav-item{color:var(--text2);}
 .bottom-nav-item.active{color:var(--blue);}
 .ach-badge{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:10px;min-width:60px;transition:all .2s;}
@@ -237,41 +234,82 @@ tr.clickable{cursor:pointer;}
 
 /* ═══════════════════════════════════════════
    MOBILE OVERRIDE — ต้องอยู่ท้ายสุดเสมอ
-   ให้ชนะ CSS ทุกอย่างข้างบน
 ═══════════════════════════════════════════ */
 @media(max-width:768px){
-  /* Market card — COLUMN layout บังคับ */
   .mkc-actions{flex-direction:column !important;gap:8px !important;display:flex !important;}
   .btn-claim{width:100% !important;padding:14px !important;font-size:15px !important;border-radius:10px !important;flex:unset !important;}
   .btn-skip{width:100% !important;padding:12px !important;font-size:14px !important;text-align:center !important;border-radius:10px !important;}
-  .mkc{padding:16px !important;border-radius:16px !important;margin-bottom:12px !important;}
+  .mkc{padding:16px !important;border-radius:16px !important;margin-bottom:12px !important;transform:none !important;}
   .mkc-name{font-size:16px !important;font-weight:700 !important;}
   .mkc-report{font-size:13px !important;max-height:none !important;line-height:1.6 !important;}
-
-  /* Admin layout */
   .admin-mobile-content{margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
-
-  /* Modal เต็มจอ */
   .overlay{padding:0 !important;align-items:flex-end !important;}
-  .modal{width:100% !important;max-width:100% !important;max-height:95vh !important;border-radius:20px 20px 0 0 !important;}
-
-  /* Table → card */
+  .modal{width:100% !important;max-width:100% !important;max-height:95vh !important;border-radius:20px 20px 0 0 !important;animation:slideUp .3s cubic-bezier(.16,1,.3,1) !important;}
   .table-wrap td{display:flex !important;justify-content:space-between !important;align-items:center !important;}
   .table-wrap thead{display:none !important;}
   .table-wrap tr{margin-bottom:10px !important;border-radius:12px !important;padding:12px 14px !important;}
-
-  /* Page + input */
-  .page{padding:12px !important;}
+  .page{padding:12px !important;animation:fadeInUp .3s ease !important;}
   .page-hd{flex-direction:row !important;gap:8px !important;flex-wrap:wrap !important;}
   input,select,textarea{font-size:16px !important;}
-
-  /* Sales content */
   .sales-content{display:block !important;margin-left:0 !important;padding-bottom:70px !important;}
+  .bottom-nav-item svg,.admin-bottom-nav .bottom-nav-item svg{display:inline-block !important;fill:none !important;stroke:currentColor !important;}
+  .market-card:hover{transform:none !important;}
+}
+@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
 
-  /* Nav icons */
-  .bottom-nav-item svg,.admin-bottom-nav .bottom-nav-item svg{
-    display:inline-block !important;fill:none !important;stroke:currentColor !important;
-  }
+/* ═══════════════════════════════════════
+   GLOBAL ANIMATIONS & TRANSITIONS
+═══════════════════════════════════════ */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideInRight{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideOutRight{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+@keyframes neonPulse{0%,100%{box-shadow:0 0 8px var(--blue)}50%{box-shadow:0 0 20px var(--blue),0 0 40px var(--blue)}}
+@keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes shimmerMove{from{background-position:-400px 0}to{background-position:400px 0}}
+
+/* Page enter animation */
+.page{animation:fadeInUp .35s cubic-bezier(.16,1,.3,1);}
+.card{animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);}
+.modal{animation:scaleIn .25s cubic-bezier(.16,1,.3,1);}
+.overlay{animation:fadeInUp .2s ease;}
+.market-card{animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);}
+
+/* Hover effects */
+.card:hover{transition:border-color .2s,box-shadow .2s;}
+.clickable{transition:background .15s;}
+tr.clickable:hover td{background:rgba(88,166,255,.04)!important;}
+
+/* Nav active indicator glow */
+.nav-item.active{animation:none;}
+.bottom-nav-item.active svg{filter:drop-shadow(0 0 4px var(--blue));}
+
+/* Toast container */
+#toast-container{position:fixed;bottom:90px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.toast{pointer-events:auto;padding:12px 18px;border-radius:12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;min-width:240px;max-width:340px;animation:slideInRight .3s cubic-bezier(.16,1,.3,1);box-shadow:0 8px 32px rgba(0,0,0,.4);}
+.toast.out{animation:slideOutRight .25s ease forwards;}
+.toast-ok{background:rgba(35,134,54,.95);border:1px solid rgba(63,185,80,.4);color:#fff;}
+.toast-err{background:rgba(218,54,51,.95);border:1px solid rgba(248,81,73,.4);color:#fff;}
+.toast-info{background:rgba(31,111,235,.95);border:1px solid rgba(88,166,255,.4);color:#fff;}
+.toast-warn{background:rgba(187,128,9,.95);border:1px solid rgba(210,153,34,.4);color:#fff;}
+
+/* Skeleton shimmer improved */
+.skeleton{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:800px 100%;animation:shimmerMove 1.4s infinite;}
+
+/* Focus glow on inputs */
+input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px rgba(31,111,235,.2);transition:border-color .15s,box-shadow .15s;}
+
+/* Stat numbers */
+.stat-num{transition:color .3s;}
+
+/* Smooth scroll */
+html{scroll-behavior:smooth;}
+
+@media(max-width:768px){
+  #toast-container{bottom:76px;left:12px;right:12px;}
+  .toast{min-width:unset;width:100%;}
 }
 </style>
 </head>
@@ -380,6 +418,31 @@ function copyText(text){
   }
   el.innerHTML='✅&nbsp; คัดลอกแล้ว!';el.style.opacity='1';el.style.transform='translateX(-50%) translateY(0)';
   _copyToastTimer=setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(-50%) translateY(10px)';},1800);
+}
+
+// ============================================================
+// 🔔 TOAST NOTIFICATION SYSTEM
+// ============================================================
+let _toastContainer=null;
+function getToastContainer(){
+  if(!_toastContainer){
+    _toastContainer=document.createElement('div');
+    _toastContainer.id='toast-container';
+    document.body.appendChild(_toastContainer);
+  }
+  return _toastContainer;
+}
+function showToast(msg,type='ok',duration=3000){
+  const container=getToastContainer();
+  const el=document.createElement('div');
+  const icons={ok:'✅',err:'❌',info:'ℹ️',warn:'⚠️'};
+  el.className=`toast toast-${type}`;
+  el.innerHTML=`<span style="font-size:16px;flex-shrink:0">${icons[type]||'📢'}</span><span>${msg}</span>`;
+  container.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add('out');
+    setTimeout(()=>el.remove(),300);
+  },duration);
 }
 
 const STATUSES = ['รอข้อมูล','ไปต่อได้','เคสเลี้ยง','เคสวัด 50/50','ติดต่อไม่ได้','ยังไม่สะดวก','จอง','รอเซ็นต์','รอผล','อนุมัติ','ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
@@ -496,7 +559,7 @@ async function sbApi(action,data){
     case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbQ('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
     case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
-    case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
+    case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ',attachment:data.attachment||''});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
     case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);
       // Push notification ถ้าเปลี่ยน sales (assign)
       if(data.sales&&data.sales!==data.changedBy){
@@ -1048,7 +1111,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded}){
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   useEffect(()=>{const d=new Date();const pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');api('getCases',{all:'true'}).then(r=>{if(r.success){const max=(r.data||[]).filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[]);
   async function submit(){
-    if(!form.customername||!form.sales)return alert('กรุณากรอกชื่อลูกค้าและเลือกเซลส์');
+    if(!form.customername||!form.sales)return showToast('กรุณากรอกชื่อลูกค้าและเลือกเซลส์','warn');
     setLoading(true);
     const submitData={...form};
     // เก็บ clipad ใน attachment field โดย prefix [CLIP:...]
@@ -1079,7 +1142,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded}){
 function AddBookingModal({currentUser,users,onClose,onAdded}){
   const [form,setForm]=useState({caseId:'',sales:currentUser.role==='Admin'?'':currentUser.name,customer:'',facebook:'',ads:'',brand:'',model:'',plate:'',status:'จองแล้ว',note:''});
   const [loading,setLoading]=useState(false);const set=(k,v)=>setForm(f=>({...f,[k]:v}));const models=form.brand?CAR_MODELS[form.brand]||[]:[];
-  async function submit(){if(!form.caseId||!form.customer)return alert('กรุณากรอกรหัสเคสและชื่อลูกค้า');setLoading(true);const r=await api('addBooking',{...form});setLoading(false);if(r.success){onAdded();onClose();}else alert(r.error);}
+  async function submit(){if(!form.caseId||!form.customer)return showToast('กรุณากรอกรหัสเคสและชื่อลูกค้า','warn');setLoading(true);const r=await api('addBooking',{...form});setLoading(false);if(r.success){onAdded();onClose();}else alert(r.error);}
   return <Modal title="📋 เพิ่มการจอง" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'บันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group"><label>รหัสเคส *</label><input value={form.caseId} onChange={e=>set('caseId',e.target.value)} placeholder="เช่น 2603001"/></div>
@@ -1157,11 +1220,7 @@ async function sendToMarketDirect(caseId,salesName){
 
   if(!r.success){
     setSending(null);
-    const toast=document.createElement('div');
-    toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(218,54,51,.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;max-width:90vw;text-align:center;line-height:1.5;';
-    toast.textContent='❌ ส่งตลาดไม่สำเร็จ: '+(r.error||'ไม่ทราบสาเหตุ');
-    document.body.appendChild(toast);
-    setTimeout(()=>{toast.style.opacity='0';toast.style.transition='opacity .3s';setTimeout(()=>toast.remove(),400);},6000);
+    showToast('ส่งตลาดไม่สำเร็จ: '+(r.error||'ไม่ทราบสาเหตุ'),'err',5000);
     return;
   }
 
@@ -1179,11 +1238,7 @@ async function sendToMarketDirect(caseId,salesName){
   });
 
   // แสดง toast ทันที
-  const toast=document.createElement('div');
-  toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(35,134,54,.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;';
-  toast.textContent='✅ ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!';
-  document.body.appendChild(toast);
-  setTimeout(()=>{toast.style.opacity='0';toast.style.transition='opacity .3s';setTimeout(()=>toast.remove(),400);},2500);
+  showToast('ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!','ok',2500);
 
   setSending(null);
 
@@ -1547,10 +1602,10 @@ function AdminUsers({currentUser}){
   const setE=(k,v)=>setEditForm(f=>({...f,[k]:v}));
   const load=()=>{setLoading(true);api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);setLoading(false);});};
   useEffect(()=>{load();},[]);
-  async function addUser(){if(!form.username||!form.name)return alert('กรอกชื่อและ username');await api('addUser',form);load();setShowAdd(false);setForm({username:'',password:'1234',name:'',role:'Sales'});}
+  async function addUser(){if(!form.username||!form.name)return showToast('กรุณากรอกชื่อและ username','warn');await api('addUser',form);load();setShowAdd(false);setForm({username:'',password:'1234',name:'',role:'Sales'});}
   function openEdit(u){setEditUser(u);setEditForm({name:u.name||'',password:'',status:u.status||'active',role:u.role||'Sales',avatar:u.avatar||'',startdate:u.startdate||''});}
   async function saveEdit(){
-    if(!editForm.name)return alert('กรุณากรอกชื่อ');
+    if(!editForm.name)return showToast('กรุณากรอกชื่อ','warn');
     setSaving(true);
     const upd={name:editForm.name,status:editForm.status,role:editForm.role,avatar:editForm.avatar||''};
     if(editForm.password.trim())upd.password=editForm.password.trim();
@@ -2064,16 +2119,113 @@ function OnboardingTour({currentUser,onDone}){
 }
 
 function LoginPage({onLogin}){
-  const [username,setUsername]=useState('');const [password,setPassword]=useState('');const [showPass,setShowPass]=useState(false);const [loading,setLoading]=useState(false);const [error,setError]=useState('');
-  async function submit(){if(!username||!password)return setError('กรุณากรอกข้อมูลให้ครบ');setLoading(true);setError('');const r=await api('login',{username,password});setLoading(false);if(r.success)onLogin(r.user);else setError(r.error||'เข้าสู่ระบบไม่สำเร็จ');}
-  return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg)',padding:16}}>
-    <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:16,padding:32,width:'100%',maxWidth:380,boxShadow:'var(--shadow)'}}>
-      <div style={{textAlign:'center',marginBottom:28}}><div style={{fontSize:40,marginBottom:8}}>🚗</div><div style={{fontSize:22,fontWeight:800,color:'var(--text)'}}>CasePool</div><div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ระบบจัดการเคสรถยนต์</div></div>
-      {error&&<div style={{background:'rgba(248,81,73,.1)',border:'1px solid var(--red)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13,color:'var(--red)'}}>{error}</div>}
-      <div className="form-group"><label>Username</label><input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Username" autoComplete="username"/></div>
-      <div className="form-group"><label>รหัสผ่าน</label><div style={{position:'relative'}}><input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="current-password"/><button onClick={()=>setShowPass(!showPass)} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--text2)',cursor:'pointer',fontSize:14}}>{showPass?'🙈':'👁'}</button></div></div>
-      <button className="btn btn-primary" onClick={submit} disabled={loading} style={{width:'100%',padding:'10px',fontSize:15,marginTop:4}}>{loading?'⏳ กำลังเข้าสู่ระบบ...':'เข้าสู่ระบบ →'}</button>
+  const [username,setUsername]=useState('');
+  const [password,setPassword]=useState('');
+  const [showPass,setShowPass]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState('');
+  const [mounted,setMounted]=useState(false);
+  useEffect(()=>{setTimeout(()=>setMounted(true),50);},[]);
+
+  async function submit(){
+    if(!username||!password)return setError('กรุณากรอกข้อมูลให้ครบ');
+    setLoading(true);setError('');
+    const r=await api('login',{username,password});
+    setLoading(false);
+    if(r.success)onLogin(r.user);
+    else setError(r.error||'เข้าสู่ระบบไม่สำเร็จ');
+  }
+
+  return <div style={{
+    minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',
+    background:'linear-gradient(135deg,#060a10 0%,#0a0f1e 50%,#060d16 100%)',
+    padding:16,position:'relative',overflow:'hidden',
+  }}>
+    {/* Animated grid lines */}
+    <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(0,245,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,255,.04) 1px,transparent 1px)',backgroundSize:'40px 40px',animation:'gridMove 20s linear infinite'}}/>
+    {/* Glow orbs */}
+    <div style={{position:'absolute',width:400,height:400,borderRadius:'50%',background:'radial-gradient(circle,rgba(0,245,255,.06) 0%,transparent 70%)',top:'10%',left:'10%',animation:'orbFloat 8s ease-in-out infinite'}}/>
+    <div style={{position:'absolute',width:300,height:300,borderRadius:'50%',background:'radial-gradient(circle,rgba(255,45,120,.05) 0%,transparent 70%)',bottom:'10%',right:'10%',animation:'orbFloat 10s ease-in-out infinite reverse'}}/>
+    {/* Top neon line */}
+    <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'linear-gradient(90deg,transparent,#00f5ff,#ff2d78,#a855f7,transparent)',animation:'scanH 3s ease-in-out infinite'}}/>
+
+    {/* LOGIN CARD */}
+    <div style={{
+      position:'relative',width:'100%',maxWidth:400,
+      background:'rgba(10,15,30,.85)',
+      border:'1px solid rgba(0,245,255,.25)',
+      borderRadius:20,padding:'40px 36px',
+      boxShadow:'0 0 60px rgba(0,245,255,.1),0 0 120px rgba(255,45,120,.05),inset 0 1px 0 rgba(0,245,255,.1)',
+      backdropFilter:'blur(20px)',
+      transform:mounted?'translateY(0)':'translateY(30px)',
+      opacity:mounted?1:0,
+      transition:'all .6s cubic-bezier(.16,1,.3,1)',
+    }}>
+      {/* Corner accents */}
+      <div style={{position:'absolute',top:0,left:0,width:20,height:20,borderTop:'2px solid #00f5ff',borderLeft:'2px solid #00f5ff',borderRadius:'20px 0 0 0'}}/>
+      <div style={{position:'absolute',top:0,right:0,width:20,height:20,borderTop:'2px solid #ff2d78',borderRight:'2px solid #ff2d78',borderRadius:'0 20px 0 0'}}/>
+      <div style={{position:'absolute',bottom:0,left:0,width:20,height:20,borderBottom:'2px solid #a855f7',borderLeft:'2px solid #a855f7',borderRadius:'0 0 0 20px'}}/>
+      <div style={{position:'absolute',bottom:0,right:0,width:20,height:20,borderBottom:'2px solid #00f5ff',borderRight:'2px solid #00f5ff',borderRadius:'0 0 20px 0'}}/>
+
+      {/* LOGO */}
+      <div style={{textAlign:'center',marginBottom:32}}>
+        <div style={{fontSize:52,marginBottom:10,filter:'drop-shadow(0 0 20px rgba(0,245,255,.5))',animation:'logoPulse 3s ease-in-out infinite'}}>🚗</div>
+        <div style={{fontSize:28,fontWeight:900,letterSpacing:2,background:'linear-gradient(90deg,#00f5ff,#ff2d78,#a855f7)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>CasePool</div>
+        <div style={{fontSize:11,color:'rgba(0,245,255,.5)',marginTop:6,letterSpacing:3,textTransform:'uppercase'}}>ระบบจัดการเคสรถยนต์</div>
+        <div style={{height:1,background:'linear-gradient(90deg,transparent,rgba(0,245,255,.3),transparent)',marginTop:16}}/>
+      </div>
+
+      {/* ERROR */}
+      {error&&<div style={{background:'rgba(255,45,120,.1)',border:'1px solid rgba(255,45,120,.4)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#ff2d78',display:'flex',alignItems:'center',gap:8,animation:'shake .3s ease'}}><span>⚠️</span>{error}</div>}
+
+      {/* USERNAME */}
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:11,color:'rgba(0,245,255,.6)',letterSpacing:2,textTransform:'uppercase',display:'block',marginBottom:8}}>Username</label>
+        <div style={{position:'relative'}}>
+          <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Username" autoComplete="username"
+            style={{width:'100%',background:'rgba(0,245,255,.05)',border:'1px solid rgba(0,245,255,.25)',borderRadius:10,color:'#fff',padding:'12px 16px',fontSize:14,outline:'none',transition:'all .2s'}}
+            onFocus={e=>{e.target.style.borderColor='rgba(0,245,255,.7)';e.target.style.boxShadow='0 0 16px rgba(0,245,255,.2)';}}
+            onBlur={e=>{e.target.style.borderColor='rgba(0,245,255,.25)';e.target.style.boxShadow='none';}}
+          />
+        </div>
+      </div>
+
+      {/* PASSWORD */}
+      <div style={{marginBottom:24}}>
+        <label style={{fontSize:11,color:'rgba(0,245,255,.6)',letterSpacing:2,textTransform:'uppercase',display:'block',marginBottom:8}}>รหัสผ่าน</label>
+        <div style={{position:'relative'}}>
+          <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="current-password"
+            style={{width:'100%',background:'rgba(0,245,255,.05)',border:'1px solid rgba(0,245,255,.25)',borderRadius:10,color:'#fff',padding:'12px 44px 12px 16px',fontSize:14,outline:'none',transition:'all .2s'}}
+            onFocus={e=>{e.target.style.borderColor='rgba(0,245,255,.7)';e.target.style.boxShadow='0 0 16px rgba(0,245,255,.2)';}}
+            onBlur={e=>{e.target.style.borderColor='rgba(0,245,255,.25)';e.target.style.boxShadow='none';}}
+          />
+          <button onClick={()=>setShowPass(!showPass)} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(0,245,255,.5)',cursor:'pointer',fontSize:16,padding:4}}>{showPass?'🙈':'👁'}</button>
+        </div>
+      </div>
+
+      {/* SUBMIT */}
+      <button onClick={submit} disabled={loading} style={{
+        width:'100%',padding:'14px',fontSize:15,fontWeight:800,border:'none',cursor:loading?'wait':'pointer',
+        borderRadius:12,letterSpacing:.5,position:'relative',overflow:'hidden',
+        background:loading?'rgba(0,245,255,.1)':'linear-gradient(135deg,#006699,#00d4ff)',
+        color:loading?'rgba(0,245,255,.5)':'#fff',
+        boxShadow:loading?'none':'0 0 30px rgba(0,212,255,.4)',
+        textShadow:loading?'none':'0 0 10px rgba(255,255,255,.5)',
+        transition:'all .25s',
+      }}>
+        {loading?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}><span style={{width:16,height:16,border:'2px solid rgba(0,245,255,.3)',borderTopColor:'#00f5ff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/> กำลังเข้าสู่ระบบ...</span>:'⚡ เข้าสู่ระบบ'}
+      </button>
+
+      <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'rgba(255,255,255,.2)',letterSpacing:1}}>CASEPOOL v2.0 · SECURE LOGIN</div>
     </div>
+
+    <style>{`
+      @keyframes gridMove{from{backgroundPosition:0 0}to{backgroundPosition:40px 40px}}
+      @keyframes orbFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-30px) scale(1.05)}}
+      @keyframes scanH{0%,100%{opacity:.6}50%{opacity:1}}
+      @keyframes logoPulse{0%,100%{filter:drop-shadow(0 0 20px rgba(0,245,255,.5))}50%{filter:drop-shadow(0 0 35px rgba(0,245,255,.9))}}
+      @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+    `}</style>
   </div>;
 }
 
@@ -2271,7 +2423,7 @@ function AdminBroadcast({users}){
   const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
 
   async function send(){
-    if(!msg.trim())return alert('กรุณาพิมพ์ข้อความ');
+    if(!msg.trim())return showToast('กรุณาพิมพ์ข้อความก่อนส่ง','warn');
     setSending(true);setDone('');
     const r=await api('broadcast',{sales:target,message:msg});
     setSending(false);
@@ -2702,7 +2854,8 @@ function AdminTargetContent({users,neon='#ff2d78'}){
   const monthLabel=MONTH_NAMES[d.getMonth()]+' 25'+String(d.getFullYear()).slice(-2);
   const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
   useEffect(()=>{api('getCases',{}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[]);
-  function setTgt(name,val){const upd={...targets,[monthKey+'_'+name]:parseInt(val)||0};setTargets(upd);try{localStorage.setItem(TG_KEY,JSON.stringify(upd));}catch(e){}}
+  function setTgt(name,val){const v=parseInt(val)||0;const upd={...targets,[monthKey+'_'+name]:v};setTargets(upd);try{localStorage.setItem(TG_KEY,JSON.stringify(upd));}catch(e){}
+    if(v>0)sbHist('TARGET',currentUser?.name||'Admin','ตั้งเป้า',name+' เป้า '+v+' คัน เดือน '+monthLabel);}
   function getTarget(name){return targets[monthKey+'_'+name]||0;}
   const totalSold=salesList.reduce((s,u)=>{return s+cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length;},0);
   const totalTarget=salesList.reduce((s,u)=>s+getTarget(u.name),0);
@@ -2768,7 +2921,7 @@ function AdminBroadcastContent({users,neon='#a855f7'}){
   const [target,setTarget]=useState('all');const [msg,setMsg]=useState('');const [sending,setSending]=useState(false);const [done,setDone]=useState('');
   const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
   async function send(){
-    if(!msg.trim())return alert('กรุณาพิมพ์ข้อความ');
+    if(!msg.trim())return showToast('กรุณาพิมพ์ข้อความก่อนส่ง','warn');
     setSending(true);setDone('');
     const r=await api('broadcast',{sales:target,message:msg});
     setSending(false);
