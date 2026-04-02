@@ -2429,21 +2429,175 @@ function AdminFollowups({users}){
   </div>;
 }
 
-function AdminTeam({users,currentUser}){
-  const [tab,setTab]=useState('target');
-  return <div className="page">
-    <div className="page-hd"><div><div className="page-title">🎯 จัดการทีม</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Target & Broadcast</div></div></div>
-    <div style={{display:'flex',gap:6,marginBottom:18,borderBottom:'1px solid var(--border)',paddingBottom:10}}>
-      {[['target','🎯 Target'],['broadcast','📢 Broadcast']].map(([k,l])=>
-        <button key={k} onClick={()=>setTab(k)} style={{padding:'7px 20px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)',transition:'all .15s'}}>{l}</button>
-      )}
+function AdminFollowupsContent({users,neon='#00f5ff'}){
+  const [history,setHistory]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [filterSales,setFilterSales]=useState('all');
+  const [filterType,setFilterType]=useState('all');
+  const [dateFrom,setDateFrom]=useState('');
+  const [dateTo,setDateTo]=useState('');
+  const salesList=(users||[]).filter(u=>u.role==='Sales');
+  const load=useCallback(()=>{
+    setLoading(true);
+    sbQ('GET','history',{order:'createdat.desc',limit:'500'}).then(rows=>{
+      const f=safeArray(rows).filter(r=>String(r.detail||'').includes('นัด Follow-up')||String(r.detail||'').includes('📝 Note:'));
+      setHistory(f);setLoading(false);
+    }).catch(()=>setLoading(false));
+  },[]);
+  useEffect(()=>{load();},[load]);
+  function parseHistDate(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+  const today=new Date().toISOString().slice(0,10);
+  const filtered=history.filter(r=>{
+    if(filterSales!=='all'&&r.sales!==filterSales)return false;
+    if(filterType==='followup'&&!String(r.detail||'').includes('นัด Follow-up'))return false;
+    if(filterType==='note'&&!String(r.detail||'').includes('📝 Note:'))return false;
+    if(dateFrom){const d=parseHistDate(r.createdat);if(!d||d<new Date(dateFrom))return false;}
+    if(dateTo){const d=parseHistDate(r.createdat);const to=new Date(dateTo);to.setHours(23,59,59);if(!d||d>to)return false;}
+    return true;
+  });
+  const overdue=filtered.filter(r=>{const m=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m&&m[1]<today;}).length;
+  const todayCount=filtered.filter(r=>{const m=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m&&m[1]===today;}).length;
+  return <div>
+    {/* STATS ROW */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
+      {[
+        ['ทั้งหมด',filtered.length,neon],
+        ['วันนี้',todayCount,'#ffd700'],
+        ['เลยกำหนด',overdue,'#ff2d78'],
+      ].map(([l,v,c])=><div key={l} style={{background:`${c}10`,border:`1px solid ${c}40`,borderRadius:12,padding:'14px 10px',textAlign:'center'}}>
+        <div style={{fontSize:28,fontWeight:900,color:c,textShadow:`0 0 16px ${c}`}}>{v}</div>
+        <div style={{fontSize:11,color:`${c}70`,marginTop:2,letterSpacing:1}}>{l}</div>
+      </div>)}
     </div>
-    {tab==='target'&&<AdminTargetContent users={users}/>}
-    {tab==='broadcast'&&<AdminBroadcastContent users={users}/>}
+    {/* FILTERS */}
+    <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
+      <select value={filterSales} onChange={e=>setFilterSales(e.target.value)} style={{background:`${neon}08`,border:`1px solid ${neon}40`,borderRadius:8,color:'#fff',padding:'8px 12px',fontSize:13,outline:'none',flex:'0 0 auto'}}>
+        <option value="all">ทุกเซลส์</option>
+        {salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
+      </select>
+      <div style={{display:'flex',gap:4,background:'rgba(255,255,255,.05)',borderRadius:20,padding:4}}>
+        {[['all','ทั้งหมด'],['followup','📅 นัด'],['note','📝 Note']].map(([v,l])=>
+          <button key={v} onClick={()=>setFilterType(v)} style={{
+            padding:'5px 14px',borderRadius:16,border:'none',cursor:'pointer',fontSize:12,fontWeight:700,
+            background:filterType===v?neon:'transparent',
+            color:filterType===v?'#000':'rgba(255,255,255,.4)',
+            boxShadow:filterType===v?`0 0 12px ${neon}80`:'none',transition:'all .2s',
+          }}>{l}</button>
+        )}
+      </div>
+      <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{background:`${neon}08`,border:`1px solid ${neon}30`,borderRadius:8,color:'#fff',padding:'7px 10px',fontSize:12,outline:'none',flex:'0 0 auto',width:130}}/>
+      <span style={{color:`${neon}40`}}>—</span>
+      <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{background:`${neon}08`,border:`1px solid ${neon}30`,borderRadius:8,color:'#fff',padding:'7px 10px',fontSize:12,outline:'none',flex:'0 0 auto',width:130}}/>
+      {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom('');setDateTo('');}} style={{background:'transparent',border:`1px solid ${neon}40`,borderRadius:8,color:`${neon}`,padding:'6px 10px',cursor:'pointer',fontSize:12}}>✕</button>}
+      <button onClick={load} style={{background:`${neon}15`,border:`1px solid ${neon}40`,borderRadius:8,color:neon,padding:'7px 12px',cursor:'pointer',fontSize:13,marginLeft:'auto'}}>🔄</button>
+    </div>
+    {/* LIST */}
+    {loading?<Loading/>:filtered.length===0?
+      <div style={{textAlign:'center',padding:'60px 20px',color:`${neon}40`}}>
+        <div style={{fontSize:48,marginBottom:12,opacity:.3}}>📭</div>
+        <div style={{color:`${neon}60`,fontWeight:600}}>ยังไม่มีข้อมูล</div>
+        <div style={{fontSize:12,color:`${neon}30`,marginTop:6}}>เซลส์ต้องบันทึกนัดหรือ note ผ่านหน้าเคสก่อน</div>
+      </div>:
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {filtered.map((r,i)=>{
+          const isFollowup=String(r.detail||'').includes('นัด Follow-up');
+          const fuDateM=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);
+          const fuDate=fuDateM?fuDateM[1]:'';
+          const fuNoteM=String(r.detail||'').match(/— (.+)$/);
+          const fuNote=fuNoteM?fuNoteM[1]:'';
+          const noteText=String(r.detail||'').replace('📝 Note: ','');
+          const isOverdue=fuDate&&fuDate<today;
+          const isToday=fuDate===today;
+          const cardNeon=isOverdue?'#ff2d78':isToday?'#ffd700':isFollowup?'#00ff88':neon;
+          return<div key={i} style={{
+            background:`linear-gradient(135deg,${cardNeon}08,${cardNeon}04)`,
+            border:`1px solid ${cardNeon}35`,
+            borderLeft:`3px solid ${cardNeon}`,
+            borderRadius:'0 12px 12px 0',
+            padding:'12px 16px',
+            boxShadow:`inset 0 0 20px ${cardNeon}05`,
+            transition:'all .15s',
+          }}
+            onMouseOver={e=>{e.currentTarget.style.borderColor=cardNeon+'80';e.currentTarget.style.boxShadow=`0 0 16px ${cardNeon}20,inset 0 0 20px ${cardNeon}08`;}}
+            onMouseOut={e=>{e.currentTarget.style.borderColor=cardNeon+'35';e.currentTarget.style.boxShadow=`inset 0 0 20px ${cardNeon}05`;}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6,flexWrap:'wrap',gap:6}}>
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                <span style={{fontSize:11,fontWeight:800,padding:'2px 10px',borderRadius:20,background:`${cardNeon}20`,color:cardNeon,border:`1px solid ${cardNeon}50`,textShadow:`0 0 8px ${cardNeon}`,letterSpacing:.5}}>
+                  {isFollowup?'📅 นัด':'📝 NOTE'}
+                </span>
+                <span style={{fontWeight:800,color:'#58a6ff',fontSize:13,textShadow:'0 0 8px #58a6ff60'}}>{r.caseid}</span>
+                <span style={{fontSize:12,color:'#a855f7',fontWeight:700}}>{r.sales}</span>
+              </div>
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                {fuDate&&<span style={{fontSize:12,fontWeight:800,padding:'2px 10px',borderRadius:20,background:`${cardNeon}15`,color:cardNeon,border:`1px solid ${cardNeon}40`,textShadow:`0 0 8px ${cardNeon}`}}>
+                  {isOverdue?'⚠️ ':isToday?'🔥 ':''}{fuDate}
+                </span>}
+                <span style={{fontSize:11,color:'rgba(255,255,255,.3)'}}>{String(r.createdat||'').split(' ')[0]}</span>
+              </div>
+            </div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,.75)',lineHeight:1.6,paddingLeft:4}}>
+              {isFollowup?fuNote||'ไม่มีหมายเหตุ':noteText}
+            </div>
+          </div>;
+        })}
+      </div>
+    }
   </div>;
 }
 
-function AdminTargetContent({users}){
+function AdminTeam({users,currentUser}){
+  const [tab,setTab]=useState('followup');
+  const TABS=[
+    {k:'followup',label:'📅 Followup',neon:'#00f5ff',shadow:'rgba(0,245,255,.4)'},
+    {k:'target',label:'🎯 Target',neon:'#ff2d78',shadow:'rgba(255,45,120,.4)'},
+    {k:'broadcast',label:'📢 Broadcast',neon:'#a855f7',shadow:'rgba(168,85,247,.4)'},
+  ];
+  const cur=TABS.find(t=>t.k===tab)||TABS[0];
+  return <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#060a10 0%,#0a0f1e 50%,#060d16 100%)'}}>
+    {/* CYBER HEADER */}
+    <div style={{position:'relative',overflow:'hidden',padding:'28px 24px 0',marginBottom:0}}>
+      <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,rgba(0,245,255,.04) 0%,rgba(255,45,120,.04) 50%,rgba(168,85,247,.04) 100%)'}}/>
+      <div style={{position:'absolute',top:0,left:0,right:0,height:1,background:'linear-gradient(90deg,transparent,#00f5ff,#ff2d78,#a855f7,transparent)'}}/>
+      <div style={{position:'relative'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:6}}>
+          <div style={{width:4,height:28,background:'linear-gradient(180deg,#00f5ff,#a855f7)',borderRadius:2,boxShadow:'0 0 12px #00f5ff'}}/>
+          <div>
+            <div style={{fontSize:22,fontWeight:900,letterSpacing:.5,background:'linear-gradient(90deg,#00f5ff,#ff2d78,#a855f7)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>TEAM HQ</div>
+            <div style={{fontSize:11,color:'rgba(0,245,255,.6)',letterSpacing:2,textTransform:'uppercase',marginTop:1}}>Command Center</div>
+          </div>
+        </div>
+        {/* NEON TABS */}
+        <div style={{display:'flex',gap:4,marginTop:18,overflowX:'auto',paddingBottom:0}}>
+          {TABS.map(t=>{
+            const active=tab===t.k;
+            return<button key={t.k} onClick={()=>setTab(t.k)} style={{
+              position:'relative',padding:'10px 22px',border:'none',cursor:'pointer',
+              fontSize:13,fontWeight:700,borderRadius:'10px 10px 0 0',
+              background:active?`linear-gradient(135deg,${t.neon}22,${t.neon}11)`:'transparent',
+              color:active?t.neon:'rgba(255,255,255,.35)',
+              borderTop:active?`1.5px solid ${t.neon}`:'1.5px solid transparent',
+              borderLeft:active?`1.5px solid ${t.neon}44`:'1.5px solid transparent',
+              borderRight:active?`1.5px solid ${t.neon}44`:'1.5px solid transparent',
+              boxShadow:active?`0 -4px 20px ${t.shadow},inset 0 1px 0 ${t.neon}22`:'none',
+              textShadow:active?`0 0 20px ${t.neon}`:'none',
+              transition:'all .2s',whiteSpace:'nowrap',
+            }}>{t.label}</button>;
+          })}
+        </div>
+        {/* GLOW LINE */}
+        <div style={{height:1.5,background:`linear-gradient(90deg,transparent,${cur.neon}80,${cur.neon},${cur.neon}80,transparent)`,boxShadow:`0 0 12px ${cur.neon}`,transition:'all .3s'}}/>
+      </div>
+    </div>
+    {/* CONTENT */}
+    <div style={{padding:'20px 24px 80px',background:'transparent'}}>
+      {tab==='followup'&&<AdminFollowupsContent users={users} neon="#00f5ff"/>}
+      {tab==='target'&&<AdminTargetContent users={users} neon="#ff2d78"/>}
+      {tab==='broadcast'&&<AdminBroadcastContent users={users} neon="#a855f7"/>}
+    </div>
+  </div>;
+}
+
+function AdminTargetContent({users,neon='#ff2d78'}){
   const TG_KEY='cp_targets';
   const [targets,setTargets]=useState(()=>{try{return JSON.parse(localStorage.getItem(TG_KEY)||'{}');}catch(e){return{};}});
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);
@@ -2452,47 +2606,121 @@ function AdminTargetContent({users}){
   const monthLabel=MONTH_NAMES[d.getMonth()]+' 25'+String(d.getFullYear()).slice(-2);
   const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
   useEffect(()=>{api('getCases',{}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[]);
-  function setTarget(name,val){const upd={...targets,[monthKey+'_'+name]:parseInt(val)||0};setTargets(upd);try{localStorage.setItem(TG_KEY,JSON.stringify(upd));}catch(e){}}
+  function setTgt(name,val){const upd={...targets,[monthKey+'_'+name]:parseInt(val)||0};setTargets(upd);try{localStorage.setItem(TG_KEY,JSON.stringify(upd));}catch(e){}}
   function getTarget(name){return targets[monthKey+'_'+name]||0;}
+  const totalSold=salesList.reduce((s,u)=>{return s+cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length;},0);
+  const totalTarget=salesList.reduce((s,u)=>s+getTarget(u.name),0);
   return <div>
-    <div style={{fontSize:13,color:'var(--text2)',marginBottom:14}}>เดือน {monthLabel}</div>
+    {/* TEAM SUMMARY BAR */}
+    <div style={{background:`linear-gradient(135deg,${neon}15,${neon}08)`,border:`1px solid ${neon}40`,borderRadius:14,padding:'16px 20px',marginBottom:20,display:'flex',gap:20,alignItems:'center',flexWrap:'wrap'}}>
+      <div style={{flex:1}}>
+        <div style={{fontSize:11,color:`${neon}99`,letterSpacing:2,textTransform:'uppercase',marginBottom:4}}>เดือน {monthLabel} — ภาพรวมทีม</div>
+        <div style={{fontSize:28,fontWeight:900,color:neon,textShadow:`0 0 20px ${neon}`,letterSpacing:1}}>
+          {totalSold}<span style={{fontSize:16,fontWeight:400,color:`${neon}80`,marginLeft:6}}>/ {totalTarget} คัน</span>
+        </div>
+      </div>
+      {totalTarget>0&&<div style={{textAlign:'center'}}>
+        <div style={{fontSize:36,fontWeight:900,color:totalSold>=totalTarget?'#00ff88':neon,textShadow:`0 0 30px ${neon}`}}>
+          {Math.min(Math.round(totalSold/totalTarget*100),100)}%
+        </div>
+        <div style={{fontSize:11,color:`${neon}60`}}>Win Rate</div>
+      </div>}
+    </div>
     {loading?<Loading/>:<div style={{display:'grid',gap:12}}>
-      {salesList.map(u=>{
+      {salesList.map((u,idx)=>{
         const sold=cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length;
         const tg=getTarget(u.name);const pct=tg>0?Math.min(Math.round(sold/tg*100),100):0;
-        return<div key={u.userId} className="card">
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:tg>0?12:0}}>
-            <div style={{width:40,height:40,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>
+        const barColor=pct>=100?'#00ff88':pct>=70?neon:'#ffd700';
+        return<div key={u.userId} style={{background:`linear-gradient(135deg,rgba(255,255,255,.03),rgba(255,255,255,.01))`,border:`1px solid ${neon}25`,borderRadius:14,padding:'16px',position:'relative',overflow:'hidden',transition:'all .2s'}}
+          onMouseOver={e=>{e.currentTarget.style.borderColor=neon+'80';e.currentTarget.style.boxShadow=`0 0 20px ${neon}20`;}}
+          onMouseOut={e=>{e.currentTarget.style.borderColor=neon+'25';e.currentTarget.style.boxShadow='none';}}>
+          {/* rank badge */}
+          {idx<3&&<div style={{position:'absolute',top:12,right:12,fontSize:20}}>{['🥇','🥈','🥉'][idx]}</div>}
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+            <div style={{width:46,height:46,borderRadius:'50%',background:`${neon}15`,border:`2px solid ${neon}50`,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,boxShadow:`0 0 12px ${neon}30`}}>
               {u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}
             </div>
-            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:15}}>{u.name}</div><div style={{fontSize:12,color:'var(--text2)'}}>ปล่อยแล้ว {sold} คัน</div></div>
-            <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <span style={{fontSize:12,color:'var(--text2)'}}>เป้า:</span>
-              <input type="number" value={tg||''} onChange={e=>setTarget(u.name,e.target.value)} min={0} placeholder="0" style={{width:60,textAlign:'center',fontSize:14,fontWeight:700,padding:'4px 8px'}}/>
-              <span style={{fontSize:12,color:'var(--text2)'}}>คัน</span>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:800,fontSize:15,color:'#fff',letterSpacing:.3}}>{u.name}</div>
+              <div style={{fontSize:12,color:`${neon}80`,marginTop:2}}>ปล่อยแล้ว <strong style={{color:neon}}>{sold}</strong> คัน</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <input type="number" value={tg||''} onChange={e=>setTgt(u.name,e.target.value)} min={0} placeholder="เป้า"
+                style={{width:64,textAlign:'center',fontSize:15,fontWeight:800,padding:'6px',
+                  background:`${neon}10`,border:`1px solid ${neon}50`,borderRadius:8,color:neon,outline:'none'}}/>
+              <span style={{fontSize:11,color:`${neon}60`}}>คัน</span>
             </div>
           </div>
-          {tg>0&&<><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:12,color:'var(--text2)'}}>{sold} / {tg} คัน</span><span style={{fontSize:13,fontWeight:700,color:pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--yellow)'}}>{pct}%</span></div><div style={{height:8,background:'var(--bg3)',borderRadius:6,overflow:'hidden'}}><div style={{height:'100%',borderRadius:6,width:pct+'%',background:pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--yellow)',transition:'width .4s'}}/></div>{pct>=100&&<div style={{fontSize:12,color:'var(--green)',marginTop:6,fontWeight:700}}>🎉 บรรลุเป้าหมายแล้ว!</div>}</>}
+          {tg>0&&<>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+              <span style={{fontSize:12,color:'rgba(255,255,255,.4)'}}>{sold} / {tg} คัน</span>
+              <span style={{fontSize:14,fontWeight:900,color:barColor,textShadow:`0 0 10px ${barColor}`}}>{pct}%</span>
+            </div>
+            {/* NEON PROGRESS BAR */}
+            <div style={{height:6,background:'rgba(255,255,255,.08)',borderRadius:6,overflow:'hidden',position:'relative'}}>
+              <div style={{height:'100%',borderRadius:6,width:pct+'%',background:`linear-gradient(90deg,${barColor}80,${barColor})`,boxShadow:`0 0 12px ${barColor}`,transition:'width .6s ease'}}/>
+            </div>
+            {pct>=100&&<div style={{fontSize:12,fontWeight:700,color:'#00ff88',marginTop:8,textShadow:'0 0 10px #00ff88'}}>⚡ บรรลุเป้าแล้ว!</div>}
+          </>}
         </div>;
       })}
     </div>}
   </div>;
 }
 
-function AdminBroadcastContent({users}){
+function AdminBroadcastContent({users,neon='#a855f7'}){
   const [target,setTarget]=useState('all');const [msg,setMsg]=useState('');const [sending,setSending]=useState(false);const [done,setDone]=useState('');
   const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
-  async function send(){if(!msg.trim())return alert('กรุณาพิมพ์ข้อความ');setSending(true);setDone('');const r=await api('broadcast',{sales:target,message:msg});setSending(false);if(r.success){setDone('✅ ส่งถึง '+r.sent+' คน');setMsg('');}else setDone('❌ '+(r.error||'เกิดข้อผิดพลาด'));}
+  async function send(){
+    if(!msg.trim())return alert('กรุณาพิมพ์ข้อความ');
+    setSending(true);setDone('');
+    const r=await api('broadcast',{sales:target,message:msg});
+    setSending(false);
+    if(r.success){setDone('✅ ส่งถึง '+r.sent+' คน');setMsg('');}
+    else setDone('❌ '+(r.error||'เกิดข้อผิดพลาด'));
+  }
   return <div>
-    <div className="card" style={{marginBottom:14}}>
-      <div className="form-group"><label>ส่งถึง</label><select value={target} onChange={e=>setTarget(e.target.value)}><option value="all">ทุกคน ({salesList.length} คน)</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
-      <div className="form-group"><label>ข้อความ</label><textarea rows={4} value={msg} onChange={e=>setMsg(e.target.value)} placeholder="พิมพ์ข้อความที่ต้องการแจ้งเตือนเซลส์..."/></div>
-      {done&&<div style={{background:done.startsWith('✅')?'rgba(63,185,80,.1)':'rgba(248,81,73,.1)',border:'1px solid '+(done.startsWith('✅')?'var(--green)':'var(--red)'),borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:13}}>{done}</div>}
-      <button className="btn btn-primary" style={{width:'100%',padding:'12px',fontSize:15,fontWeight:700}} onClick={send} disabled={sending}>{sending?'กำลังส่ง...':'📢 ส่งข้อความ'}</button>
+    <div style={{background:`linear-gradient(135deg,${neon}12,${neon}06)`,border:`1px solid ${neon}40`,borderRadius:16,padding:'20px',marginBottom:16}}>
+      <div style={{marginBottom:14}}>
+        <label style={{fontSize:12,color:`${neon}99`,letterSpacing:1.5,textTransform:'uppercase',display:'block',marginBottom:8}}>ส่งถึง</label>
+        <select value={target} onChange={e=>setTarget(e.target.value)} style={{background:`${neon}10`,border:`1px solid ${neon}50`,borderRadius:8,color:'#fff',padding:'10px 12px',fontSize:14,outline:'none',width:'100%'}}>
+          <option value="all">⚡ ทุกคน ({salesList.length} คน)</option>
+          {salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
+        </select>
+      </div>
+      <div style={{marginBottom:14}}>
+        <label style={{fontSize:12,color:`${neon}99`,letterSpacing:1.5,textTransform:'uppercase',display:'block',marginBottom:8}}>ข้อความ</label>
+        <textarea rows={5} value={msg} onChange={e=>setMsg(e.target.value)} placeholder="พิมพ์ข้อความ..." style={{background:`${neon}08`,border:`1px solid ${neon}40`,borderRadius:8,color:'#fff',padding:'12px',fontSize:14,outline:'none',width:'100%',resize:'vertical',lineHeight:1.6}}/>
+        <div style={{textAlign:'right',fontSize:11,color:`${neon}50`,marginTop:4}}>{msg.length} ตัวอักษร</div>
+      </div>
+      {done&&<div style={{borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,fontWeight:700,
+        background:done.startsWith('✅')?'rgba(0,255,136,.1)':'rgba(255,45,120,.1)',
+        border:`1px solid ${done.startsWith('✅')?'#00ff88':'#ff2d78'}`,
+        color:done.startsWith('✅')?'#00ff88':'#ff2d78',
+        textShadow:`0 0 10px ${done.startsWith('✅')?'#00ff88':'#ff2d78'}`
+      }}>{done}</div>}
+      <button onClick={send} disabled={sending||!msg.trim()} style={{
+        width:'100%',padding:'14px',fontSize:15,fontWeight:800,border:'none',cursor:sending?'wait':'pointer',
+        borderRadius:10,letterSpacing:.5,
+        background:sending?`${neon}30`:`linear-gradient(135deg,${neon},${neon}cc)`,
+        color:'#fff',boxShadow:sending?'none':`0 0 24px ${neon}60`,
+        textShadow:sending?'none':`0 0 10px rgba(255,255,255,.5)`,
+        transition:'all .2s',
+      }}>
+        {sending?'⚡ กำลังส่ง...':'📢 ส่งข้อความ'}
+      </button>
     </div>
-    <div style={{background:'var(--bg3)',borderRadius:10,padding:'14px',fontSize:13,color:'var(--text2)',lineHeight:1.8}}>
-      <div style={{fontWeight:700,color:'var(--text)',marginBottom:6}}>💡 ใช้สำหรับ</div>
-      📌 แจ้งเปลี่ยนแปลงนโยบาย<br/>🎯 แจ้งเป้าหมายประจำเดือน<br/>⚠️ แจ้งเตือนด่วน<br/>🎉 ประกาศผลงาน
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:8}}>
+      {[['📌','แจ้งนโยบาย'],['🎯','แจ้งเป้าหมาย'],['⚠️','แจ้งเตือนด่วน'],['🎉','ประกาศผลงาน']].map(([ic,l])=>
+        <div key={l} style={{background:`${neon}08`,border:`1px solid ${neon}20`,borderRadius:10,padding:'12px',textAlign:'center',cursor:'pointer',transition:'all .15s'}}
+          onMouseOver={e=>{e.currentTarget.style.borderColor=neon+'60';e.currentTarget.style.background=`${neon}15`;}}
+          onMouseOut={e=>{e.currentTarget.style.borderColor=neon+'20';e.currentTarget.style.background=`${neon}08`;}}
+          onClick={()=>setMsg(m=>m+(m?'
+':'')+l)}>
+          <div style={{fontSize:24,marginBottom:4}}>{ic}</div>
+          <div style={{fontSize:11,color:`${neon}80`,fontWeight:600}}>{l}</div>
+        </div>
+      )}
     </div>
   </div>;
 }
@@ -2513,7 +2741,7 @@ function AdminApp({currentUser,onLogout}){
     market:<AdminMarket currentUser={currentUser} users={users}/>,
     dashboard:<AdminDashboard currentUser={currentUser}/>,
     bookings:<AdminBookings currentUser={currentUser} users={users}/>,
-    followups:<AdminFollowups users={users}/>,
+    followups:<AdminTeam users={users} currentUser={currentUser}/>,
     users:<AdminUsers currentUser={currentUser}/>,
     team:<AdminTeam users={users} currentUser={currentUser}/>,
     ai:<AdminAIPage currentUser={currentUser}/>,
