@@ -85,6 +85,52 @@ tr.clickable{cursor:pointer;}
   .admin-topbar{display:flex !important;}
   .admin-bottom-nav{display:flex;}
   .bottom-nav{display:flex;}
+
+  /* ── 1. ขยายปุ่ม + input ให้กดง่ายขึ้น ── */
+  .btn{padding:11px 16px;font-size:14px;border-radius:10px;}
+  .btn-primary{padding:12px 18px;}
+  .btn-ghost{padding:10px 14px;}
+  input,select,textarea{padding:11px 12px;font-size:16px;border-radius:8px;}
+  .card{padding:14px;border-radius:12px;}
+  .badge{padding:4px 12px;font-size:12px;}
+
+  /* ── 2. Table → Stack Card (ไม่ต้อง scroll แนวนอน) ── */
+  .table-wrap table,.table-wrap thead,.table-wrap tbody,.table-wrap th,.table-wrap tr{display:block;}
+  .table-wrap thead{display:none;}
+  .table-wrap tr{background:var(--bg2);border:1px solid var(--border);margin-bottom:10px;border-radius:12px;padding:12px 14px;}
+  .table-wrap tr:hover td{background:transparent;}
+  .table-wrap td{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .table-wrap td:last-child{border-bottom:none;padding-top:8px;}
+  .table-wrap td::before{content:attr(data-label);color:var(--text2);font-size:12px;flex-shrink:0;margin-right:8px;}
+
+  /* ── 3. Modal เต็มจอ ── */
+  .overlay{padding:0;align-items:flex-end;}
+  .modal{width:100%;max-width:100%;max-height:95vh;border-radius:20px 20px 0 0;}
+  .modal-hd{padding:14px 18px;}
+  .modal-bd{padding:16px 18px;}
+  .modal-ft{padding:12px 18px;padding-bottom:max(12px,env(safe-area-inset-bottom));}
+
+  /* ── 4. Market Card ใหญ่ขึ้น ── */
+  .mkc{padding:16px;border-radius:14px;}
+  .mkc-name{font-size:16px;}
+  .mkc-report{font-size:13px;max-height:none;}
+  .mkc-actions{flex-direction:row;}
+  .btn-claim{padding:13px;font-size:15px;}
+
+  /* ── 5. Page padding ลดลงนิด ── */
+  .page{padding:14px;}
+  .page-title{font-size:18px;}
+  .stat-grid{grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;}
+  .stat-card{padding:12px 8px;}
+  .stat-num{font-size:24px;}
+
+  /* ── 6. Focus block ── */
+  .focus-block{padding:12px 14px;}
+
+  /* ── 7. mk-hero ── */
+  .mk-hero{padding:14px 14px 0;}
+  .mk-cards-area{padding:12px;}
+  .mk-cards-grid{grid-template-columns:1fr;}
 }
 .page{padding:20px;}
 .page-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
@@ -144,6 +190,9 @@ tr.clickable{cursor:pointer;}
 @media(max-width:900px){.mk-sidebar{display:none;}}
 @media(max-width:600px){.mk-cards-grid{grid-template-columns:1fr;}.mk-hero{padding:16px 16px 0;}.mk-cards-area{padding:12px;}.mk-stats{flex-wrap:wrap;gap:6px;}.mk-stat{min-width:70px;padding:10px 12px;}}
 .focus-block{border-radius:10px;padding:14px 16px;margin-bottom:12px;}
+.fab{display:none;position:fixed;bottom:76px;right:16px;width:52px;height:52px;border-radius:50%;background:var(--blue2);color:#fff;border:none;cursor:pointer;font-size:24px;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(31,111,235,.5);z-index:90;transition:transform .15s;}
+.fab:active{transform:scale(.93);}
+@media(max-width:768px){.fab{display:flex;}}
 .ach-badge{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:10px;min-width:60px;transition:all .2s;}
 .onboard-progress-dot{height:6px;border-radius:3px;transition:all .3s;}
 .gs-result{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
@@ -1177,7 +1226,7 @@ async function sendToMarketDirect(caseId,salesName){
       <input type="date" value={filter.dateTo||''} onChange={e=>setFilter(f=>({...f,dateTo:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
       {(filter.dateFrom||filter.dateTo)&&<button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>setFilter(f=>({...f,dateFrom:'',dateTo:''}))}>✕ ล้างวันที่</button>}
     </div>
-    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th><th>ตลาด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:filtered.length===0?<tr><td colSpan={6} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const cv=formatContact(c.contact||'');const isPhone=cv&&/^\d{9,10}$/.test(cv.replace(/\D/g,''));return<tr key={i} className="clickable" onClick={()=>setSel(c)}><td><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td style={{fontWeight:500}}>{c.customername}</td><td style={{fontSize:13}}><div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>{displayContact(c.contact)}</span>{isPhone&&<a href={`tel:${cv}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none',fontSize:11,padding:'2px 8px'}}><Ico.phone/>โทร</a>}{isPhone&&<a href={`https://line.me/ti/p/~${cv}`} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none',fontSize:11,padding:'2px 8px'}}>Line</a>}</div></td><td><div style={{display:'flex',gap:4,alignItems:'center'}}><StatusBadge status={c.status}/><ScoreBadge score={calculateCaseScore(c)}/></div></td><td><span style={{color:'var(--purple)'}}>{c.sales}</span></td><td style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td>
+    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th><th>ตลาด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:filtered.length===0?<tr><td colSpan={6} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const cv=formatContact(c.contact||'');const isPhone=cv&&/^\d{9,10}$/.test(cv.replace(/\D/g,''));return<tr key={i} className="clickable" onClick={()=>setSel(c)}><td data-label="รหัสเคส"><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td data-label="ชื่อลูกค้า" style={{fontWeight:500}}>{c.customername}</td><td data-label="ติดต่อ" style={{fontSize:13}}><div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>{displayContact(c.contact)}</span>{isPhone&&<a href={`tel:${cv}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none',fontSize:11,padding:'2px 8px'}}><Ico.phone/>โทร</a>}{isPhone&&<a href={`https://line.me/ti/p/~${cv}`} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none',fontSize:11,padding:'2px 8px'}}>Line</a>}</div></td><td data-label="สถานะ"><div style={{display:'flex',gap:4,alignItems:'center'}}><StatusBadge status={c.status}/><ScoreBadge score={calculateCaseScore(c)}/></div></td><td data-label="เซลส์"><span style={{color:'var(--purple)'}}>{c.sales}</span></td><td data-label="อัปเดต" style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td>
           <td onClick={e=>e.stopPropagation()}>
             {marketIds.has(String(c.caseid))?
               <span style={{fontSize:11,fontWeight:700,color:'var(--purple)',background:'rgba(188,140,255,.15)',border:'1px solid rgba(188,140,255,.4)',borderRadius:20,padding:'2px 8px',whiteSpace:'nowrap'}}>🏪 ในตลาด</span>:
@@ -1233,6 +1282,8 @@ async function sendToMarketDirect(caseId,salesName){
     </div>}
     {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={load}/>}
     {showAddBook&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAddBook(false)} onAdded={()=>{}}/>}
+    {/* FAB มือถือ */}
+    <button className="fab" onClick={()=>setShowAdd(true)} title="เพิ่มลูกค้า">＋</button>
   </div>;
 }
 
@@ -1349,7 +1400,7 @@ function AdminBookings({currentUser,users}){
   useEffect(()=>{load();},[load]);
   return <div className="page">
     <div className="page-hd"><div><div className="page-title">📝 การจอง</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{bookings.length} รายการ</div></div><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มการจอง</button></div>
-    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>วันที่</th><th>รหัสเคส</th><th>ลูกค้า</th><th>เซลส์</th><th>รถ</th><th>รุ่น</th><th>ทะเบียน</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={9}/>:bookings.length===0?<tr><td colSpan={9} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่มีการจอง</td></tr>:bookings.map((b,i)=><tr key={i} className="clickable" onClick={()=>setSel(b)}><td style={{fontSize:12,whiteSpace:'nowrap'}}>{String(b['วันที่']||'').split(' ')[0]}</td><td><span style={{color:'var(--blue)',fontWeight:700}}>{b.CaseID}</span></td><td style={{fontWeight:500}}>{b['ลูกค้า']||'-'}</td><td style={{color:'var(--purple)'}}>{b['เซลส์']||'-'}</td><td>{b['รถ']||'-'}</td><td>{b['รุ่น']||'-'}</td><td>{b['ทะเบียน']||'-'}</td><td><StatusBadge status={b['สถานะ']}/></td><td style={{fontSize:12,color:'var(--text2)'}}>{b['หมายเหตุ']||'-'}</td></tr>)}</tbody></table></div></div>
+    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>วันที่</th><th>รหัสเคส</th><th>ลูกค้า</th><th>เซลส์</th><th>รถ</th><th>รุ่น</th><th>ทะเบียน</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={9}/>:bookings.length===0?<tr><td colSpan={9} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่มีการจอง</td></tr>:bookings.map((b,i)=><tr key={i} className="clickable" onClick={()=>setSel(b)}><td data-label="วันที่" style={{fontSize:12,whiteSpace:'nowrap'}}>{String(b['วันที่']||'').split(' ')[0]}</td><td data-label="รหัสเคส"><span style={{color:'var(--blue)',fontWeight:700}}>{b.CaseID}</span></td><td data-label="ลูกค้า" style={{fontWeight:500}}>{b['ลูกค้า']||'-'}</td><td data-label="เซลส์" style={{color:'var(--purple)'}}>{b['เซลส์']||'-'}</td><td data-label="ยี่ห้อ">{b['รถ']||'-'}</td><td data-label="รุ่น">{b['รุ่น']||'-'}</td><td data-label="ทะเบียน">{b['ทะเบียน']||'-'}</td><td data-label="สถานะ"><StatusBadge status={b['สถานะ']}/></td><td data-label="หมายเหตุ" style={{fontSize:12,color:'var(--text2)'}}>{b['หมายเหตุ']||'-'}</td></tr>)}</tbody></table></div></div>
     {sel&&<BookingDetailModal booking={sel} onClose={()=>setSel(null)} onUpdated={load}/>}
     {showAdd&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAdd(false)} onAdded={load}/>}
   </div>;
