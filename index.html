@@ -2715,8 +2715,7 @@ function AdminBroadcastContent({users,neon='#a855f7'}){
         <div key={l} style={{background:`${neon}08`,border:`1px solid ${neon}20`,borderRadius:10,padding:'12px',textAlign:'center',cursor:'pointer',transition:'all .15s'}}
           onMouseOver={e=>{e.currentTarget.style.borderColor=neon+'60';e.currentTarget.style.background=`${neon}15`;}}
           onMouseOut={e=>{e.currentTarget.style.borderColor=neon+'20';e.currentTarget.style.background=`${neon}08`;}}
-          onClick={()=>setMsg(m=>m+(m?'
-':'')+l)}>
+          onClick={()=>setMsg(m=>m+(m?'\n':'')+l)}>
           <div style={{fontSize:24,marginBottom:4}}>{ic}</div>
           <div style={{fontSize:11,color:`${neon}80`,fontWeight:600}}>{l}</div>
         </div>
