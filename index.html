@@ -1609,6 +1609,7 @@ function AdminUsers({currentUser}){
           </div>;
         })}
       </div>}
+    </div>
 
     {/* Add User Modal */}
     {showAdd&&<Modal title="➕ เพิ่มผู้ใช้ใหม่" onClose={()=>setShowAdd(false)} footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={addUser}>บันทึก</button></>}>
