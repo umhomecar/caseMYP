@@ -80,13 +80,16 @@ tr.clickable{cursor:pointer;}
 .bottom-nav-item.active{color:var(--blue);}
 @media(max-width:768px){
   .sidebar{display:none;}
-  .main-content{margin-left:0;padding-bottom:70px;}
-  .admin-mobile-content{margin-left:0;padding-bottom:70px;padding-top:56px;}
+  /* ซ่อน .main-content บน mobile — ใช้ admin-mobile-content แทน */
+  .main-content{display:none;}
+  .admin-mobile-content{display:block !important;margin-left:0 !important;padding-bottom:80px;padding-top:60px;}
   .admin-topbar{display:flex !important;}
   .admin-bottom-nav{display:flex;}
   .bottom-nav{display:flex;}
+  /* Sales ใช้ main-content — ต้องเปิดไว้ให้ */
+  .sales-content{display:block !important;margin-left:0;padding-bottom:70px;}
 
-  /* ── 1. ขยายปุ่ม + input ให้กดง่ายขึ้น ── */
+  /* ── 1. ขยายปุ่ม + input ── */
   .btn{padding:11px 16px;font-size:14px;border-radius:10px;}
   .btn-primary{padding:12px 18px;}
   .btn-ghost{padding:10px 14px;}
@@ -94,7 +97,7 @@ tr.clickable{cursor:pointer;}
   .card{padding:14px;border-radius:12px;}
   .badge{padding:4px 12px;font-size:12px;}
 
-  /* ── 2. Table → Stack Card (ไม่ต้อง scroll แนวนอน) ── */
+  /* ── 2. Table → Stack Card ── */
   .table-wrap table,.table-wrap thead,.table-wrap tbody,.table-wrap th,.table-wrap tr{display:block;}
   .table-wrap thead{display:none;}
   .table-wrap tr{background:var(--bg2);border:1px solid var(--border);margin-bottom:10px;border-radius:12px;padding:12px 14px;}
@@ -110,24 +113,27 @@ tr.clickable{cursor:pointer;}
   .modal-bd{padding:16px 18px;}
   .modal-ft{padding:12px 18px;padding-bottom:max(12px,env(safe-area-inset-bottom));}
 
-  /* ── 4. Market Card ใหญ่ขึ้น ── */
-  .mkc{padding:16px;border-radius:14px;}
-  .mkc-name{font-size:16px;}
-  .mkc-report{font-size:13px;max-height:none;}
-  .mkc-actions{flex-direction:row;}
-  .btn-claim{padding:13px;font-size:15px;}
+  /* ── 4. Market Card — FIX หลัก ── */
+  .mkc{padding:16px;border-radius:16px;margin-bottom:12px;}
+  .mkc-top{flex-direction:row;gap:6px;align-items:center;}
+  .mkc-name{font-size:16px;font-weight:700;}
+  .mkc-contact{font-size:13px;}
+  .mkc-report{font-size:13px;line-height:1.5;margin-top:6px;max-height:none;}
+  .mkc-actions{flex-direction:column;gap:10px;}
+  .btn-claim{width:100%;padding:14px;font-size:15px;}
+  .btn-skip{width:100%;padding:12px;font-size:14px;text-align:center;}
 
-  /* ── 5. Page padding ลดลงนิด ── */
-  .page{padding:14px;}
-  .page-title{font-size:18px;}
-  .stat-grid{grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;}
-  .stat-card{padding:12px 8px;}
-  .stat-num{font-size:24px;}
+  /* ── 5. Page layout ── */
+  .page{padding:12px !important;}
+  .page-title{font-size:18px;width:100%;}
+  .page-hd{flex-direction:row;align-items:center;gap:8px;margin-bottom:14px;}
+  .stat-grid{grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;}
+  .stat-card{padding:10px 6px;}
+  .stat-num{font-size:22px;}
+  .search-bar{width:100%;flex-direction:column;align-items:stretch;}
 
-  /* ── 6. Focus block ── */
+  /* ── 6. Focus + Hero ── */
   .focus-block{padding:12px 14px;}
-
-  /* ── 7. mk-hero ── */
   .mk-hero{padding:14px 14px 0;}
   .mk-cards-area{padding:12px;}
   .mk-cards-grid{grid-template-columns:1fr;}
@@ -193,6 +199,10 @@ tr.clickable{cursor:pointer;}
 .fab{display:none;position:fixed;bottom:76px;right:16px;width:52px;height:52px;border-radius:50%;background:var(--blue2);color:#fff;border:none;cursor:pointer;font-size:24px;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(31,111,235,.5);z-index:90;transition:transform .15s;}
 .fab:active{transform:scale(.93);}
 @media(max-width:768px){.fab{display:flex;}}
+/* ── Fix SVG icon color ── */
+.nav-item svg,.sidebar svg,.bottom-nav-item svg,.admin-topbar svg,.admin-bottom-nav svg{color:var(--text2);stroke:currentColor;}
+.nav-item.active svg,.bottom-nav-item.active svg{color:var(--blue);}
+svg{fill:none;}
 .ach-badge{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:10px;min-width:60px;transition:all .2s;}
 .onboard-progress-dot{height:6px;border-radius:3px;transition:all .3s;}
 .gs-result{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
@@ -2542,7 +2552,7 @@ function SalesApp({currentUser,onLogout}){
         <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onLogout}><Ico.logout/></button>
       </div>
     </div>
-    <div style={{paddingTop:56}}>{pages[page]||pages.focus}</div>
+    <div className="sales-content" style={{paddingTop:56}}>{pages[page]||pages.focus}</div>
     <div className="bottom-nav">{navItems.map(n=><div key={n.key} className={`bottom-nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)}>{n.icon}<span>{n.label}</span></div>)}</div>
     {showNotif&&<NotifPanel user={currentUser} onClose={()=>setShowNotif(false)} onCountChange={setNotifCount}/>}
   </div>;
