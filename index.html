@@ -936,14 +936,18 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const [followups,setFollowups]=useState(()=>{try{return JSON.parse(localStorage.getItem(FU_KEY)||'[]');}catch(e){return[];}});
   const [followupDate,setFollowupDate]=useState('');
   const [followupNote,setFollowupNote]=useState('');
-  function saveFollowup(){if(!followupDate)return;const upd=[...followups,{date:followupDate,note:followupNote,done:false,caseid:caseId,customername:caseData.customername||caseData.name||'',by:currentUser.name}];setFollowups(upd);try{localStorage.setItem(FU_KEY,JSON.stringify(upd));}catch(e){}setFollowupDate('');setFollowupNote('');}
+  function saveFollowup(){if(!followupDate)return;const newFU={date:followupDate,note:followupNote,done:false,caseid:caseId,customername:caseData.customername||caseData.name||'',by:currentUser.name};const upd=[...followups,newFU];setFollowups(upd);try{localStorage.setItem(FU_KEY,JSON.stringify(upd));}catch(e){}
+    sbHist(caseId,currentUser.name,'นัด Follow-up','นัด Follow-up: '+followupDate+(followupNote?' — '+followupNote:''));
+    setFollowupDate('');setFollowupNote('');}
   function doneFollowup(i){const upd=followups.map((f,idx)=>idx===i?{...f,done:true}:f);setFollowups(upd);try{localStorage.setItem(FU_KEY,JSON.stringify(upd));}catch(e){}}
   function delFollowup(i){const upd=followups.filter((_,idx)=>idx!==i);setFollowups(upd);try{localStorage.setItem(FU_KEY,JSON.stringify(upd));}catch(e){}}
   const contactRaw=caseData.contact||'';
   const contactVal=formatContact(contactRaw);
   const isQR=contactRaw.startsWith('http')||contactRaw.startsWith('data:image');
   useEffect(()=>{try{const d=JSON.parse(localStorage.getItem('cnotes_'+caseId)||'[]');setNotes(Array.isArray(d)?d:[]);}catch(e){setNotes([]);}},[caseId]);
-  function saveNote(){if(!newNote.trim())return;const upd=[...notes,{text:newNote.trim(),date:new Date().toLocaleString('th-TH'),by:currentUser.name}];setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}setNewNote('');setAddingNote(false);}
+  function saveNote(){if(!newNote.trim())return;const upd=[...notes,{text:newNote.trim(),date:new Date().toLocaleString('th-TH'),by:currentUser.name}];setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}
+    sbHist(caseId,currentUser.name,'📝 Note','📝 Note: '+newNote.trim());
+    setNewNote('');setAddingNote(false);}
   function deleteNote(i){const upd=notes.filter((_,idx)=>idx!==i);setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}}
   async function save(){
     const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:editReport?report:caseData.report,sales:(isAdmin&&newSales)?newSales:caseData.sales};
