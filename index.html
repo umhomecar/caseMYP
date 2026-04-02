@@ -2205,6 +2205,102 @@ function SalesFollowups({currentUser}){
 // ============================================================
 // 🎯 ADMIN TEAM — รวม Target + Broadcast ในหน้าเดียว
 // ============================================================
+// ============================================================
+// 📅 ADMIN FOLLOWUPS — ดูนัดหมายและโน็ตของเซลส์ทุกคน
+// ============================================================
+function AdminFollowups({users}){
+  const [history,setHistory]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [filterSales,setFilterSales]=useState('all');
+  const [filterType,setFilterType]=useState('all');
+  const [dateFrom,setDateFrom]=useState('');
+  const [dateTo,setDateTo]=useState('');
+  const salesList=(users||[]).filter(u=>u.role==='Sales');
+
+  const load=useCallback(()=>{
+    setLoading(true);
+    sbQ('GET','history',{order:'createdat.desc',limit:'500'}).then(rows=>{
+      const filtered=safeArray(rows).filter(r=>
+        String(r.detail||'').includes('นัด Follow-up')||
+        String(r.detail||'').includes('📝 Note:')
+      );
+      setHistory(filtered);
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+  },[]);
+
+  useEffect(()=>{load();},[load]);
+
+  function parseHistDate(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+
+  const filtered=history.filter(r=>{
+    if(filterSales!=='all'&&r.sales!==filterSales)return false;
+    if(filterType==='followup'&&!String(r.detail||'').includes('นัด Follow-up'))return false;
+    if(filterType==='note'&&!String(r.detail||'').includes('📝 Note:'))return false;
+    if(dateFrom){const d=parseHistDate(r.createdat);if(!d||d<new Date(dateFrom))return false;}
+    if(dateTo){const d=parseHistDate(r.createdat);const to=new Date(dateTo);to.setHours(23,59,59);if(!d||d>to)return false;}
+    return true;
+  });
+
+  function parseFollowupDate(detail){const m=String(detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m?m[1]:'';}
+  function parseFollowupNote(detail){const m=String(detail||'').match(/— (.+)$/);return m?m[1]:'';}
+  const today=new Date().toISOString().slice(0,10);
+
+  return <div className="page">
+    <div className="page-hd">
+      <div><div className="page-title">📅 Followup & Notes</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>นัดหมายและโน็ตของเซลส์ทุกคน ({filtered.length} รายการ)</div></div>
+      <button className="btn btn-ghost" onClick={load} style={{fontSize:13}}>🔄</button>
+    </div>
+    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+      <select value={filterSales} onChange={e=>setFilterSales(e.target.value)} style={{fontSize:13,height:34,padding:'0 10px',borderRadius:8,flex:'0 0 auto'}}>
+        <option value="all">ทุกเซลส์</option>
+        {salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
+      </select>
+      <div style={{display:'flex',gap:4}}>
+        {[['all','ทั้งหมด'],['followup','📅 นัด'],['note','📝 Note']].map(([v,l])=>
+          <button key={v} onClick={()=>setFilterType(v)} style={{padding:'6px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,background:filterType===v?'var(--blue2)':'var(--bg3)',color:filterType===v?'#fff':'var(--text2)',transition:'all .15s'}}>{l}</button>
+        )}
+      </div>
+      <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{fontSize:12,height:34,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
+      <span style={{fontSize:12,color:'var(--text3)'}}>—</span>
+      <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{fontSize:12,height:34,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
+      {(dateFrom||dateTo)&&<button className="btn btn-ghost" style={{fontSize:11,height:34,padding:'0 8px'}} onClick={()=>{setDateFrom('');setDateTo('');}}>✕</button>}
+    </div>
+    {loading?<Loading/>:filtered.length===0?
+      <div style={{textAlign:'center',padding:48,color:'var(--text2)'}}>
+        <div style={{fontSize:40,marginBottom:12}}>📭</div>
+        <div>ยังไม่มีข้อมูล</div>
+        <div style={{fontSize:12,color:'var(--text3)',marginTop:6}}>เซลส์ต้องบันทึกนัดหรือ note ผ่านหน้าเคสก่อน</div>
+      </div>:
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {filtered.map((r,i)=>{
+          const isFollowup=String(r.detail||'').includes('นัด Follow-up');
+          const isNote=String(r.detail||'').includes('📝 Note:');
+          const fuDate=isFollowup?parseFollowupDate(r.detail):'';
+          const fuNote=isFollowup?parseFollowupNote(r.detail):'';
+          const noteText=isNote?String(r.detail||'').replace('📝 Note: ',''):'';
+          const isOverdue=fuDate&&fuDate<today;
+          const isToday=fuDate===today;
+          return <div key={i} style={{background:'var(--bg2)',border:'1px solid '+(isOverdue?'rgba(248,81,73,.4)':isToday?'rgba(210,153,34,.4)':'var(--border)'),borderRadius:10,padding:'12px 16px',borderLeft:'3px solid '+(isNote?'var(--blue)':isOverdue?'var(--red)':isToday?'var(--yellow)':'var(--green)')}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6,flexWrap:'wrap',gap:8}}>
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:20,background:isNote?'rgba(88,166,255,.12)':'rgba(63,185,80,.12)',color:isNote?'var(--blue)':'var(--green)'}}>{isNote?'📝 Note':'📅 นัด'}</span>
+                <span style={{fontWeight:700,color:'var(--blue)',fontSize:13}}>{r.caseid}</span>
+                <span style={{fontSize:12,color:'var(--purple)',fontWeight:600}}>{r.sales}</span>
+              </div>
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                {fuDate&&<span style={{fontSize:12,fontWeight:700,padding:'2px 8px',borderRadius:20,background:isOverdue?'rgba(248,81,73,.15)':isToday?'rgba(210,153,34,.15)':'rgba(63,185,80,.1)',color:isOverdue?'var(--red)':isToday?'var(--yellow)':'var(--green)'}}>{isOverdue?'⚠️ ':isToday?'📌 ':''}{fuDate}</span>}
+                <span style={{fontSize:11,color:'var(--text3)'}}>{String(r.createdat||'').split(' ')[0]}</span>
+              </div>
+            </div>
+            <div style={{fontSize:13,color:'var(--text)',lineHeight:1.6}}>{isNote?noteText:fuNote||'ไม่มีหมายเหตุ'}</div>
+          </div>;
+        })}
+      </div>
+    }
+  </div>;
+}
+
 function AdminTeam({users,currentUser}){
   const [tab,setTab]=useState('target');
   return <div className="page">
