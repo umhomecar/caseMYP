@@ -2352,7 +2352,7 @@ function AdminApp({currentUser,onLogout}){
         <div style={{flex:1,padding:'8px 8px'}}>
           {allNavItems.map(n=><div key={n.key} className={`nav-item ${page===n.key?'active':''}`} style={{padding:'12px 14px',borderRadius:8,marginBottom:2}} onClick={()=>goTo(n.key)}>{n.icon}<span style={{fontSize:14}}>{n.label}</span></div>)}
         </div>
-        <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)',display:'flex',gap:8'}}>
+        <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)',display:'flex',gap:8}}>
           <button className="btn btn-ghost" style={{flex:1,fontSize:13}} onClick={()=>{toggleTheme();setMenuOpen(false);}}>🌓 เปลี่ยนธีม</button>
           <button className="btn btn-danger" style={{flex:1,fontSize:13}} onClick={()=>{setMenuOpen(false);onLogout();}}><Ico.logout/> ออก</button>
         </div>
