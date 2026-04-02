@@ -68,9 +68,9 @@ tr.clickable{cursor:pointer;}
 .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:50;}
 .sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid var(--border);}
 .sidebar-nav{flex:1;padding:8px;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:2px;color:var(--text2);font-size:14px;transition:all .15s;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:2px;color:var(--text2);font-size:14px;transition:all .15s;border-left:3px solid transparent;}
 .nav-item:hover{background:var(--bg3);color:var(--text);}
-.nav-item.active{background:#1f6feb22;color:var(--blue);border-left:3px solid var(--blue);}
+.nav-item.active{background:rgba(31,111,235,.12);color:var(--blue);border-left:3px solid var(--blue);}
 .main-content{margin-left:220px;min-height:100vh;}
 .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:50;}
 .admin-topbar{display:none;position:fixed;top:0;left:0;right:0;height:56px;background:var(--bg2);border-bottom:1px solid var(--border);z-index:50;align-items:center;justify-content:space-between;padding:0 16px;}
@@ -200,11 +200,14 @@ tr.clickable{cursor:pointer;}
 .fab:active{transform:scale(.93);}
 @media(max-width:768px){.fab{display:flex;}}
 /* ── Fix SVG icon color ── */
-.nav-item svg,.sidebar svg,.bottom-nav-item svg,.admin-topbar svg,.admin-bottom-nav svg{color:var(--text2);stroke:currentColor;}
-.nav-item.active svg,.bottom-nav-item.active svg{color:var(--blue);}
-svg{fill:none;stroke:currentColor;}
-.nav-item,.bottom-nav-item,.admin-topbar,.admin-bottom-nav{color:var(--text2);}
-.nav-item.active,.bottom-nav-item.active{color:var(--blue);}
+.nav-item svg,.sidebar svg,.bottom-nav-item svg,.admin-topbar svg,.admin-bottom-nav svg{
+  fill:none;stroke:currentColor;display:inline-block;vertical-align:middle;flex-shrink:0;
+  width:18px;height:18px;
+}
+.nav-item{color:var(--text2);}
+.nav-item.active{color:var(--blue);background:rgba(31,111,235,.13);border-left:3px solid var(--blue);}
+.bottom-nav-item{color:var(--text2);}
+.bottom-nav-item.active{color:var(--blue);}
 .ach-badge{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:10px;min-width:60px;transition:all .2s;}
 .onboard-progress-dot{height:6px;border-radius:3px;transition:all .3s;}
 .gs-result{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
@@ -237,15 +240,15 @@ svg{fill:none;stroke:currentColor;}
    ให้ชนะ CSS ทุกอย่างข้างบน
 ═══════════════════════════════════════════ */
 @media(max-width:768px){
-  /* Market card actions — column layout */
-  .mkc-actions{flex-direction:column !important;gap:10px !important;}
-  .btn-claim{width:100% !important;padding:14px !important;font-size:15px !important;border-radius:10px !important;}
+  /* Market card — COLUMN layout บังคับ */
+  .mkc-actions{flex-direction:column !important;gap:8px !important;display:flex !important;}
+  .btn-claim{width:100% !important;padding:14px !important;font-size:15px !important;border-radius:10px !important;flex:unset !important;}
   .btn-skip{width:100% !important;padding:12px !important;font-size:14px !important;text-align:center !important;border-radius:10px !important;}
   .mkc{padding:16px !important;border-radius:16px !important;margin-bottom:12px !important;}
   .mkc-name{font-size:16px !important;font-weight:700 !important;}
   .mkc-report{font-size:13px !important;max-height:none !important;line-height:1.6 !important;}
 
-  /* Admin layout fix */
+  /* Admin layout */
   .admin-mobile-content{margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
 
   /* Modal เต็มจอ */
@@ -255,11 +258,20 @@ svg{fill:none;stroke:currentColor;}
   /* Table → card */
   .table-wrap td{display:flex !important;justify-content:space-between !important;align-items:center !important;}
   .table-wrap thead{display:none !important;}
+  .table-wrap tr{margin-bottom:10px !important;border-radius:12px !important;padding:12px 14px !important;}
 
-  /* Page */
+  /* Page + input */
   .page{padding:12px !important;}
-  .page-hd{flex-direction:row !important;gap:8px !important;}
+  .page-hd{flex-direction:row !important;gap:8px !important;flex-wrap:wrap !important;}
   input,select,textarea{font-size:16px !important;}
+
+  /* Sales content */
+  .sales-content{display:block !important;margin-left:0 !important;padding-bottom:70px !important;}
+
+  /* Nav icons */
+  .bottom-nav-item svg,.admin-bottom-nav .bottom-nav-item svg{
+    display:inline-block !important;fill:none !important;stroke:currentColor !important;
+  }
 }
 </style>
 </head>
@@ -1119,7 +1131,7 @@ function AdminCurrentCases({currentUser,users}){
     }
   });
   const [sending,setSending]=useState(null); // caseid ที่กำลังส่งตลาด
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases','getMarketIds']);Promise.all([api('getCases',{}),api('getMarketIds',{})]).then(([r,mr])=>{
+  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases','getMarketIds']);Promise.all([api('getCases',{all:'true'}),api('getMarketIds',{})]).then(([r,mr])=>{
     const casesData = safeArray(r.data);
     const marketData = safeArray(mr.data);
     setCases(casesData);
