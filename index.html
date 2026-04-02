@@ -202,7 +202,9 @@ tr.clickable{cursor:pointer;}
 /* ── Fix SVG icon color ── */
 .nav-item svg,.sidebar svg,.bottom-nav-item svg,.admin-topbar svg,.admin-bottom-nav svg{color:var(--text2);stroke:currentColor;}
 .nav-item.active svg,.bottom-nav-item.active svg{color:var(--blue);}
-svg{fill:none;}
+svg{fill:none;stroke:currentColor;}
+.nav-item,.bottom-nav-item,.admin-topbar,.admin-bottom-nav{color:var(--text2);}
+.nav-item.active,.bottom-nav-item.active{color:var(--blue);}
 .ach-badge{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:10px;min-width:60px;transition:all .2s;}
 .onboard-progress-dot{height:6px;border-radius:3px;transition:all .3s;}
 .gs-result{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
@@ -229,6 +231,36 @@ svg{fill:none;}
 .api-key-banner{background:rgba(31,111,235,.08);border:1px solid rgba(88,166,255,.3);border-radius:10px;padding:16px;margin-bottom:16px;}
 .api-key-banner.warning{background:rgba(248,81,73,.08);border-color:rgba(248,81,73,.3);}
 .api-key-banner.success{background:rgba(63,185,80,.08);border-color:rgba(63,185,80,.3);}
+
+/* ═══════════════════════════════════════════
+   MOBILE OVERRIDE — ต้องอยู่ท้ายสุดเสมอ
+   ให้ชนะ CSS ทุกอย่างข้างบน
+═══════════════════════════════════════════ */
+@media(max-width:768px){
+  /* Market card actions — column layout */
+  .mkc-actions{flex-direction:column !important;gap:10px !important;}
+  .btn-claim{width:100% !important;padding:14px !important;font-size:15px !important;border-radius:10px !important;}
+  .btn-skip{width:100% !important;padding:12px !important;font-size:14px !important;text-align:center !important;border-radius:10px !important;}
+  .mkc{padding:16px !important;border-radius:16px !important;margin-bottom:12px !important;}
+  .mkc-name{font-size:16px !important;font-weight:700 !important;}
+  .mkc-report{font-size:13px !important;max-height:none !important;line-height:1.6 !important;}
+
+  /* Admin layout fix */
+  .admin-mobile-content{margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
+
+  /* Modal เต็มจอ */
+  .overlay{padding:0 !important;align-items:flex-end !important;}
+  .modal{width:100% !important;max-width:100% !important;max-height:95vh !important;border-radius:20px 20px 0 0 !important;}
+
+  /* Table → card */
+  .table-wrap td{display:flex !important;justify-content:space-between !important;align-items:center !important;}
+  .table-wrap thead{display:none !important;}
+
+  /* Page */
+  .page{padding:12px !important;}
+  .page-hd{flex-direction:row !important;gap:8px !important;}
+  input,select,textarea{font-size:16px !important;}
+}
 </style>
 </head>
 <body>
