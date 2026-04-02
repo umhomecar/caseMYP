@@ -4,7 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>CasePool — ระบบจัดการเคส</title>
-<meta name="theme-color" content="#161b22"/>
+<meta name="theme-color" content="#0d1117"/>
+<meta name="color-scheme" content="dark"/>
+<style>html{background:#0d1117;}</style>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -32,7 +34,8 @@ body.light{
   --yellow:#9a6700;--purple:#8250df;--orange:#bc4c00;
   --shadow:0 8px 24px rgba(0,0,0,.12);
 }
-body{background:var(--bg);color:var(--text);min-height:100vh;}
+body{background:#0d1117;color:var(--text);min-height:100vh;-webkit-tap-highlight-color:transparent;}
+body.light{background:#f0f2f5;}
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:var(--bg2);}
 ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px;}
@@ -164,7 +167,7 @@ tr.clickable{cursor:pointer;}
 </style>
 </head>
 <body>
-  <div id="app-loader" style="position:fixed;inset:0;background:#0d1117;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:12px;">
+  <div id="app-loader" style="position:fixed;inset:0;background:#0d1117;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:12px;-webkit-tap-highlight-color:transparent;">
   <div style="font-size:42px">🚗</div>
   <div style="color:#58a6ff;font-size:18px;font-weight:800;">CasePool</div>
   <div style="width:36px;height:36px;border:3px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .7s linear infinite;margin-top:8px;"></div>
@@ -384,7 +387,7 @@ async function sbApi(action,data){
     case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbQ('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
     case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
-    case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
+    case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}const clipadVal=data.clipad?'[CLIP:'+data.clipad+']':'';await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ',attachment:clipadVal});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
     case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);
       // Push notification ถ้าเปลี่ยน sales (assign)
       if(data.sales&&data.sales!==data.changedBy){
@@ -639,23 +642,73 @@ function HistoryModal({caseId,onClose}){
 // ============================================================
 function calculateCaseScore(c){
   let score=0;
-  const STATUS_SCORE={'ไปต่อได้':80,'จอง':90,'รอเซ็นต์':85,'รอผล':75,'อนุมัติ':88,'เคสวัด 50/50':60,'เคสเลี้ยง':40,'รอข้อมูล':30,'ยังไม่สะดวก':20,'ติดต่อไม่ได้':10};
+  // ── 1) สถานะ ──
+  const STATUS_SCORE={'ไปต่อได้':78,'จอง':90,'รอเซ็นต์':84,'รอผล':72,'อนุมัติ':86,'เคสวัด 50/50':52,'เคสเลี้ยง':35,'รอข้อมูล':22,'ยังไม่สะดวก':16,'ติดต่อไม่ได้':8};
   score += STATUS_SCORE[c.status]||0;
+  // ── 2) ความสดใหม่ ──
   const parseD=d=>{const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));};
   const upd=parseD(c.updatedat);
-  if(upd){const hrs=(Date.now()-upd.getTime())/3600000;if(hrs<2)score+=20;else if(hrs<12)score+=12;else if(hrs<24)score+=6;}
-  if(c.report&&c.report.length>20)score+=10;
-  return Math.min(score,100);
+  if(upd){const hrs=(Date.now()-upd.getTime())/3600000;if(hrs<2)score+=12;else if(hrs<12)score+=8;else if(hrs<24)score+=4;else if(hrs>72)score-=8;}
+  // ── 3) Keyword จากข้อมูลจริงในทีม ──
+  const rp=String(c.report||'').toLowerCase();
+  if(rp.length>10){
+    const POS=[
+      ['ไม่เคยติดแบล็',10],['ไม่เคยติดblacklist',10],
+      ['กำลังส่ง',8],['ส่งข้อมูล',8],['ส่งรูป',7],
+      ['เครดิตใส',10],['ใสแจ๋ว',10],['บูโรใส',9],['บูโรปกติ',8],['เช็คบูโร',8],
+      ['ผ่อนตรง',8],['ตรงปกติ',8],
+      ['แอดไลน์',6],['add line',5],
+      ['งบดาวน์',8],['มีดาวน์',8],['เงินดาวน์',8],['วางดาวน์',8],
+      ['นัด',9],['จะมา',9],['พรุ่งนี้',8],['มาดูรถ',10],['เข้ามาดู',9],
+      ['ข้าราชการ',7],['เจ้าของกิจการ',6],
+      ['รายได้ 3',6],['รายได้ 4',7],['รายได้ 5',7],['รายได้ 7',8],
+      ['จอง',10],['มัดจำ',10],['วางมัดจำ',12],
+      ['ไปต่อได้',10],['ตกลง',8],['ยืนยัน',9],['โอน',7],['เซ็น',8],
+      ['ทดลองขับ',8],['สนใจ',5],['พร้อม',6],
+    ];
+    const NEG=[
+      ['ไปต่อไม่ได้',-15],['ฟรีดาวน์',-12],
+      ['ไม่มีเอกสาร',-10],['ไม่มีสลิป',-10],
+      ['ยอดปิดเหลือ',-12],['ค้างค่างวด',-12],
+      ['ไม่มีคนออก',-10],['ไม่มีคนค้ำ',-10],
+      ['ไม่มีประกันสังคม',-8],['ไม่มีปกส',-8],
+      ['รับเงินสด',-7],['รับสด',-7],
+      ['ไม่รับสาย',-8],['โทรไม่รับ',-6],
+      ['แบล็กลิส',-8],['แบล็คลิส',-8],['ติดแบล็',-8],
+      ['ติดบูโร',-12],['ติดแท็ก',-10],
+      ['มัดจำที่อื่น',-15],['จะไปมัดจำที่อื่น',-15],
+      ['ไม่ตอบ',-5],['ไม่อ่าน',-5],['ไม่ให้ข้อมูล',-5],
+      ['สอบถามเฉยๆ',-6],['ไม่สนใจ',-15],['ปฏิเสธ',-12],
+      ['ซื้อไปแล้ว',-15],['ซื้อแล้ว',-12],['ได้ที่อื่น',-15],
+    ];
+    POS.forEach(([kw,pt])=>{if(rp.includes(kw))score+=pt;});
+    NEG.forEach(([kw,pt])=>{if(rp.includes(kw))score+=pt;});
+    // bonus: ครบทั้ง รายได้ + ดาวน์ + เครดิต
+    const hasIncome=rp.includes('รายได้')||rp.includes('เงินเดือน');
+    const hasDown=rp.includes('ดาวน์')||rp.includes('มัดจำ');
+    const hasCredit=rp.includes('บูโร')||rp.includes('เครดิต');
+    if(hasIncome&&hasDown)score+=8;
+    if(hasIncome&&hasCredit)score+=5;
+  }
+  return Math.max(0,Math.min(score,100));
 }
 
 function getCaseAlert(c){
   const parseD=d=>{const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));};
   const upd=parseD(c.updatedat);
   const hrs=upd?(Date.now()-upd.getTime())/3600000:999;
+  const rp=String(c.report||'').toLowerCase();
+  // สัญญาณบวกชัดเจน
+  const hasConfirm=rp.includes('มัดจำ')||rp.includes('จะมา')||rp.includes('นัด')||rp.includes('ตกลง')||rp.includes('ยืนยัน');
+  // สัญญาณลบชัดเจน
+  const hasKill=rp.includes('ไปต่อไม่ได้')||rp.includes('ติดบูโร')||rp.includes('มัดจำที่อื่น')||rp.includes('ซื้อแล้ว')||rp.includes('ได้ที่อื่น');
+  if(hasKill)return{msg:'💀 สัญญาณลบในรีพอร์ต — ตรวจสอบด่วน',color:'var(--red)'};
+  if(['ไปต่อได้','จอง','รอเซ็นต์','อนุมัติ'].includes(c.status)&&hasConfirm&&hrs<=6)return{msg:'🔥 ลูกค้าพร้อมมาก! รีบดำเนินการ',color:'var(--red)'};
   if(['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'].includes(c.status)&&hrs>4)return{msg:'🔥 รีบโทร! ลูกค้าร้อน',color:'var(--red)'};
-  if(c.status==='ติดต่อไม่ได้')return{msg:'📞 เปลี่ยนช่องทางติดต่อ',color:'var(--orange)'};
-  if(hrs>48)return{msg:'❄️ เคสเย็นมาก — รีบตาม',color:'var(--text3)'};
-  if(hrs>24)return{msg:'⚠️ เคสเริ่มเย็น',color:'var(--yellow)'};
+  if(c.status==='ติดต่อไม่ได้')return{msg:'📞 ลองทักไลน์หรือ FB แทน',color:'var(--orange)'};
+  if(hasConfirm&&hrs>12)return{msg:'📅 มีนัดรออยู่ — ยืนยันด่วน!',color:'var(--blue)'};
+  if(hrs>72)return{msg:'❄️ เคสเย็นมาก — รีบตาม',color:'var(--text3)'};
+  if(hrs>48)return{msg:'⚠️ เคสเริ่มเย็น — ควร follow up',color:'var(--yellow)'};
   return null;
 }
 
@@ -854,12 +907,18 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
           <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10}}>
             <div className="form-group"><label>สถานะ:</label><select value={status} onChange={e=>setStatus(e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
             <div className="form-group"><label>การส่ง:</label>
-              <div style={{display:'flex',gap:6}}>
-                {SENT_TYPES.map(t=><button key={t} type="button"
-                  onClick={()=>setSentType(t)}
-                  style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,borderRadius:8,cursor:'pointer',border:'2px solid '+(sentType===t?(t==='ส่วนตัว'?'var(--purple)':'var(--green)'):'var(--border)'),background:sentType===t?(t==='ส่วนตัว'?'rgba(188,140,255,.15)':'rgba(63,185,80,.12)'):'var(--bg3)',color:sentType===t?(t==='ส่วนตัว'?'var(--purple)':'var(--green)'):'var(--text2)',transition:'all .15s'}}
-                >{t==='ส่วนตัว'?'🔒 ส่วนตัว':'📤 ปกติ'}</button>)}
-              </div>
+              {isAdmin?
+                <div style={{display:'flex',gap:6}}>
+                  {SENT_TYPES.map(t=><button key={t} type="button"
+                    onClick={()=>setSentType(t)}
+                    style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,borderRadius:8,cursor:'pointer',border:'2px solid '+(sentType===t?(t==='ส่วนตัว'?'var(--purple)':'var(--green)'):'var(--border)'),background:sentType===t?(t==='ส่วนตัว'?'rgba(188,140,255,.15)':'rgba(63,185,80,.12)'):'var(--bg3)',color:sentType===t?(t==='ส่วนตัว'?'var(--purple)':'var(--green)'):'var(--text2)',transition:'all .15s'}}
+                  >{t==='ส่วนตัว'?'🔒 ส่วนตัว':'📤 ปกติ'}</button>)}
+                </div>:
+                <div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,color:sentType==='ส่วนตัว'?'var(--purple)':'var(--green)',display:'flex',alignItems:'center',gap:6}}>
+                  {sentType==='ส่วนตัว'?'🔒 ส่วนตัว':'📤 ปกติ'}
+                  <span style={{fontSize:11,color:'var(--text3)',fontWeight:400,marginLeft:4}}>ดูได้อย่างเดียว</span>
+                </div>
+              }
             </div>
           </div>
           <div className="form-group"><label>เซลส์:</label>{isAdmin&&!isClaimed?<select value={newSales} onChange={e=>setNewSales(e.target.value)}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>:<div style={{display:'flex',gap:8,alignItems:'center'}}><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:14,flex:1}}>{caseData.sales||caseData.sale||currentUser.name}</div>{!isClaimed&&currentUser.role==='Sales'&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px',whiteSpace:'nowrap',color:'var(--orange)'}} onClick={()=>setShowTransfer(v=>!v)}>↔ โอนเคส</button>}</div>}</div>
@@ -927,11 +986,11 @@ function ImageUploader({value,onChange,caseId='',label='📷',accept='image/*',m
 function QrUploader({value,onChange,caseId=''}){return <ImageUploader value={value} onChange={onChange} caseId={caseId} label="📷" maxMB={10}/>;}
 
 function AddCaseModal({users,currentUser,onClose,onAdded}){
-  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:'ปกติ'});
+  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:'ปกติ',clipad:''});
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   useEffect(()=>{const d=new Date();const pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');api('getCases',{all:'true'}).then(r=>{if(r.success){const max=(r.data||[]).filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[]);
-  async function submit(){if(!form.customername||!form.sales)return alert('กรุณากรอกชื่อลูกค้าและเลือกเซลส์');setLoading(true);const r=await api('addCase',{...form});setLoading(false);if(r.success){onAdded();onClose();}else alert(r.error||'เกิดข้อผิดพลาด');}
+  async function submit(){if(!form.customername||!form.sales)return alert('กรุณากรอกชื่อลูกค้าและเลือกเซลส์');setLoading(true);const submitData={...form};if(!submitData.clipad)delete submitData.clipad;const r=await api('addCase',submitData);setLoading(false);if(r.success){onAdded();onClose();}else alert(r.error||'เกิดข้อผิดพลาด');}
   return <Modal title="➕ เพิ่มข้อมูลลูกค้า" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
@@ -941,6 +1000,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded}){
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
       <div className="form-group"><label>ส่ง</label><select value={form.sent} onChange={e=>set('sent',e.target.value)}>{SENT_TYPES.map(s=><option key={s}>{s}</option>)}</select></div>
       {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>}
+      {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1',background:'rgba(210,153,34,.06)',border:'1px solid rgba(210,153,34,.25)',borderRadius:8,padding:'10px 12px'}}><label style={{display:'flex',alignItems:'center',gap:6,color:'var(--yellow)'}}>🎬 ข้อมูลคลิปแอด <span style={{fontSize:11,fontWeight:400,color:'var(--text3)'}}>เห็นเฉพาะ Admin</span></label><input value={form.clipad} onChange={e=>set('clipad',e.target.value)} placeholder="ชื่อแอด / แคมเปญ / คลิป URL..."/></div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รีพอร์ต</label><textarea rows={4} value={form.report} onChange={e=>set('report',e.target.value)} placeholder="ข้อมูลลูกค้า..."/></div>
     </div>
   </Modal>;
@@ -1626,11 +1686,12 @@ function DailyFocusPage({currentUser,onNavigate}){
   const FocusBlock=({color,borderColor,bg,title,items,extra=null})=><div className="focus-block" style={{background:bg,border:`1px solid ${borderColor}`}}><div style={{fontWeight:700,color,marginBottom:8,fontSize:13}}>{title}</div>{items.slice(0,5).map((c,i)=><div key={i} onClick={()=>setSelCase(c)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',borderRadius:7,background:'rgba(255,255,255,.03)',marginBottom:i<items.length-1?4:0,cursor:'pointer',transition:'background .1s'}} onMouseOver={e=>e.currentTarget.style.background='rgba(88,166,255,.1)'} onMouseOut={e=>e.currentTarget.style.background='rgba(255,255,255,.03)'}><div style={{display:'flex',alignItems:'center',gap:6,minWidth:0,flex:1}}><span style={{color:'#58a6ff',fontWeight:700,fontSize:12,flexShrink:0}}>{c.caseid}</span><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--text)'}}>{c.customername}</span><StatusBadge status={c.status}/></div><span style={{fontSize:11,color,flexShrink:0,marginLeft:8}}>{hText(hoursAgo(c.updatedat))}</span></div>)}{items.length>5&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginTop:4}}>+{items.length-5} รายการ</div>}{extra}</div>;
   return <div className="page">
     <div style={{background:'linear-gradient(135deg,#1a2a4a 0%,#0f2233 100%)',border:'1px solid rgba(88,166,255,.2)',borderRadius:14,padding:'20px 22px',marginBottom:18}}><div style={{fontSize:12,color:'rgba(88,166,255,.9)',marginBottom:3}}>{greeting}</div><div style={{fontSize:20,fontWeight:800,marginBottom:4}}>{currentUser.name} 👋</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><div style={{fontSize:12,color:'rgba(230,237,243,.7)'}}>{new Date().toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div><button className="btn btn-ghost" style={{fontSize:11,padding:'3px 10px',borderRadius:20,border:'1px solid rgba(88,166,255,.3)',color:'var(--blue)'}} onClick={load}>🔄</button></div></div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>{[['📋 เคส Active',active.length,'var(--blue)','cases'],['🏪 ตลาดว่าง',marketCount,'var(--green)',null],['📥 รับแล้ว',claimedCases.length,'var(--purple)','claimed']].map(([l,v,c,key])=>{const clickable=key!==null;return<div key={l} onClick={clickable?()=>onNavigate(key):undefined} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center',cursor:clickable?'pointer':'default'}} onMouseOver={e=>{if(clickable)e.currentTarget.style.borderColor=c;}} onMouseOut={e=>{if(clickable)e.currentTarget.style.borderColor='var(--border)';}}><div style={{fontSize:12,color:c,opacity:.7,marginBottom:4}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:c}}>{loading?'—':v}</div></div>;})}</div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>{[['📋 เคส Active',active.length,'var(--blue)','cases'],['🏪 ตลาดว่าง',marketCount,'var(--green)','market'],['📥 รับแล้ว',claimedCases.length,'var(--purple)','claimed']].map(([l,v,c,key])=><div key={key} onClick={()=>onNavigate(key)} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center',cursor:'pointer'}} onMouseOver={e=>e.currentTarget.style.borderColor=c} onMouseOut={e=>e.currentTarget.style.borderColor='var(--border)'}><div style={{fontSize:12,color:c,opacity:.7,marginBottom:4}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:c}}>{loading?'—':v}</div></div>)}</div>
     {loading?<Loading/>:<>{autoSendSoon.length>0&&<FocusBlock color="var(--red)" borderColor="rgba(248,81,73,.45)" bg="rgba(248,81,73,.07)" title={`🚨 ใกล้ถูกส่งตลาดอัตโนมัติ (${autoSendSoon.length})`} items={autoSendSoon} extra={<div style={{fontSize:12,color:'rgba(248,81,73,.8)',marginTop:6}}>⚡ รีบอัปเดตก่อนเคสถูกส่งตลาด</div>}/>}{critical.length>0&&<FocusBlock color="var(--yellow)" borderColor="rgba(210,153,34,.4)" bg="rgba(210,153,34,.07)" title={`⚠️ ค้างนาน — ควร follow up ด่วน (${critical.length})`} items={critical}/>}{warn.length>0&&<FocusBlock color="var(--blue)" borderColor="rgba(88,166,255,.25)" bg="rgba(88,166,255,.05)" title={`⏰ ควร follow up วันนี้ (${warn.length})`} items={warn}/>}{hot.length>0&&<FocusBlock color="var(--green)" borderColor="rgba(63,185,80,.25)" bg="rgba(63,185,80,.05)" title={`🎯 สถานะดี — โอกาสปิดการขาย (${hot.length})`} items={hot}/>}{allClear&&hot.length===0&&<div style={{textAlign:'center',padding:'36px 0',color:'var(--green)'}}><div style={{fontSize:52,marginBottom:12}}>✅</div><div style={{fontWeight:800,fontSize:17}}>ทุกอย่างอัปเดตแล้ว!</div><div style={{fontSize:13,color:'var(--text2)',marginTop:6}}>คุณกำลังทำได้ยอดเยี่ยมมาก 🎉</div></div>}</>}
-    {marketCount>0&&!loading&&<div style={{background:'rgba(188,140,255,.08)',border:'1px solid rgba(188,140,255,.3)',borderRadius:12,padding:'14px 16px',display:'flex',alignItems:'center',gap:12,marginTop:4,marginBottom:4}}>
-      <div style={{fontSize:24}}>🏪</div>
-      <div><div style={{fontWeight:700,color:'var(--purple)',fontSize:15}}>ตลาดมีเคสว่าง {marketCount} ใบ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>ไปที่แท็บ "ตลาด" เพื่อดูเคส</div></div>
+    {marketCount>0&&!loading&&<div onClick={()=>onNavigate('market')} style={{background:'rgba(188,140,255,.1)',border:'2px solid rgba(188,140,255,.5)',borderRadius:12,padding:'14px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:12,marginTop:4,marginBottom:4}}>
+      <div style={{fontSize:28}}>🏪</div>
+      <div><div style={{fontWeight:700,color:'var(--purple)',fontSize:15}}>ตลาดมีเคสว่าง {marketCount} ใบ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กดเพื่อไปหน้าตลาด →</div></div>
+      <div style={{marginLeft:'auto',fontSize:22,color:'var(--purple)'}}>›</div>
     </div>}
     <button className="btn btn-ghost" style={{marginTop:8,width:'100%',fontSize:13}} onClick={load}>🔄 รีเฟรช</button>
     {selCase&&<CaseModal caseData={selCase} users={[]} currentUser={currentUser} onClose={()=>setSelCase(null)} onUpdated={()=>{setSelCase(null);load();}}/>}
