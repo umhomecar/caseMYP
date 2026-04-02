@@ -1425,9 +1425,26 @@ function AdminDashboard({currentUser}){
   const PALETTE=['#58a6ff','#bc8cff','#3fb950','#ffa657','#f85149','#d29922','#39d353','#79c0ff','#ffd700','#ff7b72','#a5d6ff','#56d364'];
   const STATUS_COLORS={'รอข้อมูล':'#6e7681','ไปต่อได้':'#3fb950','เคสเลี้ยง':'#ffa657','เคสวัด 50/50':'#d29922','ติดต่อไม่ได้':'#f85149','ยังไม่สะดวก':'#bc8cff','จอง':'#58a6ff','รอเซ็นต์':'#39d353','รอผล':'#79c0ff','อนุมัติ':'#56d364','ปิดเคส':'#ff6b6b','รีเจค':'#da3633','ปล่อยแล้ว':'#3fb950','ได้รถจากที่อื่น':'#ffa657','โยนเคส':'#ffd700'};
   const tabs=[{k:'overview',l:'ภาพรวม'},{k:'sales',l:'รายเซลส์'},{k:'status',l:'สถานะ'}];
-  return <div className="page">
-    <div className="page-hd" style={{marginBottom:16}}><div className="page-title">📊 แดชบอร์ด</div><button className="btn btn-ghost" onClick={load} style={{fontSize:13}}>🔄 รีเฟรช</button></div>
-    <div className="stat-grid" style={{marginBottom:20}}>{[['เคสเดือนนี้',totalCases,'var(--blue)'],['ปล่อยแล้ว',totalSold,'var(--green)'],['รับจากตลาด',totalClaimed,'var(--purple)'],['Sales ทั้งหมด',salesList.length,'var(--orange)']].map(([l,v,c])=><div key={l} className="stat-card"><div className="stat-num" style={{color:c}}>{v}</div><div className="stat-lbl">{l}</div></div>)}</div>
+  const MP={bg:'linear-gradient(135deg,#0f1117 0%,#161b27 60%,#0f1420 100%)',card:'rgba(255,255,255,.03)',border:'rgba(79,142,247,.18)',accent:'#4f8ef7',accent2:'#7c3aed',text:'#e2e8f0',sub:'#64748b'};
+  return <div style={{minHeight:'100vh',background:MP.bg}}>
+    {/* MIDNIGHT HEADER */}
+    <div style={{padding:'24px 28px 0',background:'linear-gradient(180deg,rgba(79,142,247,.06),transparent)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24,paddingBottom:16,borderBottom:'1px solid rgba(79,142,247,.15)'}}>
+        <div>
+          <div style={{fontSize:11,color:'rgba(79,142,247,.5)',letterSpacing:3,textTransform:'uppercase',marginBottom:4}}>Admin Dashboard</div>
+          <div style={{fontSize:22,fontWeight:900,color:MP.text,letterSpacing:.3}}>📊 แดชบอร์ด</div>
+        </div>
+        <button onClick={load} style={{background:'rgba(79,142,247,.1)',border:'1px solid rgba(79,142,247,.3)',borderRadius:10,color:MP.accent,padding:'8px 16px',cursor:'pointer',fontSize:13,fontWeight:600}}>🔄 รีเฟรช</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12,marginBottom:24}}>
+        {[['เคสเดือนนี้',totalCases,'#4f8ef7','rgba(79,142,247,.12)'],['ปล่อยแล้ว',totalSold,'#34d399','rgba(52,211,153,.12)'],['รับจากตลาด',totalClaimed,'#a78bfa','rgba(167,139,250,.12)'],['Sales ทั้งหมด',salesList.length,'#fb923c','rgba(251,146,60,.12)']].map(([l,v,c,bg])=>
+          <div key={l} style={{background:bg,border:`1px solid ${c}30`,borderRadius:12,padding:'16px 14px',textAlign:'center'}}>
+            <div style={{fontSize:28,fontWeight:900,color:c}}>{v}</div>
+            <div style={{fontSize:11,color:`${c}70`,marginTop:4,letterSpacing:.5}}>{l}</div>
+          </div>
+        )}
+      </div>
+    </div>
     {/* Hot Cases Summary */}
     {allCases.length>0&&(()=>{
       const CLOSED_ST=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
@@ -1437,18 +1454,18 @@ function AdminDashboard({currentUser}){
       const cold=active.filter(c=>calculateCaseScore(c)<50);
       const winRate=totalCases>0?Math.round(totalSold/totalCases*100):0;
       return<div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
-        {[['🔥 เคสร้อน',hot.length,'rgba(248,81,73,.15)','var(--red)'],['⚠️ ตาม',warm.length,'rgba(210,153,34,.15)','var(--yellow)'],['❄️ เย็น',cold.length,'rgba(139,148,158,.12)','var(--text3)'],['🏆 Win Rate',winRate+'%','rgba(63,185,80,.12)','var(--green)']].map(([l,v,bg,c])=>
-          <div key={l} style={{background:bg,border:'1px solid '+c+'44',borderRadius:10,padding:'10px 8px',textAlign:'center'}}>
-            <div style={{fontSize:16,fontWeight:800,color:c}}>{v}</div>
-            <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{l}</div>
+        {[['🔥 เคสร้อน',hot.length,'#f87171','rgba(248,113,113,.12)'],['⚠️ ตาม',warm.length,'#fbbf24','rgba(251,191,36,.12)'],['❄️ เย็น',cold.length,'#94a3b8','rgba(148,163,184,.1)'],['🏆 Win Rate',winRate+'%','#4ade80','rgba(74,222,128,.12)']].map(([l,v,c,bg])=>
+          <div key={l} style={{background:bg,border:`1px solid ${c}40`,borderRadius:10,padding:'10px 8px',textAlign:'center'}}>
+            <div style={{fontSize:16,fontWeight:900,color:c}}>{v}</div>
+            <div style={{fontSize:10,color:`${c}80`,marginTop:2}}>{l}</div>
           </div>
         )}
       </div>;
     })()}
-    <div style={{display:'flex',gap:6,marginBottom:18,borderBottom:'1px solid var(--border)',paddingBottom:10}}>{tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'6px 18px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:tab===t.k?'var(--blue2)':'var(--bg3)',color:tab===t.k?'#fff':'var(--text2)',transition:'all .15s'}}>{t.l}</button>)}</div>
+    <div style={{display:'flex',gap:6,marginBottom:18,borderBottom:'1px solid rgba(79,142,247,.15)',paddingBottom:10,padding:'0 28px 10px'}}>{tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'7px 20px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,background:tab===t.k?'linear-gradient(135deg,#4f8ef7,#7c3aed)':'rgba(255,255,255,.05)',color:tab===t.k?'#fff':'#64748b',boxShadow:tab===t.k?'0 4px 14px rgba(79,142,247,.35)':'none',transition:'all .2s'}}>{t.l}</button>)}</div>
     {tab==='overview'&&<div style={{display:'grid',gap:16}}><div className="card"><div style={{fontWeight:700,marginBottom:16,fontSize:14}}>📋 เคสต่อเซลส์ (เดือนนี้)</div><div style={{height:220}}><BarChart id="salesBar" labels={salesList.map(s=>s.name)} datasets={[{label:'เคสปัจจุบัน',data:salesList.map(s=>s.currentCases||0),backgroundColor:'rgba(88,166,255,.8)'},{label:'รับตลาด',data:salesList.map(s=>s.claimedCases||0),backgroundColor:'rgba(188,140,255,.8)'},{label:'ปล่อยแล้ว',data:salesList.map(s=>s.sold||0),backgroundColor:'rgba(63,185,80,.85)'}]}/></div></div>{statusEntries.length>0&&<div className="card"><div style={{fontWeight:700,marginBottom:16,fontSize:14}}>🏷 สัดส่วนสถานะ</div><div style={{height:240}}><DonutChart id="statusDonut" labels={statusEntries.map(([k])=>k)} values={statusEntries.map(([,v])=>v)} colors={statusEntries.map(([k],i)=>STATUS_COLORS[k]||PALETTE[i%PALETTE.length])}/></div></div>}</div>}
     {tab==='sales'&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>{salesList.map((s,i)=>{const stEntries=Object.entries(s.statuses||{}).sort((a,b)=>b[1]-a[1]);const maxSt=stEntries.reduce((m,[,v])=>v>m?v:m,1);return <div key={i} className="card"><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}><div style={{width:46,height:46,borderRadius:'50%',background:'var(--bg3)',border:'2px solid var(--border)',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{s.avatar?<img src={s.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:<Ico.user/>}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:15}}>{s.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Sales</div></div></div><div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>{[['เคส',s.currentCases||0,'var(--blue)'],['ตลาด',s.claimedCases||0,'var(--purple)'],['ปล่อย',s.sold||0,'var(--green)']].map(([l,v,c])=><div key={l} style={{textAlign:'center',background:'var(--bg3)',borderRadius:8,padding:'10px 4px'}}><div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:11,color:'var(--text2)'}}>{l}</div></div>)}</div></div>;})}  </div>}
-    {tab==='status'&&<div style={{display:'grid',gap:14}}><div className="card"><div style={{fontWeight:700,marginBottom:14,fontSize:14}}>📊 สรุปสถานะ</div>{statusEntries.map(([st,cnt],i)=>{const pct=Math.round(cnt/(totalCases||1)*100);return <div key={st} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{width:10,height:10,borderRadius:'50%',background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],flexShrink:0}}/><div style={{flex:1,fontSize:13}}><StatusBadge status={st}/></div><div style={{flex:2,height:8,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],width:`${pct}%`,transition:'width .4s'}}/></div><div style={{fontSize:13,fontWeight:700,minWidth:28,textAlign:'right'}}>{cnt}</div><div style={{fontSize:11,color:'var(--text3)',minWidth:36,textAlign:'right'}}>{pct}%</div></div>;})} </div></div>}
+    {tab==='status'&&<div style={{display:'grid',gap:14,padding:'0 28px 28px'}}><div style={{background:'rgba(79,142,247,.05)',border:'1px solid rgba(79,142,247,.15)',borderRadius:14,padding:16}}><div style={{fontWeight:700,marginBottom:14,fontSize:14,color:'#e2e8f0'}}>📊 สรุปสถานะ</div>{statusEntries.map(([st,cnt],i)=>{const pct=Math.round(cnt/(totalCases||1)*100);return <div key={st} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{width:8,height:8,borderRadius:'50%',background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],flexShrink:0,boxShadow:`0 0 6px ${STATUS_COLORS[st]||PALETTE[i%PALETTE.length]}`}}/><div style={{flex:1,fontSize:13}}><StatusBadge status={st}/></div><div style={{flex:2,height:5,background:'rgba(255,255,255,.06)',borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',borderRadius:3,background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],width:`${pct}%`,transition:'width .5s'}}/></div><div style={{fontSize:13,fontWeight:700,minWidth:28,textAlign:'right',color:'#e2e8f0'}}>{cnt}</div><div style={{fontSize:11,color:'#475569',minWidth:36,textAlign:'right'}}>{pct}%</div></div>;})} </div></div>}
   </div>;
 }
 
@@ -1456,9 +1473,54 @@ function AdminBookings({currentUser,users}){
   const [bookings,setBookings]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);
   const load=useCallback(()=>{setLoading(true);api('getBookings',{}).then(r=>{if(r.success)setBookings(r.data||[]);setLoading(false);});},[]);
   useEffect(()=>{load();},[load]);
-  return <div className="page">
-    <div className="page-hd"><div><div className="page-title">📝 การจอง</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{bookings.length} รายการ</div></div><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มการจอง</button></div>
-    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>วันที่</th><th>รหัสเคส</th><th>ลูกค้า</th><th>เซลส์</th><th>รถ</th><th>รุ่น</th><th>ทะเบียน</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={9}/>:bookings.length===0?<tr><td colSpan={9} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่มีการจอง</td></tr>:bookings.map((b,i)=><tr key={i} className="clickable" onClick={()=>setSel(b)}><td data-label="วันที่" style={{fontSize:12,whiteSpace:'nowrap'}}>{String(b['วันที่']||'').split(' ')[0]}</td><td data-label="รหัสเคส"><span style={{color:'var(--blue)',fontWeight:700}}>{b.CaseID}</span></td><td data-label="ลูกค้า" style={{fontWeight:500}}>{b['ลูกค้า']||'-'}</td><td data-label="เซลส์" style={{color:'var(--purple)'}}>{b['เซลส์']||'-'}</td><td data-label="ยี่ห้อ">{b['รถ']||'-'}</td><td data-label="รุ่น">{b['รุ่น']||'-'}</td><td data-label="ทะเบียน">{b['ทะเบียน']||'-'}</td><td data-label="สถานะ"><StatusBadge status={b['สถานะ']}/></td><td data-label="หมายเหตุ" style={{fontSize:12,color:'var(--text2)'}}>{b['หมายเหตุ']||'-'}</td></tr>)}</tbody></table></div></div>
+  const OD={bg:'linear-gradient(160deg,#020d18 0%,#041e35 50%,#062840 100%)',neon:'#00d4ff',dim:'rgba(0,212,255,.12)',border:'rgba(0,212,255,.2)',text:'#cce8f4',sub:'rgba(0,212,255,.5)'};
+  return <div style={{minHeight:'100vh',background:OD.bg}}>
+    {/* OCEAN HEADER */}
+    <div style={{padding:'24px 28px 20px',borderBottom:'1px solid rgba(0,212,255,.12)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>
+          <div style={{fontSize:10,color:OD.sub,letterSpacing:3,textTransform:'uppercase',marginBottom:4}}>Booking System</div>
+          <div style={{fontSize:22,fontWeight:900,color:OD.text,display:'flex',alignItems:'center',gap:10}}>
+            🌊 การจอง
+            <span style={{fontSize:13,fontWeight:600,background:OD.dim,border:`1px solid ${OD.border}`,borderRadius:20,padding:'3px 12px',color:OD.neon}}>{bookings.length} รายการ</span>
+          </div>
+        </div>
+        <button onClick={()=>setShowAdd(true)} style={{background:`linear-gradient(135deg,#006699,#00d4ff)`,border:'none',borderRadius:10,color:'#fff',padding:'10px 18px',cursor:'pointer',fontSize:14,fontWeight:700,boxShadow:'0 4px 14px rgba(0,212,255,.3)'}}>+ เพิ่มการจอง</button>
+      </div>
+    </div>
+    {/* TABLE */}
+    <div style={{padding:'20px 28px 80px'}}>
+      <div style={{background:'rgba(0,212,255,.04)',border:'1px solid rgba(0,212,255,.15)',borderRadius:14,overflow:'hidden'}}>
+        <div className="table-wrap">
+          <table style={{borderCollapse:'collapse',width:'100%'}}>
+            <thead>
+              <tr style={{background:'rgba(0,212,255,.08)'}}>
+                {['วันที่','รหัสเคส','ลูกค้า','เซลส์','รถ','รุ่น','ทะเบียน','สถานะ','หมายเหตุ'].map(h=><th key={h} style={{padding:'12px 14px',textAlign:'left',fontSize:11,color:OD.sub,letterSpacing:1.5,textTransform:'uppercase',borderBottom:'1px solid rgba(0,212,255,.1)',fontWeight:700}}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {loading?<SkeletonRows n={5} cols={9}/>:bookings.length===0?
+                <tr><td colSpan={9} style={{textAlign:'center',padding:40,color:OD.sub}}>ไม่มีการจอง</td></tr>:
+                bookings.map((b,i)=><tr key={i} style={{borderBottom:'1px solid rgba(0,212,255,.06)',cursor:'pointer',transition:'background .15s'}}
+                  onClick={()=>setSel(b)}
+                  onMouseOver={e=>e.currentTarget.style.background='rgba(0,212,255,.06)'}
+                  onMouseOut={e=>e.currentTarget.style.background='transparent'}>
+                  <td data-label="วันที่" style={{padding:'11px 14px',fontSize:12,color:OD.sub,whiteSpace:'nowrap'}}>{String(b['วันที่']||'').split(' ')[0]}</td>
+                  <td data-label="รหัสเคส" style={{padding:'11px 14px'}}><span style={{color:OD.neon,fontWeight:800,textShadow:`0 0 8px ${OD.neon}60`}}>{b.CaseID}</span></td>
+                  <td data-label="ลูกค้า" style={{padding:'11px 14px',fontWeight:600,color:OD.text}}>{b['ลูกค้า']||'-'}</td>
+                  <td data-label="เซลส์" style={{padding:'11px 14px',color:'#60a5fa'}}>{b['เซลส์']||'-'}</td>
+                  <td data-label="ยี่ห้อ" style={{padding:'11px 14px',color:OD.text}}>{b['รถ']||'-'}</td>
+                  <td data-label="รุ่น" style={{padding:'11px 14px',color:OD.text}}>{b['รุ่น']||'-'}</td>
+                  <td data-label="ทะเบียน" style={{padding:'11px 14px',color:'#7dd3fc',fontWeight:600}}>{b['ทะเบียน']||'-'}</td>
+                  <td data-label="สถานะ" style={{padding:'11px 14px'}}><StatusBadge status={b['สถานะ']}/></td>
+                  <td data-label="หมายเหตุ" style={{padding:'11px 14px',fontSize:12,color:OD.sub}}>{b['หมายเหตุ']||'-'}</td>
+                </tr>)
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
     {sel&&<BookingDetailModal booking={sel} onClose={()=>setSel(null)} onUpdated={load}/>}
     {showAdd&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAdd(false)} onAdded={load}/>}
   </div>;
@@ -1501,19 +1563,52 @@ function AdminUsers({currentUser}){
     await api('updateUser',{userId:u.userId,status:newStatus});
     load();
   }
-  return <div className="page">
-    <div className="page-hd"><div className="page-title">👥 จัดการผู้ใช้</div><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มผู้ใช้</button></div>
-    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>ID</th><th>Username</th><th>ชื่อ</th><th>Role</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:users.map((u,i)=><tr key={i}>
-      <td style={{fontSize:12,color:'var(--text2)'}}>{u.userId}</td>
-      <td><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:32,height:32,borderRadius:'50%',background:'var(--bg3)',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:'👤'}</div><span style={{fontWeight:600}}>{u.username}</span></div></td>
-      <td>{u.name}</td>
-      <td><span className={`badge ${u.role==='Admin'?'s-approve':'s-book'}`}>{u.role}</span></td>
-      <td><span className={`badge ${u.status==='active'?'s-go':'s-reject'}`}>{u.status}</span></td>
-      <td><div style={{display:'flex',gap:6}}>
-        <button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>openEdit(u)}>✏️ แก้ไข</button>
-        {u.userId!==currentUser.userId&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px',color:u.status==='active'?'var(--red)':'var(--green)'}} onClick={()=>toggleStatus(u)}>{u.status==='active'?'🔒 ปิด':'🔓 เปิด'}</button>}
-      </div></td>
-    </tr>)}</tbody></table></div></div>
+  const AU={bg:'linear-gradient(160deg,#080818 0%,#100828 50%,#0d1830 100%)',p:'#a78bfa',b:'#60a5fa',g:'#34d399',dim:'rgba(139,92,246,.1)',border:'rgba(139,92,246,.2)',text:'#e2e8f0',sub:'#6b7280'};
+  return <div style={{minHeight:'100vh',background:AU.bg}}>
+    {/* AURORA HEADER */}
+    <div style={{padding:'24px 28px 20px',position:'relative',overflow:'hidden'}}>
+      <div style={{position:'absolute',top:0,left:0,right:0,height:1,background:'linear-gradient(90deg,transparent,#8b5cf6,#3b82f6,#10b981,transparent)'}}/>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>
+          <div style={{fontSize:10,color:'rgba(167,139,250,.5)',letterSpacing:3,textTransform:'uppercase',marginBottom:4}}>User Management</div>
+          <div style={{fontSize:22,fontWeight:900,background:'linear-gradient(90deg,#a78bfa,#60a5fa,#34d399)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>👥 จัดการผู้ใช้</div>
+        </div>
+        <button onClick={()=>setShowAdd(true)} style={{background:'linear-gradient(135deg,#7c3aed,#2563eb)',border:'none',borderRadius:10,color:'#fff',padding:'10px 18px',cursor:'pointer',fontSize:14,fontWeight:700,boxShadow:'0 4px 16px rgba(139,92,246,.4)'}}>+ เพิ่มผู้ใช้</button>
+      </div>
+    </div>
+    {/* USER CARDS */}
+    <div style={{padding:'16px 28px 80px'}}>
+      {loading?<Loading/>:
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14}}>
+        {users.map((u,i)=>{
+          const isAdmin=u.role==='Admin';
+          const cardColor=isAdmin?AU.p:AU.b;
+          return <div key={i} style={{background:`linear-gradient(135deg,${cardColor}0e,${cardColor}06)`,border:`1px solid ${cardColor}30`,borderRadius:16,padding:18,transition:'all .2s'}}
+            onMouseOver={e=>{e.currentTarget.style.borderColor=cardColor+'60';e.currentTarget.style.boxShadow=`0 0 20px ${cardColor}20`;}}
+            onMouseOut={e=>{e.currentTarget.style.borderColor=cardColor+'30';e.currentTarget.style.boxShadow='none';}}>
+            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
+              <div style={{width:52,height:52,borderRadius:'50%',background:`${cardColor}15`,border:`2px solid ${cardColor}50`,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,boxShadow:`0 0 12px ${cardColor}30`}}>
+                {u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:<span style={{fontSize:20}}>👤</span>}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:800,fontSize:16,color:AU.text}}>{u.name}</div>
+                <div style={{fontSize:12,color:`${cardColor}80`,marginTop:2}}>@{u.username}</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:4,alignItems:'flex-end'}}>
+                <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,background:`${cardColor}15`,color:cardColor,border:`1px solid ${cardColor}40`}}>{u.role}</span>
+                <span style={{fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:20,background:u.status==='active'?'rgba(52,211,153,.12)':'rgba(248,113,113,.12)',color:u.status==='active'?AU.g:'#f87171',border:`1px solid ${u.status==='active'?AU.g+'40':'rgba(248,113,113,.4)'}`}}>{u.status==='active'?'● Active':'○ Inactive'}</span>
+              </div>
+            </div>
+            <div style={{fontSize:11,color:AU.sub,marginBottom:12,padding:'6px 10px',background:'rgba(255,255,255,.03)',borderRadius:8}}>ID: {u.userId}{u.startdate?` · เริ่ม ${u.startdate}`:''}</div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>openEdit(u)} style={{flex:1,background:`${cardColor}15`,border:`1px solid ${cardColor}40`,borderRadius:8,color:cardColor,padding:'8px',cursor:'pointer',fontSize:12,fontWeight:700,transition:'all .15s'}}
+                onMouseOver={e=>{e.currentTarget.style.background=`${cardColor}25`;}}
+                onMouseOut={e=>{e.currentTarget.style.background=`${cardColor}15`;}}>✏️ แก้ไข</button>
+              {u.userId!==currentUser.userId&&<button onClick={()=>toggleStatus(u)} style={{flex:1,background:u.status==='active'?'rgba(248,113,113,.1)':'rgba(52,211,153,.1)',border:`1px solid ${u.status==='active'?'rgba(248,113,113,.4)':AU.g+'40'}`,borderRadius:8,color:u.status==='active'?'#f87171':AU.g,padding:'8px',cursor:'pointer',fontSize:12,fontWeight:700}}>{u.status==='active'?'🔒 ปิด':'🔓 เปิด'}</button>}
+            </div>
+          </div>;
+        })}
+      </div>}
 
     {/* Add User Modal */}
     {showAdd&&<Modal title="➕ เพิ่มผู้ใช้ใหม่" onClose={()=>setShowAdd(false)} footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={addUser}>บันทึก</button></>}>
