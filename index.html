@@ -1034,7 +1034,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}
     sbHist(caseId,currentUser.name,'📝 Note','📝 Note: '+newNote.trim()); // sync background
   }
-  function deleteNote(i){const upd=notes.filter((_,idx)=>idx!==i);setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){} // instant, no waiting}
+  function deleteNote(i){const upd=notes.filter((_,idx)=>idx!==i);setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}}
   async function save(){
     const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:editReport?report:caseData.report,sales:(isAdmin&&newSales)?newSales:caseData.sales};
     onUpdated(optimisticData);onClose();
