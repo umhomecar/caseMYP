@@ -41,12 +41,28 @@ window.addEventListener('load',function(){
   --radius:8px;--shadow:0 8px 24px rgba(0,0,0,.4);
 }
 body.light{
-  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f6f8fa;--bg4:#d0d7de;
-  --border:#d0d7de;--text:#1f2328;--text2:#656d76;--text3:#848d97;
-  --blue:#0969da;--blue2:#0550ae;--green:#1a7f37;--red:#cf222e;
-  --yellow:#9a6700;--purple:#8250df;--orange:#bc4c00;
-  --shadow:0 8px 24px rgba(0,0,0,.12);
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#eaedf0;--bg4:#d0d7de;
+  --border:#c4cad4;--text:#0f172a;--text2:#334155;--text3:#64748b;
+  --blue:#0969da;--blue2:#0550ae;--green:#15803d;--red:#b91c1c;
+  --yellow:#92400e;--purple:#6d28d9;--orange:#c2410c;
+  --shadow:0 8px 24px rgba(0,0,0,.10);
 }
+body.light .card{border-color:#c4cad4;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+body.light .stat-card{background:#fff;border:1px solid #c4cad4;}
+body.light input,body.light select,body.light textarea{background:#fff;border-color:#94a3b8;color:#0f172a;}
+body.light .nav-item{color:#334155;}
+body.light .nav-item:hover{background:#eaedf0;color:#0f172a;}
+body.light .nav-item.active{color:#0969da;background:rgba(9,105,218,.08);border-left-color:#0969da;}
+body.light .sidebar{background:#fff;border-right:1px solid #c4cad4;}
+body.light .modal{background:#fff;border-color:#c4cad4;}
+body.light .modal-hd{border-bottom-color:#c4cad4;}
+body.light .mkc{background:#fff;border-color:#c4cad4;}
+body.light .bottom-nav-item{color:#334155;}
+body.light .bottom-nav-item.active{color:#0969da;}
+body.light .btn-ghost{color:#334155;border-color:#c4cad4;}
+body.light .btn-ghost:hover{background:#eaedf0;}
+body.light .page-title{color:#0f172a;}
+body.light .focus-block{border-width:1.5px;}
 body{background:#0d1117;color:var(--text);min-height:100vh;-webkit-tap-highlight-color:transparent;}
 body.light{background:#f0f2f5 !important;}
 ::-webkit-scrollbar{width:6px;height:6px;}
@@ -2397,9 +2413,13 @@ function AdminTargetContent({users,neon='#ff2d78'}){
     const upd={...targets,[monthKey+'_'+name]:v};
     setTargets(upd);
     try{localStorage.setItem(TG_KEY,JSON.stringify(upd));}catch(e){}
-    // sync ขึ้น Supabase
-    await sbQ('POST','targets',{},{sales_name:name,month_key:monthKey,target_value:v,updated_at:new Date().toISOString()},
-      {'Prefer':'resolution=merge-duplicates'});
+    // sync ขึ้น Supabase — ลอง PATCH ก่อน ถ้าไม่มีค่อย POST
+    const existing=await sbQ('GET','targets',{sales_name:'eq.'+name,month_key:'eq.'+monthKey});
+    if(existing&&existing.length>0){
+      await sbQ('PATCH','targets',{sales_name:'eq.'+name,month_key:'eq.'+monthKey},{target_value:v,updated_at:new Date().toISOString()});
+    }else{
+      await sbQ('POST','targets',{},{sales_name:name,month_key:monthKey,target_value:v,updated_at:new Date().toISOString()});
+    }
   }
   function getTarget(name){return targets[monthKey+'_'+name]||0;}
   const totalSold=salesList.reduce((s,u)=>s+cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length,0);
