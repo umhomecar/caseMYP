@@ -2475,6 +2475,62 @@ function AdminApp({currentUser,onLogout}){
   </div>;
 }
 
+// ============================================================
+// 📅 SALES FOLLOWUPS
+// ============================================================
+function SalesFollowups({currentUser}){
+  const today=new Date().toISOString().slice(0,10);
+  const [allFollowups,setAllFollowups]=useState([]);
+
+  useEffect(()=>{
+    const all=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('cp_followup_')){
+        try{const fus=JSON.parse(localStorage.getItem(k)||'[]');fus.forEach(f=>{if(!f.done&&f.by===currentUser.name)all.push(f);});}catch(e){}
+      }
+    }
+    all.sort((a,b)=>a.date.localeCompare(b.date));
+    setAllFollowups(all);
+  },[currentUser.name]);
+
+  const todayFU=allFollowups.filter(f=>f.date===today);
+  const upcoming=allFollowups.filter(f=>f.date>today);
+  const overdue=allFollowups.filter(f=>f.date<today);
+
+  function FUList({items,color,title}){
+    if(!items.length)return null;
+    return<div style={{marginBottom:14}}>
+      <div style={{fontWeight:700,fontSize:13,color,marginBottom:8}}>{title} ({items.length})</div>
+      {items.map((f,i)=><div key={i} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:8}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+          <div style={{fontWeight:600,fontSize:14}}>{f.customername||f.caseid}</div>
+          <span style={{fontSize:12,fontWeight:700,color,background:color+'22',padding:'2px 8px',borderRadius:20}}>{f.date}</span>
+        </div>
+        <div style={{fontSize:12,color:'var(--text2)'}}>{f.note||'ไม่มีหมายเหตุ'}</div>
+        <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>รหัสเคส: {f.caseid}</div>
+      </div>)}
+    </div>;
+  }
+
+  return<div className="page">
+    <div className="page-hd"><div><div className="page-title">📅 Follow-up</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>นัดหมายที่ตั้งไว้</div></div></div>
+    {allFollowups.length===0?
+      <div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}>
+        <div style={{fontSize:48,marginBottom:12}}>📅</div>
+        <div style={{fontWeight:600,fontSize:16,marginBottom:6}}>ยังไม่มีนัดหมาย</div>
+        <div style={{fontSize:13,color:'var(--text3)'}}>กดเข้าไปที่เคสแล้วตั้งนัด Follow-up ได้เลยครับ</div>
+      </div>:
+      <>
+        <FUList items={overdue} color="var(--red)" title="⚠️ เลยกำหนดแล้ว"/>
+        <FUList items={todayFU} color="var(--yellow)" title="📌 วันนี้"/>
+        <FUList items={upcoming} color="var(--blue)" title="🔜 กำลังจะมา"/>
+      </>
+    }
+  </div>;
+}
+
+
 function SalesApp({currentUser,onLogout}){
   const [page,setPage]=useState('focus');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);const [showSearch,setShowSearch]=useState(false);const [showOnboarding,setShowOnboarding]=useState(false);
   usePushNotif(API_URL,currentUser.name);
