@@ -2298,9 +2298,9 @@ function LoginPage({onLogin}){
 // ============================================================
 
 // ============================================================
-// ADMIN — BROADCAST MESSAGE
+// ADMIN — BROADCAST MESSAGE (ใช้ใน AdminBroadcastContent)
 // ============================================================
-){
+function AdminBroadcastContent({users,neon='#a855f7'}){
   const [target,setTarget]=useState('all');
   const [msg,setMsg]=useState('');
   const [sending,setSending]=useState(false);
@@ -2348,7 +2348,7 @@ function LoginPage({onLogin}){
 // ============================================================
 // ADMIN — TARGET รายคน
 // ============================================================
-){
+function AdminTargetContent({users,neon='#ff2d78'}){
   const TG_KEY='cp_targets';
   const [targets,setTargets]=useState(()=>{try{return JSON.parse(localStorage.getItem(TG_KEY)||'{}');}catch(e){return{};}});
   const [cases,setCases]=useState([]);
