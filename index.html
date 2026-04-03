@@ -2372,8 +2372,7 @@ function AdminBroadcastContent({users,neon='#a855f7'}){
     </div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
       {[['📌','แจ้งนโยบาย'],['🎯','ตั้งเป้าหมาย'],['⚠️','เตือนด่วน'],['🎉','ประกาศผล']].map(([ic,l])=>
-        <div key={l} className="card" style={{textAlign:'center',cursor:'pointer',padding:12}} onClick={()=>setMsg(m=>m+(m?'
-':'')+l)}>
+        <div key={l} className="card" style={{textAlign:'center',cursor:'pointer',padding:12}} onClick={()=>setMsg(m=>m+(m?'\n':'')+l)}>
           <div style={{fontSize:22,marginBottom:4}}>{ic}</div>
           <div style={{fontSize:11,color:'var(--text2)',fontWeight:600}}>{l}</div>
         </div>
