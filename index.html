@@ -20,7 +20,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script>
 document.documentElement.style.background="#0d1117";
-document.body.style.background="#0d1117";
+if(document.body)document.body.style.background="#0d1117";
+document.addEventListener('DOMContentLoaded',function(){if(document.body)document.body.style.background="#0d1117";});
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <style>
@@ -2235,6 +2236,171 @@ function LoginPage({onLogin}){
     </div>
   </div>;
 }
+
+// ============================================================
+// 🎯 ADMIN TEAM HQ
+// ============================================================
+function AdminFollowupsContent({users,neon='#00f5ff'}){
+  const [history,setHistory]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [filterSales,setFilterSales]=useState('all');
+  const [filterType,setFilterType]=useState('all');
+  const [dateFrom,setDateFrom]=useState('');
+  const [dateTo,setDateTo]=useState('');
+  const salesList=(users||[]).filter(u=>u.role==='Sales');
+  const load=useCallback(()=>{
+    setLoading(true);
+    sbQ('GET','history',{order:'createdat.desc',limit:'500'}).then(rows=>{
+      const f=safeArray(rows).filter(r=>String(r.detail||'').includes('นัด Follow-up')||String(r.detail||'').includes('📝 Note:'));
+      setHistory(f);setLoading(false);
+    }).catch(()=>setLoading(false));
+  },[]);
+  useEffect(()=>{load();},[load]);
+  const today=new Date().toISOString().slice(0,10);
+  function parseHD(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+  const filtered=history.filter(r=>{
+    if(filterSales!=='all'&&r.sales!==filterSales)return false;
+    if(filterType==='followup'&&!String(r.detail||'').includes('นัด Follow-up'))return false;
+    if(filterType==='note'&&!String(r.detail||'').includes('📝 Note:'))return false;
+    if(dateFrom){const d=parseHD(r.createdat);if(!d||d<new Date(dateFrom))return false;}
+    if(dateTo){const d=parseHD(r.createdat);const to=new Date(dateTo);to.setHours(23,59,59);if(!d||d>to)return false;}
+    return true;
+  });
+  const overdue=filtered.filter(r=>{const m=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m&&m[1]<today;}).length;
+  const todayCount=filtered.filter(r=>{const m=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m&&m[1]===today;}).length;
+  return <div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
+      {[['ทั้งหมด',filtered.length,neon],['วันนี้',todayCount,'#ffd700'],['เลยกำหนด',overdue,'#ff2d78']].map(([l,v,c])=>
+        <div key={l} style={{background:c+'15',border:'1px solid '+c+'40',borderRadius:12,padding:'14px 10px',textAlign:'center'}}>
+          <div style={{fontSize:26,fontWeight:900,color:c}}>{v}</div>
+          <div style={{fontSize:11,color:c+'80',marginTop:2}}>{l}</div>
+        </div>)}
+    </div>
+    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+      <select value={filterSales} onChange={e=>setFilterSales(e.target.value)} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',padding:'8px 12px',fontSize:13}}>
+        <option value="all">ทุกเซลส์</option>
+        {salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
+      </select>
+      <div style={{display:'flex',gap:4,background:'var(--bg3)',borderRadius:20,padding:4}}>
+        {[['all','ทั้งหมด'],['followup','📅 นัด'],['note','📝 Note']].map(([v,l])=>
+          <button key={v} onClick={()=>setFilterType(v)} style={{padding:'5px 12px',borderRadius:16,border:'none',cursor:'pointer',fontSize:12,fontWeight:700,background:filterType===v?neon:'transparent',color:filterType===v?'#000':'var(--text2)',transition:'all .2s'}}>{l}</button>
+        )}
+      </div>
+      <button onClick={load} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text2)',padding:'7px 12px',cursor:'pointer',fontSize:13,marginLeft:'auto'}}>🔄</button>
+    </div>
+    {loading?<Loading/>:filtered.length===0?
+      <div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}><div style={{fontSize:40,marginBottom:10}}>📭</div><div>ยังไม่มีข้อมูล</div><div style={{fontSize:12,marginTop:6,color:'var(--text3)'}}>เซลส์ต้องบันทึกนัดหรือ note ผ่านหน้าเคสก่อน</div></div>:
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {filtered.map((r,i)=>{
+          const isFollowup=String(r.detail||'').includes('นัด Follow-up');
+          const fuDateM=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);
+          const fuDate=fuDateM?fuDateM[1]:'';
+          const noteText=String(r.detail||'').replace('📝 Note: ','');
+          const fuNoteM=String(r.detail||'').match(/— (.+)$/);
+          const fuNote=fuNoteM?fuNoteM[1]:'';
+          const isOverdue=fuDate&&fuDate<today;
+          const cardC=isOverdue?'#ff2d78':isFollowup?'#00ff88':neon;
+          return<div key={i} style={{background:cardC+'08',border:'1px solid '+cardC+'30',borderLeft:'3px solid '+cardC,borderRadius:'0 10px 10px 0',padding:'10px 14px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4,flexWrap:'wrap',gap:4}}>
+              <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                <span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20,background:cardC+'20',color:cardC}}>{isFollowup?'📅 นัด':'📝 NOTE'}</span>
+                <span style={{color:'var(--blue)',fontWeight:700,fontSize:12}}>{r.caseid}</span>
+                <span style={{fontSize:11,color:'var(--purple)'}}>{r.sales}</span>
+              </div>
+              {fuDate&&<span style={{fontSize:11,fontWeight:700,color:cardC}}>{isOverdue?'⚠️ ':''}{fuDate}</span>}
+            </div>
+            <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5}}>{isFollowup?fuNote||'ไม่มีหมายเหตุ':noteText}</div>
+          </div>;
+        })}
+      </div>
+    }
+  </div>;
+}
+
+function AdminTargetContent({users,neon='#ff2d78'}){
+  const TG_KEY='cp_targets';
+  const [targets,setTargets]=useState(()=>{try{return JSON.parse(localStorage.getItem(TG_KEY)||'{}');}catch(e){return{};}});
+  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);
+  const d=new Date();const monthKey=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
+  const MONTH_NAMES=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const monthLabel=MONTH_NAMES[d.getMonth()]+' 25'+String(d.getFullYear()).slice(-2);
+  const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
+  useEffect(()=>{api('getCases',{}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[]);
+  function setTgt(name,val){const upd={...targets,[monthKey+'_'+name]:parseInt(val)||0};setTargets(upd);try{localStorage.setItem(TG_KEY,JSON.stringify(upd));}catch(e){}}
+  function getTarget(name){return targets[monthKey+'_'+name]||0;}
+  const totalSold=salesList.reduce((s,u)=>s+cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length,0);
+  const totalTarget=salesList.reduce((s,u)=>s+getTarget(u.name),0);
+  return <div>
+    <div style={{background:neon+'12',border:'1px solid '+neon+'35',borderRadius:12,padding:'14px 16px',marginBottom:16,display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+      <div style={{flex:1}}>
+        <div style={{fontSize:11,color:neon+'80',letterSpacing:1,marginBottom:4}}>เดือน {monthLabel} — ภาพรวมทีม</div>
+        <div style={{fontSize:24,fontWeight:900,color:neon}}>{totalSold}<span style={{fontSize:14,fontWeight:400,color:neon+'70',marginLeft:6}}>/ {totalTarget} คัน</span></div>
+      </div>
+      {totalTarget>0&&<div style={{textAlign:'center'}}><div style={{fontSize:32,fontWeight:900,color:neon}}>{Math.min(Math.round(totalSold/totalTarget*100),100)}%</div><div style={{fontSize:10,color:neon+'60'}}>Win Rate</div></div>}
+    </div>
+    {loading?<Loading/>:<div style={{display:'grid',gap:10}}>
+      {salesList.map((u,idx)=>{
+        const sold=cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length;
+        const tg=getTarget(u.name);const pct=tg>0?Math.min(Math.round(sold/tg*100),100):0;
+        const barC=pct>=100?'#00ff88':pct>=70?neon:'#ffd700';
+        return<div key={u.userId} className="card">
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:tg>0?10:0}}>
+            <div style={{width:40,height:40,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>{u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{u.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>ปล่อยแล้ว {sold} คัน</div></div>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <input type="number" value={tg||''} onChange={e=>setTgt(u.name,e.target.value)} min={0} placeholder="เป้า" style={{width:60,textAlign:'center',fontSize:14,fontWeight:700,padding:'4px 8px'}}/>
+              <span style={{fontSize:11,color:'var(--text2)'}}>คัน</span>
+            </div>
+          </div>
+          {tg>0&&<><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:11,color:'var(--text2)'}}>{sold}/{tg}</span><span style={{fontSize:13,fontWeight:700,color:barC}}>{pct}%</span></div><div style={{height:5,background:'var(--bg3)',borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',borderRadius:3,width:pct+'%',background:barC,transition:'width .4s'}}/></div>{pct>=100&&<div style={{fontSize:11,color:'#00ff88',marginTop:4,fontWeight:700}}>🎉 บรรลุเป้าแล้ว!</div>}</>}
+        </div>;
+      })}
+    </div>}
+  </div>;
+}
+
+function AdminBroadcastContent({users,neon='#a855f7'}){
+  const [target,setTarget]=useState('all');const [msg,setMsg]=useState('');const [sending,setSending]=useState(false);const [done,setDone]=useState('');
+  const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
+  async function send(){if(!msg.trim())return showToast('กรุณาพิมพ์ข้อความก่อนส่ง','warn');setSending(true);setDone('');const r=await api('broadcast',{sales:target,message:msg});setSending(false);if(r.success){setDone('✅ ส่งถึง '+r.sent+' คน');setMsg('');}else setDone('❌ '+(r.error||'เกิดข้อผิดพลาด'));}
+  return <div>
+    <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:16,marginBottom:14}}>
+      <div className="form-group"><label>ส่งถึง</label><select value={target} onChange={e=>setTarget(e.target.value)}><option value="all">ทุกคน ({salesList.length} คน)</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
+      <div className="form-group"><label>ข้อความ</label><textarea rows={4} value={msg} onChange={e=>setMsg(e.target.value)} placeholder="พิมพ์ข้อความ..."/></div>
+      {done&&<div style={{background:done.startsWith('✅')?'rgba(63,185,80,.1)':'rgba(248,81,73,.1)',border:'1px solid '+(done.startsWith('✅')?'var(--green)':'var(--red)'),borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:13}}>{done}</div>}
+      <button className="btn btn-primary" style={{width:'100%',padding:12,fontSize:15,fontWeight:700}} onClick={send} disabled={sending}>{sending?'กำลังส่ง...':'📢 ส่งข้อความ'}</button>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
+      {[['📌','แจ้งนโยบาย'],['🎯','ตั้งเป้าหมาย'],['⚠️','เตือนด่วน'],['🎉','ประกาศผล']].map(([ic,l])=>
+        <div key={l} className="card" style={{textAlign:'center',cursor:'pointer',padding:12}} onClick={()=>setMsg(m=>m+(m?'
+':'')+l)}>
+          <div style={{fontSize:22,marginBottom:4}}>{ic}</div>
+          <div style={{fontSize:11,color:'var(--text2)',fontWeight:600}}>{l}</div>
+        </div>
+      )}
+    </div>
+  </div>;
+}
+
+function AdminTeam({users,currentUser}){
+  const [tab,setTab]=useState('followup');
+  const TABS=[
+    {k:'followup',label:'📅 Followup',neon:'#00f5ff'},
+    {k:'target',label:'🎯 Target',neon:'#ff2d78'},
+    {k:'broadcast',label:'📢 Broadcast',neon:'#a855f7'},
+  ];
+  const cur=TABS.find(t=>t.k===tab)||TABS[0];
+  return <div className="page">
+    <div className="page-hd"><div><div className="page-title">🎯 TEAM HQ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Followup · Target · Broadcast</div></div></div>
+    <div style={{display:'flex',gap:4,marginBottom:18,borderBottom:'1px solid var(--border)',paddingBottom:10}}>
+      {TABS.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'7px 16px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,background:tab===t.k?t.neon:'var(--bg3)',color:tab===t.k?'#000':'var(--text2)',transition:'all .2s'}}>{t.label}</button>)}
+    </div>
+    {tab==='followup'&&<AdminFollowupsContent users={users} neon="#00f5ff"/>}
+    {tab==='target'&&<AdminTargetContent users={users} neon="#ff2d78"/>}
+    {tab==='broadcast'&&<AdminBroadcastContent users={users} neon="#a855f7"/>}
+  </div>;
+}
+
 
 function AdminApp({currentUser,onLogout}){
   const [page,setPage]=useState('cases');
