@@ -41,28 +41,46 @@ window.addEventListener('load',function(){
   --radius:8px;--shadow:0 8px 24px rgba(0,0,0,.4);
 }
 body.light{
-  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#eaedf0;--bg4:#d0d7de;
-  --border:#c4cad4;--text:#0f172a;--text2:#334155;--text3:#64748b;
-  --blue:#0969da;--blue2:#0550ae;--green:#15803d;--red:#b91c1c;
+  --bg:#f4f6f9;--bg2:#ffffff;--bg3:#eef0f4;--bg4:#dde1e8;
+  --border:#d1d9e0;--text:#111827;--text2:#374151;--text3:#6b7280;
+  --blue:#1a6fd4;--blue2:#1558b0;--green:#15803d;--red:#b91c1c;
   --yellow:#92400e;--purple:#6d28d9;--orange:#c2410c;
-  --shadow:0 8px 24px rgba(0,0,0,.10);
+  --shadow:0 2px 12px rgba(0,0,0,.08);
 }
-body.light .card{border-color:#c4cad4;box-shadow:0 1px 4px rgba(0,0,0,.06);}
-body.light .stat-card{background:#fff;border:1px solid #c4cad4;}
-body.light input,body.light select,body.light textarea{background:#fff;border-color:#94a3b8;color:#0f172a;}
-body.light .nav-item{color:#334155;}
-body.light .nav-item:hover{background:#eaedf0;color:#0f172a;}
-body.light .nav-item.active{color:#0969da;background:rgba(9,105,218,.08);border-left-color:#0969da;}
-body.light .sidebar{background:#fff;border-right:1px solid #c4cad4;}
-body.light .modal{background:#fff;border-color:#c4cad4;}
-body.light .modal-hd{border-bottom-color:#c4cad4;}
-body.light .mkc{background:#fff;border-color:#c4cad4;}
-body.light .bottom-nav-item{color:#334155;}
-body.light .bottom-nav-item.active{color:#0969da;}
-body.light .btn-ghost{color:#334155;border-color:#c4cad4;}
-body.light .btn-ghost:hover{background:#eaedf0;}
-body.light .page-title{color:#0f172a;}
+/* Card & layout */
+body.light .card{background:#fff;border-color:#d1d9e0;box-shadow:0 1px 4px rgba(0,0,0,.05);}
+body.light .stat-card{background:#fff;border:1px solid #d1d9e0;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+body.light .page{background:#f4f6f9;}
+/* Inputs */
+body.light input,body.light select,body.light textarea{background:#fff;border-color:#b0bac5;color:#111827;}
+body.light input::placeholder,body.light textarea::placeholder{color:#9ca3af;}
+/* Nav */
+body.light .nav-item{color:#4b5563;}
+body.light .nav-item:hover{background:#eef0f4;color:#111827;}
+body.light .nav-item.active{color:#1a6fd4;background:rgba(26,111,212,.1);border-left-color:#1a6fd4;}
+body.light .sidebar{background:#fff;border-right:1px solid #d1d9e0;}
+body.light .bottom-nav,body.light .admin-bottom-nav{background:#fff;border-top-color:#d1d9e0;}
+body.light .admin-topbar{background:#fff;border-bottom-color:#d1d9e0;}
+body.light .bottom-nav-item{color:#4b5563;}
+body.light .bottom-nav-item.active{color:#1a6fd4;}
+/* Buttons */
+body.light .btn-ghost{color:#374151;border-color:#d1d9e0;background:#fff;}
+body.light .btn-ghost:hover{background:#eef0f4;border-color:#b0bac5;}
+/* Modal */
+body.light .modal{background:#fff;border-color:#d1d9e0;box-shadow:0 8px 32px rgba(0,0,0,.12);}
+body.light .modal-hd{border-bottom-color:#d1d9e0;background:#f9fafb;}
+body.light .modal-ft{border-top-color:#d1d9e0;background:#f9fafb;}
+/* Market cards */
+body.light .mkc{background:#fff;border-color:#d1d9e0;}
+body.light .mkc:hover{border-color:#1a6fd4;box-shadow:0 2px 12px rgba(26,111,212,.1);}
+/* Text */
+body.light .page-title{color:#111827;}
+body.light label{color:#374151;}
+/* Status badges — ทำให้อ่านง่ายใน light */
+body.light .badge{filter:saturate(1.2) brightness(.88);}
 body.light .focus-block{border-width:1.5px;}
+/* Top bar */
+body.light .admin-topbar .btn-ghost,body.light .sidebar .btn-ghost{color:#4b5563;}
 body{background:#0d1117;color:var(--text);min-height:100vh;-webkit-tap-highlight-color:transparent;}
 body.light{background:#f0f2f5 !important;}
 ::-webkit-scrollbar{width:6px;height:6px;}
@@ -1220,7 +1238,8 @@ function AdminCurrentCases({currentUser,users}){
       return new Set();
     }
   });
-  const [sending,setSending]=useState(null); // caseid ที่กำลังส่งตลาด
+  const [sending,setSending]=useState(null);
+  const [confirmMarket,setConfirmMarket]=useState(null); // {caseId, salesName}
   const load=useCallback(()=>{setLoading(true);cacheClear(['getCases','getMarketIds']);Promise.all([api('getCases',{all:'true'}),api('getMarketIds',{})]).then(([r,mr])=>{
     const casesData = safeArray(r.data);
     const marketData = safeArray(mr.data);
@@ -1235,9 +1254,11 @@ function AdminCurrentCases({currentUser,users}){
     setLoading(false);
   }).catch(()=>{setCases([]);setLoading(false);});},[]);
 async function sendToMarketDirect(caseId,salesName){
-  if(!window.confirm('ส่งเคส '+caseId+' เข้าตลาดทันที?'))return;
+  setSending(null);
+  setConfirmMarket({caseId,salesName});
+}
+async function doSendToMarket(caseId,salesName){
   setSending(caseId);
-
   const r = await api('sendToMarket',{caseId,sales:salesName});
 
   if(!r.success){
@@ -1332,6 +1353,22 @@ async function sendToMarketDirect(caseId,salesName){
     return rows;
   }
   return <div className="page">
+    {confirmMarket&&<div className="overlay" style={{zIndex:9999}} onClick={e=>{if(e.target===e.currentTarget)setConfirmMarket(null);}}>
+      <div className="modal" style={{maxWidth:380}}>
+        <div className="modal-hd"><span style={{fontWeight:700,fontSize:16}}>📤 ส่งเคสเข้าตลาด</span><button className="btn btn-ghost" style={{padding:'6px 10px',display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={()=>setConfirmMarket(null)}><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
+        <div className="modal-bd">
+          <div style={{textAlign:'center',padding:'8px 0 16px'}}>
+            <div style={{fontSize:40,marginBottom:12}}>📤</div>
+            <div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ส่งเคส <span style={{color:'var(--blue)'}}>{confirmMarket.caseId}</span> เข้าตลาด?</div>
+            <div style={{fontSize:13,color:'var(--text2)',lineHeight:1.6}}>เคสนี้จะถูกเปิดให้เซลส์คนอื่นรับต่อ<br/>คุณจะไม่สามารถติดตามเคสนี้ได้อีก</div>
+          </div>
+        </div>
+        <div className="modal-ft">
+          <button className="btn btn-ghost" style={{flex:1,padding:'10px'}} onClick={()=>setConfirmMarket(null)}>ยกเลิก</button>
+          <button className="btn btn-danger" style={{flex:1,padding:'10px',fontWeight:700}} onClick={()=>doSendToMarket(confirmMarket.caseId,confirmMarket.salesName)}>📤 ยืนยันส่ง</button>
+        </div>
+      </div>
+    </div>}>
     <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
