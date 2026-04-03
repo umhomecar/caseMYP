@@ -1457,7 +1457,7 @@ function AdminDashboard({currentUser}){
   const STATUS_COLORS={'รอข้อมูล':'#6e7681','ไปต่อได้':'#3fb950','เคสเลี้ยง':'#ffa657','เคสวัด 50/50':'#d29922','ติดต่อไม่ได้':'#f85149','ยังไม่สะดวก':'#bc8cff','จอง':'#58a6ff','รอเซ็นต์':'#39d353','รอผล':'#79c0ff','อนุมัติ':'#56d364','ปิดเคส':'#ff6b6b','รีเจค':'#da3633','ปล่อยแล้ว':'#3fb950','ได้รถจากที่อื่น':'#ffa657','โยนเคส':'#ffd700'};
   const tabs=[{k:'overview',l:'ภาพรวม'},{k:'sales',l:'รายเซลส์'},{k:'status',l:'สถานะ'}];
   const MP={bg:'linear-gradient(135deg,#0f1117 0%,#161b27 60%,#0f1420 100%)',card:'rgba(255,255,255,.03)',border:'rgba(79,142,247,.18)',accent:'#4f8ef7',accent2:'#7c3aed',text:'#e2e8f0',sub:'#64748b'};
-  return <div style={{minHeight:'100vh',background:MP.bg}}>
+  return <div style={{background:MP.bg,paddingBottom:40}}>
     {/* MIDNIGHT HEADER */}
     <div style={{padding:'24px 28px 0',background:'linear-gradient(180deg,rgba(79,142,247,.06),transparent)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24,paddingBottom:16,borderBottom:'1px solid rgba(79,142,247,.15)'}}>
@@ -1505,7 +1505,7 @@ function AdminBookings({currentUser,users}){
   const load=useCallback(()=>{setLoading(true);api('getBookings',{}).then(r=>{if(r.success)setBookings(r.data||[]);setLoading(false);});},[]);
   useEffect(()=>{load();},[load]);
   const OD={bg:'linear-gradient(160deg,#020d18 0%,#041e35 50%,#062840 100%)',neon:'#00d4ff',dim:'rgba(0,212,255,.12)',border:'rgba(0,212,255,.2)',text:'#cce8f4',sub:'rgba(0,212,255,.5)'};
-  return <div style={{minHeight:'100vh',background:OD.bg}}>
+  return <div style={{background:OD.bg,paddingBottom:40}}>
     {/* OCEAN HEADER */}
     <div style={{padding:'24px 28px 20px',borderBottom:'1px solid rgba(0,212,255,.12)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -1595,7 +1595,7 @@ function AdminUsers({currentUser}){
     load();
   }
   const AU={bg:'linear-gradient(160deg,#080818 0%,#100828 50%,#0d1830 100%)',p:'#a78bfa',b:'#60a5fa',g:'#34d399',dim:'rgba(139,92,246,.1)',border:'rgba(139,92,246,.2)',text:'#e2e8f0',sub:'#6b7280'};
-  return <div style={{minHeight:'100vh',background:AU.bg}}>
+  return <div style={{background:AU.bg,paddingBottom:40}}>
     {/* AURORA HEADER */}
     <div style={{padding:'24px 28px 20px',position:'relative',overflow:'hidden'}}>
       <div style={{position:'absolute',top:0,left:0,right:0,height:1,background:'linear-gradient(90deg,transparent,#8b5cf6,#3b82f6,#10b981,transparent)'}}/>
@@ -2682,7 +2682,7 @@ function AdminTeam({users,currentUser}){
     {k:'broadcast',label:'📢 Broadcast',neon:'#a855f7',shadow:'rgba(168,85,247,.4)'},
   ];
   const cur=TABS.find(t=>t.k===tab)||TABS[0];
-  return <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#060a10 0%,#0a0f1e 50%,#060d16 100%)'}}>
+  return <div style={{background:'linear-gradient(135deg,#060a10 0%,#0a0f1e 50%,#060d16 100%)',paddingBottom:40}}>
     {/* CYBER HEADER */}
     <div style={{position:'relative',overflow:'hidden',padding:'28px 24px 0',marginBottom:0}}>
       <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,rgba(0,245,255,.04) 0%,rgba(255,45,120,.04) 50%,rgba(168,85,247,.04) 100%)'}}/>
