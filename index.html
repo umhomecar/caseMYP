@@ -365,7 +365,7 @@ function getFBMessaging(){
 async function initFCM(){} // Firebase SDK not loaded — disabled
 
 // ── ส่ง Push Notification ผ่าน Edge Function ──
-async function pushNotif(){}){
+async function pushNotif(salesName,title,body,data={}){
   try{
     await fetch(FCM_EDGE_URL,{
       method:'POST',
