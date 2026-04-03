@@ -335,8 +335,8 @@ html{scroll-behavior:smooth;}
     .mkc-report{font-size:13px !important;max-height:none !important;line-height:1.6 !important;}
     .admin-mobile-content{display:block !important;margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
   .main-content.admin-mobile-content{display:block !important;margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
-    .overlay{padding:0 !important;align-items:flex-end !important;}
-    .modal{width:100% !important;max-width:100% !important;max-height:95vh !important;border-radius:20px 20px 0 0 !important;animation:slideUp .3s cubic-bezier(.16,1,.3,1) !important;}
+    .overlay{padding:16px !important;align-items:center !important;}
+    .modal{width:100% !important;max-width:520px !important;max-height:92vh !important;border-radius:16px !important;animation:scaleIn .25s cubic-bezier(.16,1,.3,1) !important;}
     .table-wrap td{display:flex !important;justify-content:space-between !important;align-items:center !important;}
     .table-wrap thead{display:none !important;}
     .table-wrap tr{margin-bottom:10px !important;border-radius:12px !important;padding:12px 14px !important;}
@@ -731,7 +731,7 @@ function StatusBadge({status}){return <span className={`badge ${getStatusClass(s
 function Modal({title,onClose,children,footer}){
   return <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div className="modal">
-      <div className="modal-hd"><span style={{fontWeight:700,fontSize:16}}>{title}</span><button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onClose}><Ico.x/></button></div>
+      <div className="modal-hd"><span style={{fontWeight:700,fontSize:16}}>{title}</span><button className="btn btn-ghost" style={{padding:'6px 10px',borderRadius:8,display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={onClose}><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
       <div className="modal-bd">{children}</div>
       {footer&&<div className="modal-ft">{footer}</div>}
     </div>
@@ -1028,10 +1028,13 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const contactVal=formatContact(contactRaw);
   const isQR=contactRaw.startsWith('http')||contactRaw.startsWith('data:image');
   useEffect(()=>{try{const d=JSON.parse(localStorage.getItem('cnotes_'+caseId)||'[]');setNotes(Array.isArray(d)?d:[]);}catch(e){setNotes([]);}},[caseId]);
-  function saveNote(){if(!newNote.trim())return;const upd=[...notes,{text:newNote.trim(),date:new Date().toLocaleString('th-TH'),by:currentUser.name}];setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}
-    sbHist(caseId,currentUser.name,'📝 Note','📝 Note: '+newNote.trim());
-    setNewNote('');setAddingNote(false);}
-  function deleteNote(i){const upd=notes.filter((_,idx)=>idx!==i);setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}}
+  function saveNote(){if(!newNote.trim())return;
+    const upd=[...notes,{text:newNote.trim(),date:new Date().toLocaleString('th-TH'),by:currentUser.name}];
+    setNotes(upd);setNewNote('');setAddingNote(false); // UI update ก่อนทันที
+    try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}
+    sbHist(caseId,currentUser.name,'📝 Note','📝 Note: '+newNote.trim()); // sync background
+  }
+  function deleteNote(i){const upd=notes.filter((_,idx)=>idx!==i);setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){} // instant, no waiting}
   async function save(){
     const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:editReport?report:caseData.report,sales:(isAdmin&&newSales)?newSales:caseData.sales};
     onUpdated(optimisticData);onClose();
