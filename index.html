@@ -1828,7 +1828,6 @@ function AIAdvisorPage({currentUser}){
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name})]).then(([cr,ccr])=>{if(cr.success)setCases((cr.data||[]).filter(c=>!CLOSED.includes(c.status)));if(ccr.success)setClaimedCases(ccr.data||[]);setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
-  function daysAgo(d){const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return 0;const dt=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return Math.floor((Date.now()-dt.getTime())/86400000);}
   function buildCaseSummary(){return[...cases.map(c=>({id:c.caseid,name:c.customername,status:c.status,report:(c.report||'').slice(0,120),daysNoUpdate:daysAgo(c.updatedat),source:'เคสของฉัน'})),...claimedCases.map(c=>({id:c.caseID,name:c.customername,status:c.newstatus||c.status,report:(c.report||'').slice(0,120),daysNoUpdate:daysAgo(c.date),source:'รับจากตลาด'}))];}
 
   // ✅ FIX: headers ถูกต้อง
@@ -1985,7 +1984,6 @@ function SalesMarket({currentUser}){
   useEffect(()=>{load();},[load]);
   async function claim(caseId){setClaimedIds(prev=>new Set([...prev,caseId]));setClaimedCases(prev=>[...prev,{caseID:caseId,sale:currentUser.name}]);showToast('✅ รับเคส '+caseId+' สำเร็จ!','ok');const r=await api('claimCase',{caseId,sales:currentUser.name});if(!r.success){setClaimedIds(prev=>{const s=new Set(prev);s.delete(caseId);return s;});setClaimedCases(prev=>prev.filter(c=>c.caseID!==caseId));showToast('❌ '+(r.error||'รับเคสไม่สำเร็จ'),'err');}else{setTimeout(()=>load(true),2000);}}
   async function notInterested(caseId){setSkippedIds(prev=>new Set([...prev,caseId]));await api('returnCase',{caseId,sales:'_skip_'+currentUser.name});setTimeout(()=>load(true),1000);}
-  function getDateBadge(c){const id=String(c.ID||'');if(id.length>=4){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
   const visibleCases=cases.filter(c=>!claimedIds.has(c.ID)&&!skippedIds.has(c.ID));const myStats=leaderboard.find(s=>s.name===currentUser.name)||{};const totalInMarket=visibleCases.length;const myClaimed=claimedCases.length+(claimedIds.size);const lbSorted=[...leaderboard].sort((a,b)=>(b.claimedCases||0)-(a.claimedCases||0));
   return <div className="mk-page">
     <div className="mk-hero"><div className="mk-hero-top"><div><div style={{fontSize:20,fontWeight:800,display:'flex',alignItems:'center',gap:8,color:'#e6edf3'}}>🎯 ตลาดเคส</div><div style={{fontSize:13,color:'rgba(230,237,243,.7)',marginTop:4}}>ใครไวได้ก่อน</div></div><button className="btn btn-ghost" onClick={()=>load(false)} style={{fontSize:13}}>🔄</button></div><div className="mk-stats">{[['ว่างอยู่',totalInMarket,'var(--blue)'],['ของฉัน',myClaimed,'var(--green)']].map(([l,v,c])=><div key={l} className="mk-stat"><div className="mk-stat-num" style={{color:c}}>{v}</div><div className="mk-stat-lbl">{l}</div></div>)}</div></div>
@@ -2042,7 +2040,6 @@ function SalesCurrentCases({currentUser,users}){
     if(!showClosed&&marketIds.has(String(c.caseid)))return false;
     if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
-  function formatDate(d){const s=String(d||'');if(s.includes('T')){const dt=new Date(s);if(!isNaN(dt)){return`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getFullYear()).slice(-2)} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;}}const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m)return`${m[1]}/${m[2]}/${String(m[3]).slice(-2)} ${m[4]}:${m[5]}`;return s.split(' ')[0]||'-';}
   return <div className="page">
     <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส{closedCount>0&&<span style={{marginLeft:8,color:'var(--text3)'}}>· ปิดแล้ว {closedCount}</span>}</div></div><button className="btn btn-ghost" onClick={load} style={{padding:'6px 10px'}}>🔄</button></div>
     <TodayFollowupBanner currentUser={currentUser}/>
@@ -2578,7 +2575,6 @@ function AdminFollowupsContent({users,neon='#00f5ff'}){
     }).catch(()=>setLoading(false));
   },[]);
   useEffect(()=>{load();},[load]);
-  function parseHistDate(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
   const today=new Date().toISOString().slice(0,10);
   const filtered=history.filter(r=>{
     if(filterSales!=='all'&&r.sales!==filterSales)return false;
@@ -2728,137 +2724,7 @@ function AdminTeam({users,currentUser}){
       {tab==='broadcast'&&<AdminBroadcastContent users={users} neon="#a855f7"/>}
     </div>
   </div>;
-}
-
-function AdminTargetContent({users,neon='#ff2d78'}){
-  const TG_KEY='cp_targets';
-  const [targets,setTargets]=useState(()=>{try{return JSON.parse(localStorage.getItem(TG_KEY)||'{}');}catch(e){return{};}});
-  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);
-  const d=new Date();const monthKey=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
-  const MONTH_NAMES=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  const monthLabel=MONTH_NAMES[d.getMonth()]+' 25'+String(d.getFullYear()).slice(-2);
-  const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
-  useEffect(()=>{api('getCases',{}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[]);
-  function setTgt(name,val){const v=parseInt(val)||0;const upd={...targets,[monthKey+'_'+name]:v};setTargets(upd);try{localStorage.setItem(TG_KEY,JSON.stringify(upd));}catch(e){}
-    if(v>0)sbHist('TARGET',currentUser?.name||'Admin','ตั้งเป้า',name+' เป้า '+v+' คัน เดือน '+monthLabel);}
-  function getTarget(name){return targets[monthKey+'_'+name]||0;}
-  const totalSold=salesList.reduce((s,u)=>{return s+cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length;},0);
-  const totalTarget=salesList.reduce((s,u)=>s+getTarget(u.name),0);
-  return <div>
-    {/* TEAM SUMMARY BAR */}
-    <div style={{background:`linear-gradient(135deg,${neon}15,${neon}08)`,border:`1px solid ${neon}40`,borderRadius:14,padding:'16px 20px',marginBottom:20,display:'flex',gap:20,alignItems:'center',flexWrap:'wrap'}}>
-      <div style={{flex:1}}>
-        <div style={{fontSize:11,color:`${neon}99`,letterSpacing:2,textTransform:'uppercase',marginBottom:4}}>เดือน {monthLabel} — ภาพรวมทีม</div>
-        <div style={{fontSize:28,fontWeight:900,color:neon,textShadow:`0 0 20px ${neon}`,letterSpacing:1}}>
-          {totalSold}<span style={{fontSize:16,fontWeight:400,color:`${neon}80`,marginLeft:6}}>/ {totalTarget} คัน</span>
-        </div>
-      </div>
-      {totalTarget>0&&<div style={{textAlign:'center'}}>
-        <div style={{fontSize:36,fontWeight:900,color:totalSold>=totalTarget?'#00ff88':neon,textShadow:`0 0 30px ${neon}`}}>
-          {Math.min(Math.round(totalSold/totalTarget*100),100)}%
-        </div>
-        <div style={{fontSize:11,color:`${neon}60`}}>Win Rate</div>
-      </div>}
-    </div>
-    {loading?<Loading/>:<div style={{display:'grid',gap:12}}>
-      {salesList.map((u,idx)=>{
-        const sold=cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length;
-        const tg=getTarget(u.name);const pct=tg>0?Math.min(Math.round(sold/tg*100),100):0;
-        const barColor=pct>=100?'#00ff88':pct>=70?neon:'#ffd700';
-        return<div key={u.userId} style={{background:`linear-gradient(135deg,rgba(255,255,255,.03),rgba(255,255,255,.01))`,border:`1px solid ${neon}25`,borderRadius:14,padding:'16px',position:'relative',overflow:'hidden',transition:'all .2s'}}
-          onMouseOver={e=>{e.currentTarget.style.borderColor=neon+'80';e.currentTarget.style.boxShadow=`0 0 20px ${neon}20`;}}
-          onMouseOut={e=>{e.currentTarget.style.borderColor=neon+'25';e.currentTarget.style.boxShadow='none';}}>
-          {/* rank badge */}
-          {idx<3&&<div style={{position:'absolute',top:12,right:12,fontSize:20}}>{['🥇','🥈','🥉'][idx]}</div>}
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
-            <div style={{width:46,height:46,borderRadius:'50%',background:`${neon}15`,border:`2px solid ${neon}50`,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,boxShadow:`0 0 12px ${neon}30`}}>
-              {u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:800,fontSize:15,color:'#fff',letterSpacing:.3}}>{u.name}</div>
-              <div style={{fontSize:12,color:`${neon}80`,marginTop:2}}>ปล่อยแล้ว <strong style={{color:neon}}>{sold}</strong> คัน</div>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <input type="number" value={tg||''} onChange={e=>setTgt(u.name,e.target.value)} min={0} placeholder="เป้า"
-                style={{width:64,textAlign:'center',fontSize:15,fontWeight:800,padding:'6px',
-                  background:`${neon}10`,border:`1px solid ${neon}50`,borderRadius:8,color:neon,outline:'none'}}/>
-              <span style={{fontSize:11,color:`${neon}60`}}>คัน</span>
-            </div>
-          </div>
-          {tg>0&&<>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-              <span style={{fontSize:12,color:'rgba(255,255,255,.4)'}}>{sold} / {tg} คัน</span>
-              <span style={{fontSize:14,fontWeight:900,color:barColor,textShadow:`0 0 10px ${barColor}`}}>{pct}%</span>
-            </div>
-            {/* NEON PROGRESS BAR */}
-            <div style={{height:6,background:'rgba(255,255,255,.08)',borderRadius:6,overflow:'hidden',position:'relative'}}>
-              <div style={{height:'100%',borderRadius:6,width:pct+'%',background:`linear-gradient(90deg,${barColor}80,${barColor})`,boxShadow:`0 0 12px ${barColor}`,transition:'width .6s ease'}}/>
-            </div>
-            {pct>=100&&<div style={{fontSize:12,fontWeight:700,color:'#00ff88',marginTop:8,textShadow:'0 0 10px #00ff88'}}>⚡ บรรลุเป้าแล้ว!</div>}
-          </>}
-        </div>;
-      })}
-    </div>}
-  </div>;
-}
-
-function AdminBroadcastContent({users,neon='#a855f7'}){
-  const [target,setTarget]=useState('all');const [msg,setMsg]=useState('');const [sending,setSending]=useState(false);const [done,setDone]=useState('');
-  const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
-  async function send(){
-    if(!msg.trim())return showToast('กรุณาพิมพ์ข้อความก่อนส่ง','warn');
-    setSending(true);setDone('');
-    const r=await api('broadcast',{sales:target,message:msg});
-    setSending(false);
-    if(r.success){setDone('✅ ส่งถึง '+r.sent+' คน');setMsg('');}
-    else setDone('❌ '+(r.error||'เกิดข้อผิดพลาด'));
-  }
-  return <div>
-    <div style={{background:`linear-gradient(135deg,${neon}12,${neon}06)`,border:`1px solid ${neon}40`,borderRadius:16,padding:'20px',marginBottom:16}}>
-      <div style={{marginBottom:14}}>
-        <label style={{fontSize:12,color:`${neon}99`,letterSpacing:1.5,textTransform:'uppercase',display:'block',marginBottom:8}}>ส่งถึง</label>
-        <select value={target} onChange={e=>setTarget(e.target.value)} style={{background:`${neon}10`,border:`1px solid ${neon}50`,borderRadius:8,color:'#fff',padding:'10px 12px',fontSize:14,outline:'none',width:'100%'}}>
-          <option value="all">⚡ ทุกคน ({salesList.length} คน)</option>
-          {salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
-        </select>
-      </div>
-      <div style={{marginBottom:14}}>
-        <label style={{fontSize:12,color:`${neon}99`,letterSpacing:1.5,textTransform:'uppercase',display:'block',marginBottom:8}}>ข้อความ</label>
-        <textarea rows={5} value={msg} onChange={e=>setMsg(e.target.value)} placeholder="พิมพ์ข้อความ..." style={{background:`${neon}08`,border:`1px solid ${neon}40`,borderRadius:8,color:'#fff',padding:'12px',fontSize:14,outline:'none',width:'100%',resize:'vertical',lineHeight:1.6}}/>
-        <div style={{textAlign:'right',fontSize:11,color:`${neon}50`,marginTop:4}}>{msg.length} ตัวอักษร</div>
-      </div>
-      {done&&<div style={{borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,fontWeight:700,
-        background:done.startsWith('✅')?'rgba(0,255,136,.1)':'rgba(255,45,120,.1)',
-        border:`1px solid ${done.startsWith('✅')?'#00ff88':'#ff2d78'}`,
-        color:done.startsWith('✅')?'#00ff88':'#ff2d78',
-        textShadow:`0 0 10px ${done.startsWith('✅')?'#00ff88':'#ff2d78'}`
-      }}>{done}</div>}
-      <button onClick={send} disabled={sending||!msg.trim()} style={{
-        width:'100%',padding:'14px',fontSize:15,fontWeight:800,border:'none',cursor:sending?'wait':'pointer',
-        borderRadius:10,letterSpacing:.5,
-        background:sending?`${neon}30`:`linear-gradient(135deg,${neon},${neon}cc)`,
-        color:'#fff',boxShadow:sending?'none':`0 0 24px ${neon}60`,
-        textShadow:sending?'none':`0 0 10px rgba(255,255,255,.5)`,
-        transition:'all .2s',
-      }}>
-        {sending?'⚡ กำลังส่ง...':'📢 ส่งข้อความ'}
-      </button>
-    </div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:8}}>
-      {[['📌','แจ้งนโยบาย'],['🎯','แจ้งเป้าหมาย'],['⚠️','แจ้งเตือนด่วน'],['🎉','ประกาศผลงาน']].map(([ic,l])=>
-        <div key={l} style={{background:`${neon}08`,border:`1px solid ${neon}20`,borderRadius:10,padding:'12px',textAlign:'center',cursor:'pointer',transition:'all .15s'}}
-          onMouseOver={e=>{e.currentTarget.style.borderColor=neon+'60';e.currentTarget.style.background=`${neon}15`;}}
-          onMouseOut={e=>{e.currentTarget.style.borderColor=neon+'20';e.currentTarget.style.background=`${neon}08`;}}
-          onClick={()=>setMsg(m=>m+(m?'\n':'')+l)}>
-          <div style={{fontSize:24,marginBottom:4}}>{ic}</div>
-          <div style={{fontSize:11,color:`${neon}80`,fontWeight:600}}>{l}</div>
-        </div>
-      )}
-    </div>
-  </div>;
-}
-
-function AdminApp({currentUser,onLogout}){
+}function AdminApp({currentUser,onLogout}){
   const [page,setPage]=useState('cases');
   const [users,setUsers]=useState([]);
   const [showNotif,setShowNotif]=useState(false);
