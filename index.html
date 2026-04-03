@@ -79,66 +79,7 @@ tr.clickable{cursor:pointer;}
 .admin-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:50;}
 .bottom-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;cursor:pointer;color:var(--text2);font-size:11px;gap:2px;}
 .bottom-nav-item.active{color:var(--blue);}
-@media(max-width:768px){
-  .sidebar{display:none;}
-  /* ซ่อน .main-content บน mobile — ใช้ admin-mobile-content แทน */
-  .main-content{display:none;}
-  .admin-mobile-content{display:block !important;margin-left:0 !important;padding-bottom:80px;padding-top:60px;}
-  .admin-topbar{display:flex !important;}
-  .admin-bottom-nav{display:flex;}
-  .bottom-nav{display:flex;}
-  /* Sales ใช้ main-content — ต้องเปิดไว้ให้ */
-  .sales-content{display:block !important;margin-left:0;padding-bottom:70px;}
 
-  /* ── 1. ขยายปุ่ม + input ── */
-  .btn{padding:11px 16px;font-size:14px;border-radius:10px;}
-  .btn-primary{padding:12px 18px;}
-  .btn-ghost{padding:10px 14px;}
-  input,select,textarea{padding:11px 12px;font-size:16px;border-radius:8px;}
-  .card{padding:14px;border-radius:12px;}
-  .badge{padding:4px 12px;font-size:12px;}
-
-  /* ── 2. Table → Stack Card ── */
-  .table-wrap table,.table-wrap thead,.table-wrap tbody,.table-wrap th,.table-wrap tr{display:block;}
-  .table-wrap thead{display:none;}
-  .table-wrap tr{background:var(--bg2);border:1px solid var(--border);margin-bottom:10px;border-radius:12px;padding:12px 14px;}
-  .table-wrap tr:hover td{background:transparent;}
-  .table-wrap td{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
-  .table-wrap td:last-child{border-bottom:none;padding-top:8px;}
-  .table-wrap td::before{content:attr(data-label);color:var(--text2);font-size:12px;flex-shrink:0;margin-right:8px;}
-
-  /* ── 3. Modal เต็มจอ ── */
-  .overlay{padding:0;align-items:flex-end;}
-  .modal{width:100%;max-width:100%;max-height:95vh;border-radius:20px 20px 0 0;}
-  .modal-hd{padding:14px 18px;}
-  .modal-bd{padding:16px 18px;}
-  .modal-ft{padding:12px 18px;padding-bottom:max(12px,env(safe-area-inset-bottom));}
-
-  /* ── 4. Market Card — FIX หลัก ── */
-  .mkc{padding:16px;border-radius:16px;margin-bottom:12px;}
-  .mkc-top{flex-direction:row;gap:6px;align-items:center;}
-  .mkc-name{font-size:16px;font-weight:700;}
-  .mkc-contact{font-size:13px;}
-  .mkc-report{font-size:13px;line-height:1.5;margin-top:6px;max-height:none;}
-  .mkc-actions{flex-direction:column;gap:10px;}
-  .btn-claim{width:100%;padding:14px;font-size:15px;}
-  .btn-skip{width:100%;padding:12px;font-size:14px;text-align:center;}
-
-  /* ── 5. Page layout ── */
-  .page{padding:12px !important;}
-  .page-title{font-size:18px;width:100%;}
-  .page-hd{flex-direction:row;align-items:center;gap:8px;margin-bottom:14px;}
-  .stat-grid{grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;}
-  .stat-card{padding:10px 6px;}
-  .stat-num{font-size:22px;}
-  .search-bar{width:100%;flex-direction:column;align-items:stretch;}
-
-  /* ── 6. Focus + Hero ── */
-  .focus-block{padding:12px 14px;}
-  .mk-hero{padding:14px 14px 0;}
-  .mk-cards-area{padding:12px;}
-  .mk-cards-grid{grid-template-columns:1fr;}
-}
 .page{padding:20px;}
 .page-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
 .page-title{font-size:20px;font-weight:700;}
@@ -199,7 +140,7 @@ tr.clickable{cursor:pointer;}
 .focus-block{border-radius:10px;padding:14px 16px;margin-bottom:12px;animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);}
 .fab{display:none;position:fixed;bottom:76px;right:16px;width:52px;height:52px;border-radius:50%;background:var(--blue2);color:#fff;border:none;cursor:pointer;font-size:24px;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(31,111,235,.5);z-index:90;transition:transform .15s;}
 .fab:active{transform:scale(.93);}
-@media(max-width:768px){.fab{display:flex;}}
+
 /* ── Fix SVG icon color ── */
 .nav-item svg,.bottom-nav-item svg,.admin-topbar svg,.admin-bottom-nav svg{display:inline-block;vertical-align:middle;flex-shrink:0;width:18px;height:18px;}
 .nav-item{color:var(--text2);}
@@ -236,26 +177,7 @@ tr.clickable{cursor:pointer;}
 /* ═══════════════════════════════════════════
    MOBILE OVERRIDE — ต้องอยู่ท้ายสุดเสมอ
 ═══════════════════════════════════════════ */
-@media(max-width:768px){
-  .mkc-actions{flex-direction:column !important;gap:8px !important;display:flex !important;}
-  .btn-claim{width:100% !important;padding:14px !important;font-size:15px !important;border-radius:10px !important;flex:unset !important;}
-  .btn-skip{width:100% !important;padding:12px !important;font-size:14px !important;text-align:center !important;border-radius:10px !important;}
-  .mkc{padding:16px !important;border-radius:16px !important;margin-bottom:12px !important;transform:none !important;}
-  .mkc-name{font-size:16px !important;font-weight:700 !important;}
-  .mkc-report{font-size:13px !important;max-height:none !important;line-height:1.6 !important;}
-  .admin-mobile-content{margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
-  .overlay{padding:0 !important;align-items:flex-end !important;}
-  .modal{width:100% !important;max-width:100% !important;max-height:95vh !important;border-radius:20px 20px 0 0 !important;animation:slideUp .3s cubic-bezier(.16,1,.3,1) !important;}
-  .table-wrap td{display:flex !important;justify-content:space-between !important;align-items:center !important;}
-  .table-wrap thead{display:none !important;}
-  .table-wrap tr{margin-bottom:10px !important;border-radius:12px !important;padding:12px 14px !important;}
-  .page{padding:12px !important;animation:fadeInUp .3s ease !important;}
-  .page-hd{flex-direction:row !important;gap:8px !important;flex-wrap:wrap !important;}
-  input,select,textarea{font-size:16px !important;}
-  .sales-content{display:block !important;margin-left:0 !important;padding-bottom:70px !important;}
-  .bottom-nav-item svg,.admin-bottom-nav .bottom-nav-item svg{display:inline-block !important;fill:none !important;stroke:currentColor !important;}
-  .market-card:hover{transform:none !important;}
-}
+
 @keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
 
 /* ═══════════════════════════════════════
@@ -309,6 +231,84 @@ input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px rgba(31,111,235,.2)
 html{scroll-behavior:smooth;}
 
 @media(max-width:768px){
+  .sidebar{display:none;}
+    /* ซ่อน .main-content บน mobile — ใช้ admin-mobile-content แทน */
+    .main-content{display:none;}
+    .admin-mobile-content{display:block !important;margin-left:0 !important;padding-bottom:80px;padding-top:60px;}
+    .admin-topbar{display:flex !important;}
+    .admin-bottom-nav{display:flex;}
+    .bottom-nav{display:flex;}
+    /* Sales ใช้ main-content — ต้องเปิดไว้ให้ */
+    .sales-content{display:block !important;margin-left:0;padding-bottom:70px;}
+  
+    /* ── 1. ขยายปุ่ม + input ── */
+    .btn{padding:11px 16px;font-size:14px;border-radius:10px;}
+    .btn-primary{padding:12px 18px;}
+    .btn-ghost{padding:10px 14px;}
+    input,select,textarea{padding:11px 12px;font-size:16px;border-radius:8px;}
+    .card{padding:14px;border-radius:12px;}
+    .badge{padding:4px 12px;font-size:12px;}
+  
+    /* ── 2. Table → Stack Card ── */
+    .table-wrap table,.table-wrap thead,.table-wrap tbody,.table-wrap th,.table-wrap tr{display:block;}
+    .table-wrap thead{display:none;}
+    .table-wrap tr{background:var(--bg2);border:1px solid var(--border);margin-bottom:10px;border-radius:12px;padding:12px 14px;}
+    .table-wrap tr:hover td{background:transparent;}
+    .table-wrap td{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+    .table-wrap td:last-child{border-bottom:none;padding-top:8px;}
+    .table-wrap td::before{content:attr(data-label);color:var(--text2);font-size:12px;flex-shrink:0;margin-right:8px;}
+  
+    /* ── 3. Modal เต็มจอ ── */
+    .overlay{padding:0;align-items:flex-end;}
+    .modal{width:100%;max-width:100%;max-height:95vh;border-radius:20px 20px 0 0;}
+    .modal-hd{padding:14px 18px;}
+    .modal-bd{padding:16px 18px;}
+    .modal-ft{padding:12px 18px;padding-bottom:max(12px,env(safe-area-inset-bottom));}
+  
+    /* ── 4. Market Card — FIX หลัก ── */
+    .mkc{padding:16px;border-radius:16px;margin-bottom:12px;}
+    .mkc-top{flex-direction:row;gap:6px;align-items:center;}
+    .mkc-name{font-size:16px;font-weight:700;}
+    .mkc-contact{font-size:13px;}
+    .mkc-report{font-size:13px;line-height:1.5;margin-top:6px;max-height:none;}
+    .mkc-actions{flex-direction:column;gap:10px;}
+    .btn-claim{width:100%;padding:14px;font-size:15px;}
+    .btn-skip{width:100%;padding:12px;font-size:14px;text-align:center;}
+  
+    /* ── 5. Page layout ── */
+    .page{padding:12px !important;}
+    .page-title{font-size:18px;width:100%;}
+    .page-hd{flex-direction:row;align-items:center;gap:8px;margin-bottom:14px;}
+    .stat-grid{grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;}
+    .stat-card{padding:10px 6px;}
+    .stat-num{font-size:22px;}
+    .search-bar{width:100%;flex-direction:column;align-items:stretch;}
+  
+    /* ── 6. Focus + Hero ── */
+    .focus-block{padding:12px 14px;}
+    .mk-hero{padding:14px 14px 0;}
+    .mk-cards-area{padding:12px;}
+    .mk-cards-grid{grid-template-columns:1fr;}
+  .fab{display:flex;}
+  .mkc-actions{flex-direction:column !important;gap:8px !important;display:flex !important;}
+    .btn-claim{width:100% !important;padding:14px !important;font-size:15px !important;border-radius:10px !important;flex:unset !important;}
+    .btn-skip{width:100% !important;padding:12px !important;font-size:14px !important;text-align:center !important;border-radius:10px !important;}
+    .mkc{padding:16px !important;border-radius:16px !important;margin-bottom:12px !important;transform:none !important;}
+    .mkc-name{font-size:16px !important;font-weight:700 !important;}
+    .mkc-report{font-size:13px !important;max-height:none !important;line-height:1.6 !important;}
+    .admin-mobile-content{margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
+    .overlay{padding:0 !important;align-items:flex-end !important;}
+    .modal{width:100% !important;max-width:100% !important;max-height:95vh !important;border-radius:20px 20px 0 0 !important;animation:slideUp .3s cubic-bezier(.16,1,.3,1) !important;}
+    .table-wrap td{display:flex !important;justify-content:space-between !important;align-items:center !important;}
+    .table-wrap thead{display:none !important;}
+    .table-wrap tr{margin-bottom:10px !important;border-radius:12px !important;padding:12px 14px !important;}
+    .page{padding:12px !important;animation:fadeInUp .3s ease !important;}
+    .page-hd{flex-direction:row !important;gap:8px !important;flex-wrap:wrap !important;}
+    input,select,textarea{font-size:16px !important;}
+    .sales-content{display:block !important;margin-left:0 !important;padding-bottom:70px !important;}
+    .bottom-nav-item svg,.admin-bottom-nav .bottom-nav-item svg{display:inline-block !important;fill:none !important;stroke:currentColor !important;}
+    .market-card:hover{transform:none !important;}
+  
   #toast-container{bottom:76px;left:12px;right:12px;}
   .toast{min-width:unset;width:100%;}
 }
@@ -354,43 +354,25 @@ let _fbApp=null,_fbMsg=null;
 function getFBMessaging(){
   if(_fbMsg)return _fbMsg;
   try{
-    if(typeof firebase==='undefined'){console.warn('Firebase SDK not loaded');return null;}
+    if(typeof firebase==='undefined'){return null;}
     _fbApp=firebase.apps&&firebase.apps.length?firebase.app():firebase.initializeApp(FB_CONFIG);
-    if(!firebase.messaging){console.warn('Firebase messaging not available');return null;}
+    if(!firebase.messaging){return null;}
     _fbMsg=firebase.messaging(_fbApp);
     return _fbMsg;
-  }catch(e){console.warn('FCM init error:',e);return null;}
+  }catch(e){return null;}
 }
 
-async function initFCM(salesName,userId){
-  try{
-    if(!('Notification' in window))return;
-    const perm=await Notification.requestPermission();
-    if(perm!=='granted')return;
-    const sw=await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    const msg=getFBMessaging();
-    if(!msg)return;
-    const token=await msg.getToken({vapidKey:FCM_VAPID,serviceWorkerRegistration:sw});
-    if(!token)return;
-    // บันทึก token ลง Supabase
-    const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'};
-    await fetch(SUPA_URL+'/rest/v1/fcm_tokens',{
-      method:'POST',headers:h,
-      body:JSON.stringify({userid:userId,sales_name:salesName,token,platform:'web',updated_at:new Date().toISOString()}),
-    });
-    console.log('FCM token saved ✅');
-  }catch(e){console.warn('FCM init failed:',e);}
-}
+async function initFCM(){} // Firebase SDK not loaded — disabled
 
 // ── ส่ง Push Notification ผ่าน Edge Function ──
-async function pushNotif(salesName,title,body,data={}){
+async function pushNotif(){}){
   try{
     await fetch(FCM_EDGE_URL,{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
       body:JSON.stringify({sales_name:salesName,title,body,data}),
     });
-  }catch(e){console.warn('Push failed:',e);}
+  }catch(e){}
 }
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobXljbnphcmJjbXdlYXZobnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNzk5NTQsImV4cCI6MjA4OTY1NTk1NH0.t7nbVArhxbsTBYXnAPwNQKfu6xxid2G4bDdAVVZHB9s';
 const API_URL  = SUPA_URL;
@@ -454,7 +436,6 @@ const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V'
 
 function getStatusClass(s){const m={'รอข้อมูล':'s-wait','ไปต่อได้':'s-go','เคสเลี้ยง':'s-nurse','เคสวัด 50/50':'s-half','ติดต่อไม่ได้':'s-cant','ยังไม่สะดวก':'s-later','จอง':'s-book','รอเซ็นต์':'s-sign','รอผล':'s-wait2','อนุมัติ':'s-approve','ปิดเคส':'s-close','รีเจค':'s-reject','ปล่อยแล้ว':'s-release','ได้รถจากที่อื่น':'s-other','โยนเคส':'s-throw','จองแล้ว':'s-book'};return m[s]||'s-wait';}
 function safeArray(x){return Array.isArray(x)?x:[];}
-function getData(res){return Array.isArray(res?.data)?res.data:[];}
 function displayContact(contact){if(!contact&&contact!==0)return '-';const s=String(contact).trim();if(s.startsWith('data:image')||s.startsWith('https://drive.google.com'))return '📷 QR Code';return formatContact(s)||'-';}
 function formatContact(contact){if(!contact&&contact!==0)return '';const s=String(contact).trim();if(s.startsWith('http')||s.startsWith('data:'))return s;if(/^\d{9}$/.test(s))return '0'+s;if(/^\d{8}$/.test(s))return '0'+s;return s;}
 
@@ -1209,7 +1190,6 @@ function AdminCurrentCases({currentUser,users}){
       localStorage.setItem('cases', JSON.stringify(casesData));
       localStorage.setItem('marketIds', JSON.stringify(Array.from(marketData)));
     } catch(e) {
-      console.error('Error saving to localStorage:', e);
     }
     setLoading(false);
   }).catch(()=>{setCases([]);setLoading(false);});},[]);
@@ -1233,7 +1213,6 @@ async function sendToMarketDirect(caseId,salesName){
     try {
       localStorage.setItem('marketIds', JSON.stringify(Array.from(newSet)));
     } catch(e) {
-      console.error('Error saving marketIds:', e);
     }
     return newSet;
   });
@@ -1256,7 +1235,6 @@ async function sendToMarketDirect(caseId,salesName){
       try {
         localStorage.setItem('cases', JSON.stringify(updatedCases));
       } catch(e) {
-        console.error('Error saving to localStorage:', e);
       }
     }
     if(marketRes.success) {
@@ -1265,16 +1243,14 @@ async function sendToMarketDirect(caseId,salesName){
       try {
         localStorage.setItem('marketIds', JSON.stringify(marketData));
       } catch(e) {
-        console.error('Error saving marketIds to localStorage:', e);
       }
     }
   } catch(err) {
-    console.error('Re-fetch failed:', err);
     load();
   }
 }
   useEffect(()=>{load();},[load]);
-  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=getData(r);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
+  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=safeArray(r.data);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
   const filtered=safeArray(cases).filter(c=>{
     if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
@@ -1432,7 +1408,6 @@ function AdminMarket({currentUser,users}){
       try {
         localStorage.setItem('marketCases', JSON.stringify(marketData));
       } catch(e) {
-        console.error('Error saving market to localStorage:', e);
       }
     }
     if(dr.success)setDashboard(dr.data);
@@ -1962,7 +1937,20 @@ function usePushNotif(apiUrl,salesName){
     if(!salesName||!apiUrl)return;
     var notifPerm='';try{notifPerm=(typeof Notification!=='undefined')?Notification.permission:'';}catch(e){return;}
     try{const s=JSON.parse(localStorage.getItem('cp_seen_notifs')||'[]');seenRef.current=new Set(s);}catch(e){}
-    function poll(){var perm='';try{perm=(typeof Notification!=='undefined')?Notification.permission:'';}catch(e){return;}if(perm!=='granted')return;fetch(apiUrl+'?action=getNotifications&sales='+encodeURIComponent(salesName),{method:'GET',mode:'cors'}).then(function(r){return r.json();}).then(function(j){var fresh=(j.data||[]).filter(function(n){return n['สถานะ']==='unread'&&!seenRef.current.has(n.notifId);});if(fresh.length>0){fresh.forEach(function(n){seenRef.current.add(n.notifId);});try{localStorage.setItem('cp_seen_notifs',JSON.stringify([...seenRef.current]));}catch(e){}var body=fresh.length===1?fresh[0].message:fresh.length+' การแจ้งเตือนใหม่';try{new Notification('🚗 CasePool',{body:body,icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png',tag:'casepool',renotify:true});}catch(e){}}}).catch(function(){});};
+    async function poll(){
+      var perm='';try{perm=(typeof Notification!=='undefined')?Notification.permission:'';}catch(e){return;}
+      if(perm!=='granted')return;
+      try{
+        const rows=await sbQ('GET','notifications',{'sales':'eq.'+salesName,'สถานะ':'eq.unread',limit:'50'});
+        const fresh=safeArray(rows).filter(n=>!seenRef.current.has(n.notifId));
+        if(fresh.length>0){
+          fresh.forEach(n=>seenRef.current.add(n.notifId));
+          try{localStorage.setItem('cp_seen_notifs',JSON.stringify([...seenRef.current]));}catch(e){}
+          const body=fresh.length===1?fresh[0].message:fresh.length+' การแจ้งเตือนใหม่';
+          try{new Notification('🚗 CasePool',{body,icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png',tag:'casepool',renotify:true});}catch(e){}
+        }
+      }catch(e){}
+    }
     window.cpTriggerPushPoll=function(delayMs){setTimeout(poll,delayMs||1500);};var t=setInterval(poll,120000);return function(){clearInterval(t);window.cpTriggerPushPoll=null;};
   },[apiUrl,salesName]);
 }
@@ -2308,190 +2296,11 @@ function LoginPage({onLogin}){
 // ============================================================
 // 📋 ADMIN DAILY REPORT — Sheet Analyzer
 // ============================================================
-const SHEET_ID = '1bcnrlBDACCWqavQb8qqdhP6bj94RNpO6KKVr4s25v2w';
-const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
-
-function parseCSV(text){
-  if(!text||text.trim().startsWith('<!DOCTYPE')||text.trim().startsWith('<html')){
-    throw new Error('ได้รับ HTML แทน CSV — Sheet ต้องแชร์เป็น Public');
-  }
-
-  // strip HTML tags + decode entities
-  function stripHtml(s){
-    if(!s)return'';
-    s=s.replace(/<[^>]*>/g,'');
-    s=s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ');
-    return s.trim();
-  }
-
-  const lines=text.split(/\r?\n/).filter(l=>l.trim());
-  if(lines.length<2)return{headers:[],rows:[]};
-
-  // หา header row — แถวแรกที่มี >= 5 columns
-  // หา header row — ต้องมี column ที่ไม่ว่างจริงๆ >= 5 อัน (ไม่ใช่แค่ comma)
-  let headerIdx=0;
-  for(let i=0;i<Math.min(5,lines.length);i++){
-    const vals=lines[i].split(',').map(v=>v.replace(/"/g,'').trim()).filter(v=>v.length>0);
-    if(vals.length>=5){headerIdx=i;break;}
-  }
-
-  function parseLine(line){
-    const vals=[];let cur='',inQ=false;
-    for(let i=0;i<line.length;i++){
-      const ch=line[i];
-      if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
-      else if(ch===','&&!inQ){vals.push(stripHtml(cur));cur='';}
-      else cur+=ch;
-    }
-    vals.push(stripHtml(cur));
-    return vals;
-  }
-
-  const headers=parseLine(lines[headerIdx]).map(h=>stripHtml(h));
-  const rows=lines.slice(headerIdx+1).map(line=>{
-    const vals=parseLine(line);
-    const row={};
-    headers.forEach((h,i)=>{row[h]=vals[i]||'';});
-    return row;
-  }).filter(r=>headers.some(h=>r[h]&&r[h]!=''));
-  return{headers,rows};
-}
-function normalizeDate(d){if(!d)return null;const m=String(d).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return null;let[,dd,mo,yy]=m;if(yy.length===2)yy='25'+yy;const yr=parseInt(yy)>2500?parseInt(yy)-543:parseInt(yy);return`${yr}-${String(mo).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
-
-function AdminDailyReport(){
-  const today=new Date();const padZ=n=>String(n).padStart(2,'0');const todayISO=`${today.getFullYear()}-${padZ(today.getMonth()+1)}-${padZ(today.getDate())}`;
-  const CACHE_KEY='cp_sheet_cache';const CACHE_DATE_KEY='cp_sheet_cache_date';
-  const [rows,setRows]=useState(()=>{try{const c=localStorage.getItem(CACHE_KEY),d=localStorage.getItem(CACHE_DATE_KEY);if(c&&d===todayISO)return JSON.parse(c);}catch(e){}return[];});
-  const [loading,setLoading]=useState(false);const [error,setError]=useState('');
-  const [sheetUrl,setSheetUrl]=useState(SHEET_CSV_URL); // locked to SHEET_CSV_URL
-  const [showUrl,setShowUrl]=useState(false);
-  const [headers,setHeaders]=useState(()=>{try{const c=localStorage.getItem(CACHE_KEY),d=localStorage.getItem(CACHE_DATE_KEY);if(c&&d===todayISO){const p=JSON.parse(c);return p.length?Object.keys(p[0]):[];}}catch(e){}return[];});
-  const [tab,setTab]=useState('overview');const [searchQ,setSearchQ]=useState('');
-  const isCached=headers.length>0&&rows.length>0;
-
-  function getV(row,...keys){
-    for(const k of keys){if(row[k]!==undefined&&row[k]!=='')return row[k];}
-    for(const k of keys){const f=Object.keys(row).find(rk=>rk.trim().toLowerCase()===k.trim().toLowerCase());if(f&&row[f])return row[f];}
-    for(const k of keys){const f=Object.keys(row).find(rk=>rk.includes(k)||k.includes(rk));if(f&&row[f])return row[f];}
-    return'';
-  }
-  function normSales(n){if(!n)return n;return n.replace(/\s*\d+$/,'').trim();}
-  const RELEASED=['ปล่อยรถแล้ว','ปล่อยแล้ว','ปล่อย','ปล่อยรถ'];
-  const APPROVED=['อนุมัติรับรถ','อนุมัติ'];
-  const WAITING=['รอผล','รอเซ็นต์','รอเซ็น'];
-  const LOST=['ปิดเคส','รีเจค','ยกเลิก'];
-  const isReleased=st=>RELEASED.some(s=>String(st).trim().includes(s.trim()));
-  const isApproved=st=>APPROVED.some(s=>String(st).trim().includes(s.trim()));
-
-  async function fetchSheet(force=false){
-    if(!force){try{if(localStorage.getItem(CACHE_DATE_KEY)===todayISO&&rows.length>0)return;}catch(e){}}
-    setLoading(true);setError('');setRows([]);setHeaders([]);
-    try{
-      const res=await fetch(sheetUrl+'&t='+Date.now());
-      if(!res.ok)throw new Error('ดึงข้อมูลไม่ได้ ('+res.status+') — Sheet ต้องเปิดเป็น Public');
-      const text=await res.text();
-      const{headers:hdrs,rows:parsed}=parseCSV(text);
-      if(!hdrs.length)throw new Error('ไม่พบ header — ลอง refresh หรือตรวจสอบ URL');
-      setRows(parsed);setHeaders(hdrs);
-      try{localStorage.setItem(CACHE_KEY,JSON.stringify(parsed));localStorage.setItem(CACHE_DATE_KEY,todayISO);}catch(e){}
-    }catch(e){setError(e.message||'เกิดข้อผิดพลาด');}
-    setLoading(false);
-  }
-
-  const stats=rows.length?(()=>{
-    const byStatus={},bySales={},byBank={},bySource={},byBrand={},byMonth={};
-    rows.forEach(r=>{
-      const st=(getV(r,'สถานะ','status','สถานะ ')||'').trim();
-      const sl=normSales((getV(r,'เซลล์','เซลส์','ชื่อเซลส์','sales','Sale')||'').trim());
-      const bk=(getV(r,'ธนาคาร','bank','Bank','ธนาคาร ')||'').trim();
-      const src=(getV(r,'ประเภท','แหล่งที่มา','source','แหล่งที่มา ')||'').trim();
-      const br=(getV(r,'ยี่ห้อรก','ยี่ห้อ','brand','Brand')||'').toLowerCase().trim();
-      const dateBook=normalizeDate(getV(r,'Date จอง','date จอง','วันที่จอง'));
-      if(dateBook){const mon=dateBook.slice(0,7);if(!byMonth[mon])byMonth[mon]={total:0,released:0};byMonth[mon].total++;if(isReleased(st))byMonth[mon].released++;}
-      const stKey=st||'ไม่ระบุ';if(stKey)byStatus[stKey]=(byStatus[stKey]||0)+1;
-      const isW=WAITING.some(s=>st.includes(s.trim()));const isL=LOST.some(s=>st.includes(s.trim()));
-      if(sl){if(!bySales[sl])bySales[sl]={total:0,released:0,approved:0,waiting:0,booked:0,lost:0};bySales[sl].total++;if(isReleased(st))bySales[sl].released++;else if(isApproved(st))bySales[sl].approved++;else if(isW)bySales[sl].waiting++;else if(isL)bySales[sl].lost++;else bySales[sl].booked++;}
-      if(bk){if(!byBank[bk])byBank[bk]={total:0,released:0,approved:0,waiting:0,lost:0};byBank[bk].total++;if(isReleased(st))byBank[bk].released++;else if(isApproved(st))byBank[bk].approved++;else if(isW)byBank[bk].waiting++;else if(isL)byBank[bk].lost++;}
-      if(src)bySource[src]=(bySource[src]||0)+1;
-      if(br)byBrand[br]=(byBrand[br]||0)+1;
-    });
-    let totalDays=0,cntDays=0;rows.forEach(r=>{const n1=normalizeDate(getV(r,'Date จอง','date จอง'));const n2=normalizeDate(getV(r,'Date วันปล่อย','date วันปล่อย'));if(n1&&n2){const diff=(new Date(n2)-new Date(n1))/86400000;if(diff>=0&&diff<365){totalDays+=diff;cntDays++;}}});
-    return{byStatus,bySales,byBank,bySource,byBrand,byMonth,total:rows.length,avgDays:cntDays>0?Math.round(totalDays/cntDays):null};
-  })():null;
-
-  const filteredRows=rows.filter(r=>!searchQ||Object.values(r).some(v=>String(v).toLowerCase().includes(searchQ.toLowerCase())));
-  const TABS=[['overview','📊 ภาพรวม'],['sales','👤 รายเซลส์'],['bank','🏦 ธนาคาร'],['source','📌 ประเภท'],['brand','🚗 ยี่ห้อ'],['table','🗂 ตาราง'],['debug','🔧 Debug']];
-  function StackBar({d,total}){const t=total||1,pR=Math.round((d.released||0)/t*100),pA=Math.round((d.approved||0)/t*100),pW=Math.round((d.waiting||0)/t*100),pL=Math.round((d.lost||0)/t*100),pO=Math.max(0,100-pR-pA-pW-pL);return<div style={{height:6,borderRadius:99,overflow:'hidden',display:'flex',background:'var(--bg3)'}}>{pR>0&&<div style={{width:`${pR}%`,background:'#3fb950'}}/>}{pA>0&&<div style={{width:`${pA}%`,background:'#00bcd4'}}/>}{pW>0&&<div style={{width:`${pW}%`,background:'#d29922'}}/>}{pL>0&&<div style={{width:`${pL}%`,background:'#f85149'}}/>}{pO>0&&<div style={{width:`${pO}%`,background:'#484f58'}}/>}</div>;}
-
-  return<div className="page">
-    <div className="page-hd"><div><div className="page-title">📊 Sheet Analyzer</div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์ข้อมูลจาก Google Sheet</div></div><button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setShowUrl(v=>!v)}>⚙️ URL</button></div>
-    {showUrl&&<div className="card" style={{marginBottom:14}}>
-      <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>🔗 Google Sheet (ล็อคแล้ว)</div>
-      <div style={{background:'var(--bg3)',borderRadius:6,padding:'8px 12px',fontSize:12,color:'var(--text2)',wordBreak:'break-all',marginBottom:8}}>{SHEET_CSV_URL}</div>
-      <div style={{fontSize:11,color:'var(--text3)'}}>⚠️ Sheet ต้องแชร์เป็น Public (Anyone with the link → Viewer)</div>
-    </div>}
-    <div style={{display:'flex',gap:8,marginBottom:14,alignItems:'center'}}>
-      <button className="btn btn-primary" style={{flex:1,padding:'12px',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8}} onClick={()=>fetchSheet(false)} disabled={loading}>{loading?<><span className="spin" style={{width:18,height:18}}/> กำลังดึง...</>:isCached?'✅ ข้อมูลวันนี้พร้อมแล้ว':'🔄 ดึงข้อมูลจาก Google Sheet'}</button>
-      {isCached&&<button className="btn btn-ghost" style={{fontSize:12,padding:'9px 14px',whiteSpace:'nowrap'}} onClick={()=>fetchSheet(true)} disabled={loading}>🔄 รีเฟรช</button>}
-    </div>
-    {isCached&&!loading&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',marginBottom:10,marginTop:-8}}>📦 cache วันนี้ · {rows.length} แถว — กดรีเฟรชถ้าต้องการดึงใหม่</div>}
-    {error&&<div style={{background:'rgba(248,81,73,.1)',border:'1px solid var(--red)',borderRadius:8,padding:'12px 16px',marginBottom:14,fontSize:13,color:'var(--red)',lineHeight:1.7}}>❌ {error}<br/><span style={{fontSize:11,opacity:.8}}>แก้ไข: เปิด Sheet → Share → เปลี่ยนเป็น "Anyone with the link" → Viewer</span></div>}
-    {rows.length>0&&stats&&<>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:8,marginBottom:14}}>
-        {[['📄 ทั้งหมด',stats.total,'var(--text)'],['🚗 ปล่อยรถ',Object.entries(stats.byStatus).filter(([k])=>isReleased(k)).reduce((s,[,v])=>s+v,0),'var(--green)'],['✅ อนุมัติ',Object.entries(stats.byStatus).filter(([k])=>isApproved(k)&&!isReleased(k)).reduce((s,[,v])=>s+v,0),'#00bcd4'],['⏳ รอผล',Object.entries(stats.byStatus).filter(([k])=>k.includes('รอผล')||k.includes('รอเซ็น')||k.includes('รอเซ็นต์')).reduce((s,[,v])=>s+v,0),'var(--purple)'],['📋 จอง',Object.entries(stats.byStatus).filter(([k])=>k==='จอง').reduce((s,[,v])=>s+v,0),'var(--blue)'],['❌ ปิด/รีเจค',Object.entries(stats.byStatus).filter(([k])=>k.includes('ปิดเคส')||k.includes('รีเจค')||k.includes('ยกเลิก')).reduce((s,[,v])=>s+v,0),'var(--red)'],stats.avgDays!=null?['⏱ เฉลี่ยวัน',stats.avgDays+' วัน','var(--orange)']:null].filter(Boolean).map(([l,v,c])=><div key={l} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 8px',textAlign:'center'}}><div style={{fontSize:18,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:10,color:'var(--text3)',marginTop:3,lineHeight:1.3}}>{l}</div></div>)}
-      </div>
-      <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto',paddingBottom:4}}>
-        {TABS.map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{padding:'6px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)'}}>{l}</button>)}
-      </div>
-      {tab==='overview'&&<div style={{display:'grid',gap:14}}>
-        <div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📋 สถานะทั้งหมด</div>{Object.entries(stats.byStatus).sort((a,b)=>b[1]-a[1]).map(([st,cnt])=>{const pct=Math.round(cnt/stats.total*100);return<div key={st} style={{marginBottom:10}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><StatusBadge status={st}/><span style={{fontSize:13,fontWeight:700}}>{cnt} <span style={{fontSize:11,color:'var(--text3)'}}>({pct}%)</span></span></div><div style={{height:7,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:'var(--blue)',width:`${pct}%`}}/></div></div>;})}
-        </div>
-        {Object.keys(stats.byMonth).length>0&&<div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📈 Trend รายเดือน</div>
-          {Object.entries(stats.byMonth).sort((a,b)=>a[0].localeCompare(b[0])).slice(-6).map(([mon,d])=>{const[y,m]=mon.split('-');const lbl=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(m)-1]+' '+(parseInt(y)+543).toString().slice(-2);const wr=d.total>0?Math.round(d.released/d.total*100):0;const mx=Math.max(...Object.values(stats.byMonth).map(x=>x.total),1);return<div key={mon} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}><div style={{fontSize:12,color:'var(--text2)',width:56,flexShrink:0}}>{lbl}</div><div style={{flex:1,height:24,background:'var(--bg3)',borderRadius:5,overflow:'hidden',position:'relative'}}><div style={{height:'100%',width:`${Math.round(d.total/mx*100)}%`,background:'rgba(88,166,255,.4)',borderRadius:5}}/><div style={{position:'absolute',inset:0,height:'100%',width:`${Math.round(d.released/mx*100)}%`,background:'rgba(63,185,80,.7)',borderRadius:5}}/><div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',paddingLeft:8,fontSize:11,fontWeight:700}}>จอง {d.total} · ปล่อย {d.released} · <span style={{color:wr>=50?'var(--green)':'var(--yellow)',marginLeft:4}}>{wr}%</span></div></div></div>;})}</div>}
-      </div>}
-      {tab==='sales'&&<div style={{display:'grid',gap:10}}>
-        {Object.entries(stats.bySales).sort((a,b)=>b[1].released-a[1].released).map(([name,d],i)=>{const t=d.total||1;const wr=Math.round(d.released/t*100);return<div key={name} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px',cursor:'pointer'}} title={`${name}: ทั้งหมด ${d.total} | ปล่อย ${d.released} | อนุมัติ ${d.approved} | รอ ${d.waiting} | เสีย ${d.lost} | Win Rate ${wr}%`}><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}><div style={{width:24,height:24,borderRadius:'50%',background:i===0?'#3d2a00':i===1?'#1c1c2e':i===2?'#1a2a00':'var(--bg3)',color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>{i<3?['🥇','🥈','🥉'][i]:i+1}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{name}</div><div style={{fontSize:11,color:'var(--text3)'}}>{[d.released&&`✅${d.released}`,d.approved&&`🔵${d.approved}`,d.waiting&&`⏳${d.waiting}`,d.lost&&`❌${d.lost}`].filter(Boolean).join(' · ')}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:16,fontWeight:800,color:wr>=60?'#3fb950':wr>=30?'#d29922':'#f85149'}}>{wr}%</div><div style={{fontSize:10,color:'var(--text3)'}}>Win Rate</div></div></div><StackBar d={d} total={t}/></div>;})}
-      </div>}
-      {tab==='bank'&&<div style={{display:'grid',gap:10}}>
-        {Object.entries(stats.byBank).sort((a,b)=>b[1].total-a[1].total).map(([bk,d])=>{const t=d.total||1;const wr=Math.round(d.released/t*100);return<div key={bk} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}><div style={{width:36,height:36,borderRadius:8,background:'#fff',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><span style={{fontSize:10,fontWeight:800,color:'#333',textAlign:'center',lineHeight:1.2}}>{bk.slice(0,6)}</span></div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{bk}</div><div style={{fontSize:11,color:'var(--text3)'}}>{[d.released&&`✅${d.released}`,d.approved&&`🔵${d.approved}`,d.waiting&&`⏳${d.waiting}`,d.lost&&`❌${d.lost}`].filter(Boolean).join(' · ')}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:16,fontWeight:800}}>{d.total}</div><div style={{fontSize:10,color:'var(--text3)'}}>เคส</div></div></div><StackBar d={d} total={t}/><div style={{display:'flex',justifyContent:'flex-end',marginTop:4}}><span style={{fontSize:10,fontWeight:700,color:wr>=50?'#3fb950':wr>=25?'#d29922':'#f85149'}}>Win Rate {wr}%</span></div></div>;})}
-      </div>}
-      {tab==='source'&&<div style={{display:'grid',gap:10}}>
-        {Object.entries(stats.bySource).sort((a,b)=>b[1]-a[1]).map(([src,cnt])=>{const pct=Math.round(cnt/stats.total*100);return<div key={src} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><div style={{fontWeight:700,fontSize:14}}>{src}</div><span style={{fontWeight:700,color:'var(--blue)'}}>{cnt} คัน ({pct}%)</span></div><div style={{height:7,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:'rgba(88,166,255,.7)',width:`${pct}%`}}/></div></div>;})}
-      </div>}
-      {tab==='brand'&&<div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:14}}>🚗 ยี่ห้อรถที่ขายบ่อย</div>{Object.entries(stats.byBrand).sort((a,b)=>b[1]-a[1]).map(([br,cnt])=>{const tot=Object.values(stats.byBrand).reduce((a,b)=>a+b,0)||1;const pct=Math.round(cnt/tot*100);return<div key={br} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{fontSize:13,fontWeight:600,width:80,flexShrink:0,textTransform:'capitalize'}}>{br}</div><div style={{flex:1,height:26,background:'var(--bg3)',borderRadius:6,overflow:'hidden',position:'relative'}}><div style={{height:'100%',background:'rgba(63,185,80,.6)',width:`${pct}%`,borderRadius:6}}/><div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',paddingLeft:10,fontSize:12,fontWeight:700}}>{cnt} คัน ({pct}%)</div></div></div>;})}
-      </div>}
-      {tab==='debug'&&<div className="card"><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>🔧 Debug — Headers ที่อ่านได้</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:8}}>ถ้า column ไม่ตรง ให้ดูชื่อจริงจากตรงนี้แล้วแจ้ง</div>{headers.map((h,i)=><div key={i} style={{display:'flex',gap:8,padding:'4px 8px',background:i%2===0?'var(--bg3)':'transparent',borderRadius:4,fontSize:12}}><span style={{color:'var(--text3)',width:24,flexShrink:0}}>{i}</span><span style={{color:'var(--blue)',fontWeight:600}}>{h}</span><span style={{color:'var(--text3)',marginLeft:'auto'}}>{rows[0]?rows[0][h]||'(ว่าง)':'—'}</span></div>)}<div style={{marginTop:12,padding:8,background:'rgba(88,166,255,.08)',borderRadius:8,fontSize:12}}><div style={{fontWeight:700,marginBottom:4}}>แถวแรกตัวอย่าง:</div>{rows[0]&&Object.entries(rows[0]).slice(0,8).map(([k,v])=><div key={k} style={{fontSize:11,color:'var(--text2)',marginBottom:2}}><strong>{k}</strong>: {v||'(ว่าง)'}</div>)}</div></div>}
-      {tab==='table'&&<div className="card" style={{padding:0}}>
-        <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',gap:10,alignItems:'center'}}>
-          <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 ค้นหาในตาราง..." style={{flex:1,fontSize:13}}/>
-          <span style={{fontSize:12,color:'var(--text3)',flexShrink:0}}>{filteredRows.length} แถว</span>
-        </div>
-        <div className="table-wrap" style={{maxHeight:500,overflowY:'auto'}}>
-          <table><thead><tr><th>ยี่ห้อ</th><th>รุ่น</th><th>ทะเบียน</th><th>เซลส์</th><th>ธนาคาร</th><th>สถานะ</th><th>วันจอง</th></tr></thead>
-          <tbody>{filteredRows.slice(0,200).map((r,i)=><tr key={i}>
-            <td style={{fontWeight:600,textTransform:'capitalize'}}>{getV(r,'ยี่ห้อรก','ยี่ห้อ','brand')}</td>
-            <td>{getV(r,'รุ่นรถ','รุ่น','model')}</td>
-            <td style={{color:'var(--blue)',fontWeight:600}}>{getV(r,'ทะเบียน','plate')}</td>
-            <td style={{color:'var(--purple)'}}>{normSales(getV(r,'เซลล์','เซลส์','sales'))}</td>
-            <td style={{fontSize:12}}>{getV(r,'ธนาคาร','bank')}</td>
-            <td><StatusBadge status={getV(r,'สถานะ','status')}/></td>
-            <td style={{fontSize:11,color:'var(--text3)'}}>{getV(r,'Date จอง','date จอง')}</td>
-          </tr>)}</tbody></table>
-          {filteredRows.length>200&&<div style={{padding:'8px 16px',fontSize:12,color:'var(--text3)',textAlign:'center'}}>แสดง 200/{filteredRows.length} แถว</div>}
-        </div>
-      </div>}
-    </>}
-    {!rows.length&&!loading&&!error&&<div style={{textAlign:'center',padding:'60px 20px',color:'var(--text2)'}}><div style={{fontSize:52,marginBottom:16}}>📊</div><div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ยังไม่มีข้อมูล</div><div style={{fontSize:13,color:'var(--text3)',lineHeight:1.8}}>กด "ดึงข้อมูลจาก Google Sheet" เพื่อเริ่มต้น<br/>⚠️ Sheet ต้องแชร์เป็น Public ก่อนครับ</div></div>}
-  </div>;
-}
-
-
-
 
 // ============================================================
 // ADMIN — BROADCAST MESSAGE
 // ============================================================
-function AdminBroadcast({users}){
+){
   const [target,setTarget]=useState('all');
   const [msg,setMsg]=useState('');
   const [sending,setSending]=useState(false);
@@ -2539,7 +2348,7 @@ function AdminBroadcast({users}){
 // ============================================================
 // ADMIN — TARGET รายคน
 // ============================================================
-function AdminTargets({users,currentUser}){
+){
   const TG_KEY='cp_targets';
   const [targets,setTargets]=useState(()=>{try{return JSON.parse(localStorage.getItem(TG_KEY)||'{}');}catch(e){return{};}});
   const [cases,setCases]=useState([]);
