@@ -450,13 +450,13 @@ function showToast(msg,type='ok',duration=3000){
   },duration);
 }
 
-const STATUSES = ['รอข้อมูล','ไปต่อได้','เคสเลี้ยง','เคสวัด 50/50','ติดต่อไม่ได้','ยังไม่สะดวก','จอง','รอเซ็นต์','รอผล','อนุมัติ','ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
+const STATUSES = ['รอข้อมูล','ไปต่อได้','กำลังติดต่อ','เคสเลี้ยง','เคสวัด 50/50','ติดต่อไม่ได้','ยังไม่สะดวก','จอง','รอเซ็นต์','รอผล','อนุมัติ','ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
 const BOOK_STATUSES = ['จองแล้ว','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยรถ','รีเจค','ปิดเคส'];
 const CONTACT_BY = ['เบอร์','ไลน์','QR Code','เบอร์&ไลน์'];
 const SENT_TYPES = ['ปกติ','ส่วนตัว'];
 const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V','CR-V','Accord','Mobilio'],Toyota:['Yaris','Vios','Altis','Revo','VIGO','Fortuner','Cross','C-HR','Camry','Veloz','Alphard','Sienta','Avanza','Prius','Innova'],Isuzu:['D-Max','MU-X','MU-7','X-Series'],Mazda:['2','3','CX-3','CX-30','BT-50'],MG:['3','5','ZS'],Nissan:['Navara','Almera','Note','March','Sylphy','Teana','Juke'],Mitsubishi:['Triton','Mirage','Attrage','Xpander','Pajero'],Suzuki:['Swift','Ciaz','Carry']};
 
-function getStatusClass(s){const m={'รอข้อมูล':'s-wait','ไปต่อได้':'s-go','เคสเลี้ยง':'s-nurse','เคสวัด 50/50':'s-half','ติดต่อไม่ได้':'s-cant','ยังไม่สะดวก':'s-later','จอง':'s-book','รอเซ็นต์':'s-sign','รอผล':'s-wait2','อนุมัติ':'s-approve','ปิดเคส':'s-close','รีเจค':'s-reject','ปล่อยแล้ว':'s-release','ได้รถจากที่อื่น':'s-other','โยนเคส':'s-throw','จองแล้ว':'s-book'};return m[s]||'s-wait';}
+function getStatusClass(s){const m={'รอข้อมูล':'s-wait','ไปต่อได้':'s-go','กำลังติดต่อ':'s-calling','เคสเลี้ยง':'s-nurse','เคสวัด 50/50':'s-half','ติดต่อไม่ได้':'s-cant','ยังไม่สะดวก':'s-later','จอง':'s-book','รอเซ็นต์':'s-sign','รอผล':'s-wait2','อนุมัติ':'s-approve','ปิดเคส':'s-close','รีเจค':'s-reject','ปล่อยแล้ว':'s-release','ได้รถจากที่อื่น':'s-other','โยนเคส':'s-throw','จองแล้ว':'s-book'};return m[s]||'s-wait';}
 function safeArray(x){return Array.isArray(x)?x:[];}
 function displayContact(contact){if(!contact&&contact!==0)return '-';const s=String(contact).trim();if(s.startsWith('data:image')||s.startsWith('https://drive.google.com'))return '📷 QR Code';return formatContact(s)||'-';}
 function formatContact(contact){if(!contact&&contact!==0)return '';const s=String(contact).trim();if(s.startsWith('http')||s.startsWith('data:'))return s;if(/^\d{9}$/.test(s))return '0'+s;if(/^\d{8}$/.test(s))return '0'+s;return s;}
@@ -818,7 +818,7 @@ function HistoryModal({caseId,onClose}){
 // ============================================================
 function calculateCaseScore(c){
   let score=0;
-  const STATUS_SCORE={'ไปต่อได้':80,'จอง':90,'รอเซ็นต์':85,'รอผล':75,'อนุมัติ':88,'เคสวัด 50/50':60,'เคสเลี้ยง':40,'รอข้อมูล':30,'ยังไม่สะดวก':20,'ติดต่อไม่ได้':10};
+  const STATUS_SCORE={'ไปต่อได้':80,'จอง':90,'รอเซ็นต์':85,'รอผล':75,'อนุมัติ':88,'เคสวัด 50/50':60,'เคสเลี้ยง':40,'กำลังติดต่อ':50,'รอข้อมูล':30,'ยังไม่สะดวก':20,'ติดต่อไม่ได้':10};
   score += STATUS_SCORE[c.status]||0;
   const parseD=d=>{const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));};
   const upd=parseD(c.updatedat);
