@@ -178,6 +178,12 @@ tr.clickable{cursor:pointer;}
 /* ═══════════════════════════════════════════
    MOBILE OVERRIDE — ต้องอยู่ท้ายสุดเสมอ
 ═══════════════════════════════════════════ */
+@media(max-width:768px){
+  /* ลบ background ของ themed pages บน mobile ให้ใช้สีพื้นฐานแทน */
+  .admin-mobile-content>div[style]{background:var(--bg) !important;}
+  /* ให้ text ยังมองเห็นได้ */
+  .admin-mobile-content{color:var(--text) !important;}
+}
 
 @keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
 
@@ -2851,3 +2857,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
+<style>.admin-mobile-content>div{background:transparent!important;}</style>
