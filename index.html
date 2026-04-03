@@ -1386,6 +1386,11 @@ async function sendToMarketDirect(caseId,salesName){
   </div>;
 }
 
+function formatDate(s){if(!s)return'-';const m=String(s).match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return String(s).split(' ')[0]||'-';return`${m[1]}/${m[2]}/${m[3]}`;}
+function daysAgo(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return 0;const dt=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return Math.floor((Date.now()-dt.getTime())/86400000);}
+function parseHistDate(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+function getDateBadge(c){const id=String(c.ID||'');if(id.length>=6){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
+
 function AdminMarket({currentUser,users}){
   const [cases,setCases]=useState(()=>{
     try {
@@ -1431,7 +1436,6 @@ function AdminMarket({currentUser,users}){
   });
   const salesList=users.filter(u=>u.role==='Sales');
   const total=allCases.length;const owned=allCases.filter(c=>c.PoolStatus==='ปิด').length;
-  function getDateBadge(c){const id=String(c.ID||'');if(id.length>=6){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
   return <div className="mk-page">
     <div className="mk-hero"><div className="mk-hero-top"><div><div style={{fontSize:22,fontWeight:800,display:'flex',alignItems:'center',gap:8}}>🏪 ตลาดเคส <span style={{fontSize:13,fontWeight:400,color:'var(--text2)'}}>Admin View</span></div><div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ภาพรวมเคสทั้งหมดในตลาด</div></div><div style={{display:'flex',gap:8,alignItems:'center'}}><div style={{display:'flex',gap:8,alignItems:'center'}}>
           <div style={{position:'relative'}}>
