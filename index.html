@@ -1257,7 +1257,7 @@ async function doSendToMarket(caseId,salesName){
   });
   // refresh marketIds จาก server ใน background
   api('getMarketIds',{}).then(r=>{if(r.success)setMarketIds(new Set(safeArray(r.data)));});
-}
+  }
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=safeArray(r.data);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
