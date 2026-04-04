@@ -2244,6 +2244,7 @@ function LoginPage({onLogin}){
   const [showPass,setShowPass]=useState(false);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
+  const [focusField,setFocusField]=useState('');
   async function submit(){
     if(!username||!password)return setError('กรุณากรอกข้อมูลให้ครบ');
     setLoading(true);setError('');
@@ -2252,73 +2253,60 @@ function LoginPage({onLogin}){
     if(r.success)onLogin(r.user);
     else setError(r.error||'เข้าสู่ระบบไม่สำเร็จ');
   }
+  const inputStyle=(field)=>({
+    paddingLeft:42,paddingRight:field==='password'?48:14,
+    background:focusField===field?'rgba(88,166,255,.08)':'rgba(255,255,255,.06)',
+    border:'1px solid '+(focusField===field?'rgba(88,166,255,.5)':'rgba(255,255,255,.1)'),
+    borderRadius:12,color:'#fff',fontSize:14,height:48,width:'100%',boxSizing:'border-box',transition:'all .2s'
+  });
   return <div style={{
     minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',
     background:'linear-gradient(135deg,#0a0e1a 0%,#0d1b2e 40%,#0a1628 70%,#0e0a1a 100%)',
     padding:16,position:'relative',overflow:'hidden'
   }}>
-    {/* Animated blobs */}
     <div style={{position:'absolute',width:400,height:400,borderRadius:'50%',background:'radial-gradient(circle,rgba(88,166,255,.18) 0%,transparent 70%)',top:'-10%',left:'-10%',filter:'blur(40px)',animation:'floatY 8s ease-in-out infinite'}}/>
     <div style={{position:'absolute',width:350,height:350,borderRadius:'50%',background:'radial-gradient(circle,rgba(188,140,255,.15) 0%,transparent 70%)',bottom:'-5%',right:'-5%',filter:'blur(40px)',animation:'floatY 10s ease-in-out infinite reverse'}}/>
-    <div style={{position:'absolute',width:250,height:250,borderRadius:'50%',background:'radial-gradient(circle,rgba(63,185,80,.1) 0%,transparent 70%)',top:'50%',right:'20%',filter:'blur(30px)',animation:'floatY 6s ease-in-out infinite 2s'}}/>
-    {/* Card */}
+    <div style={{position:'absolute',width:250,height:250,borderRadius:'50%',background:'radial-gradient(circle,rgba(63,185,80,.1) 0%,transparent 70%)',top:'50%',right:'20%',filter:'blur(30px)',animation:'floatY 6s ease-in-out infinite'}}>
+    </div>
     <div style={{
       width:'100%',maxWidth:400,position:'relative',zIndex:1,
       background:'rgba(255,255,255,.04)',
       backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',
       border:'1px solid rgba(255,255,255,.1)',
       borderRadius:24,padding:'40px 32px',
-      boxShadow:'0 32px 64px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08)',
+      boxShadow:'0 32px 64px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08)',
     }}>
-      {/* Logo */}
       <div style={{textAlign:'center',marginBottom:32}}>
         <div style={{fontSize:52,marginBottom:12,display:'inline-block',animation:'floatY 3s ease-in-out infinite',filter:'drop-shadow(0 0 20px rgba(88,166,255,.5))'}}>🚗</div>
         <div style={{fontSize:28,fontWeight:900,background:'linear-gradient(135deg,#58a6ff,#a78bfa)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',letterSpacing:.5,marginBottom:4}}>CasePool</div>
         <div style={{fontSize:13,color:'rgba(255,255,255,.4)',letterSpacing:1}}>ระบบจัดการเคสรถยนต์</div>
         <div style={{height:1,background:'linear-gradient(90deg,transparent,rgba(88,166,255,.3),transparent)',marginTop:20}}/>
       </div>
-      {/* Error */}
       {error&&<div style={{background:'rgba(248,81,73,.12)',border:'1px solid rgba(248,81,73,.3)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#ff6b6b',display:'flex',alignItems:'center',gap:8}}>⚠️ {error}</div>}
-      {/* Fields */}
       <div style={{marginBottom:16}}>
         <label style={{fontSize:11,color:'rgba(255,255,255,.5)',fontWeight:700,letterSpacing:1,display:'block',marginBottom:8}}>USERNAME</label>
         <div style={{position:'relative'}}>
           <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:16,opacity:.4}}>👤</span>
-          <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Username" autoComplete="username"
-            style={{paddingLeft:42,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,color:'#fff',fontSize:14,height:48,width:'100%',boxSizing:'border-box',transition:'all .2s'}}
-            onFocus={e=>{e.target.style.borderColor='rgba(88,166,255,.5)';e.target.style.background='rgba(88,166,255,.08)';}}
-            onBlur={e=>{e.target.style.borderColor='rgba(255,255,255,.1)';e.target.style.background='rgba(255,255,255,.06)';}}
-          />
+          <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Username" autoComplete="username" onFocus={()=>setFocusField('username')} onBlur={()=>setFocusField('')} style={inputStyle('username')}/>
         </div>
       </div>
       <div style={{marginBottom:24}}>
         <label style={{fontSize:11,color:'rgba(255,255,255,.5)',fontWeight:700,letterSpacing:1,display:'block',marginBottom:8}}>PASSWORD</label>
         <div style={{position:'relative'}}>
           <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:16,opacity:.4}}>🔒</span>
-          <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="current-password"
-            style={{paddingLeft:42,paddingRight:48,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,color:'#fff',fontSize:14,height:48,width:'100%',boxSizing:'border-box',transition:'all .2s'}}
-            onFocus={e=>{e.target.style.borderColor='rgba(88,166,255,.5)';e.target.style.background='rgba(88,166,255,.08)';}}
-            onBlur={e=>{e.target.style.borderColor='rgba(255,255,255,.1)';e.target.style.background='rgba(255,255,255,.06)';}}
-          />
+          <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="current-password" onFocus={()=>setFocusField('password')} onBlur={()=>setFocusField('')} style={inputStyle('password')}/>
           <button onClick={()=>setShowPass(!showPass)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:16,opacity:.5,padding:4}}>{showPass?'🙈':'👁'}</button>
         </div>
       </div>
-      {/* Submit */}
       <button onClick={submit} disabled={loading} style={{
         width:'100%',height:50,borderRadius:12,border:'none',cursor:loading?'wait':'pointer',
         background:loading?'rgba(255,255,255,.1)':'linear-gradient(135deg,#1f6feb 0%,#a78bfa 100%)',
         color:loading?'rgba(255,255,255,.4)':'#fff',fontSize:15,fontWeight:700,letterSpacing:.5,
-        boxShadow:loading?'none':'0 8px 24px rgba(31,111,235,.4)',
-        transition:'all .2s',
+        boxShadow:loading?'none':'0 8px 24px rgba(31,111,235,.4)',transition:'all .2s',
       }}>
-        {loading
-          ?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-            <span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.2)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/>
-            กำลังเข้าสู่ระบบ...
-          </span>
-          :'เข้าสู่ระบบ →'}
+        {loading?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}><span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.2)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/>กำลังเข้าสู่ระบบ...</span>:'เข้าสู่ระบบ →'}
       </button>
-      <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'rgba(255,255,255,.2)',letterSpacing:1}}>CasePool v2.0 · Powered by Claude</div>
+      <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'rgba(255,255,255,.2)',letterSpacing:1}}>CasePool v2.0</div>
     </div>
   </div>;
 }
