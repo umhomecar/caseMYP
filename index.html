@@ -1258,6 +1258,7 @@ async function sendToMarketDirect(caseId,salesName){
   setConfirmMarket({caseId,salesName});
 }
 async function doSendToMarket(caseId,salesName){
+  setConfirmMarket(null); // ปิด modal ทันที
   setSending(caseId);
   const r = await api('sendToMarket',{caseId,sales:salesName});
 
