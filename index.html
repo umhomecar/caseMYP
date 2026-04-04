@@ -1247,13 +1247,17 @@ function AdminCurrentCases({currentUser,users}){
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=safeArray(r.data);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+  const SHOW_MARKET_KEY='admin_show_market';
+  const [showMarket,setShowMarket]=useState(false);
   const filtered=safeArray(cases).filter(c=>{
+    if(!showMarket&&marketIds.has(String(c.caseid)))return false; // ซ่อนเคสในตลาด
     if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
     if(filter.status&&c.status!==filter.status)return false;
     if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom))return false;}
     if(filter.dateTo){const d=parseD2(c.createdat);const to=new Date(filter.dateTo);to.setHours(23,59,59);if(!d||d>to)return false;}
     return true;
   }).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
+  const marketCount=safeArray(cases).filter(c=>marketIds.has(String(c.caseid))).length;
   const salesList=users.filter(u=>u.role==='Sales');
 
   function doExport(rows,filename='cases'){
@@ -1302,7 +1306,7 @@ function AdminCurrentCases({currentUser,users}){
         </div>
       </div>
     </div>}>
-    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส{marketCount>0&&!showMarket&&<span style={{marginLeft:6,color:'var(--purple)',cursor:'pointer',textDecoration:'underline'}} onClick={()=>setShowMarket(true)}>· ซ่อน {marketCount} เคสในตลาด</span>}</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{marketCount>0&&<button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showMarket?'var(--purple)':'var(--border)'}`,color:showMarket?'var(--purple)':'var(--text2)'}} onClick={()=>setShowMarket(v=>!v)}>{showMarket?'🏪 ซ่อนเคสตลาด':'🏪 แสดงเคสตลาด ({marketCount})'}</button>}<button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
