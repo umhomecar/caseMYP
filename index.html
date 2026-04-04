@@ -408,7 +408,7 @@ body.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
   align-items: center !important;
 }
 .page-hd > button:last-child,
-.page-hd > .btn-ghost:last-child { margin-left: auto; }
+.page-hd > .btn-ghost:last-child { margin-left: auto; align-self: flex-start; }
   
 @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeInDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
@@ -526,7 +526,7 @@ html{scroll-behavior:smooth;}
     .mkc-report{font-size:13px !important;max-height:none !important;line-height:1.6 !important;}
     .admin-mobile-content{display:block !important;margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
   .main-content.admin-mobile-content{display:block !important;margin-left:0 !important;padding-top:60px !important;padding-bottom:80px !important;}
-    .overlay{padding:16px !important;align-items:center !important;}
+    .overlay{padding:calc(env(safe-area-inset-top,0px) + 68px) 16px 16px !important;align-items:flex-start !important;}
     .modal{width:100% !important;max-width:520px !important;max-height:92vh !important;border-radius:16px !important;animation:scaleIn .25s cubic-bezier(.16,1,.3,1) !important;}
     .table-wrap td{display:flex !important;justify-content:space-between !important;align-items:center !important;}
     .table-wrap thead{display:none !important;}
@@ -682,6 +682,19 @@ async function api(action,data={}){
   try{const result=await sbApi(action,data);if(CACHEABLE.includes(action)&&result.success)cacheSet(action,data,result);if(INVALIDATE_MAP[action])cacheClear(INVALIDATE_MAP[action]);return result;}catch(e){return{success:false,error:e.toString()};}
 }
 
+function formatDate(dateStr){
+  if(!dateStr) return '-';
+  const s = String(dateStr).trim();
+  const m = s.match(/(\d+)\/(\d+)\/(\d+)/);
+  if(m) return m[1]+'/'+m[2]+'/'+m[3];
+  const d = new Date(s);
+  if(!isNaN(d)){
+    const dd=String(d.getDate()).padStart(2,'0');
+    const mm=String(d.getMonth()+1).padStart(2,'0');
+    return dd+'/'+mm+'/'+d.getFullYear();
+  }
+  return s||'-';
+}
 function nowTH(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;}
 
 async function sbQ(method,table,q={},body=null){
