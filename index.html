@@ -637,24 +637,29 @@ async function sbApi(action,data){
       return{success:true,data:[...recent,...older].map(mapMarket)};
     }
     case 'sendToMarket':{
+  console.log('[sendToMarket] start', data.caseId, data.sales);
   const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
+  console.log('[sendToMarket] cases result:', cr?.length, cr?.[0]?.caseid);
   if(!cr?.length)return{success:false,error:'ไม่พบเคส '+data.caseId};
   const c=cr[0];
   const ex=await sbQ('GET','market',{id:`eq.${data.caseId}`});
+  console.log('[sendToMarket] market existing:', ex?.length);
   if(ex?.length){
-    // มีอยู่แล้ว — แค่เปิดใหม่
     const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];
     if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);
     const res=await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(','),name:c.customername,contact:c.contact,report:c.report,status:c.status});
+    console.log('[sendToMarket] PATCH result:', JSON.stringify(res));
     if(res&&res.code)return{success:false,error:'PATCH market error: '+res.message};
   }else{
-    // ยังไม่มี — INSERT ใหม่
-    const res=await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales||'',poolstatus:'เปิด'});
+    const postBody={id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales||'',poolstatus:'เปิด'};
+    console.log('[sendToMarket] POST body:', JSON.stringify(postBody));
+    const res=await sbQ('POST','market',{},postBody);
+    console.log('[sendToMarket] POST result:', JSON.stringify(res));
     if(res&&res.code)return{success:false,error:'POST market error: '+res.message};
   }
-  // อัปเดต cases.market = true
   await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{market:true,updatedat:nowTH()});
   sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');
+  console.log('[sendToMarket] done ✅');
   return{success:true};
 }
     case 'getMarketIds':{
