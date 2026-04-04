@@ -637,41 +637,23 @@ async function sbApi(action,data){
       return{success:true,data:[...recent,...older].map(mapMarket)};
     }
     case 'sendToMarket':{
+  const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
+  if(!cr?.length)return{success:false,error:'ไม่พบเคส '+data.caseId};
+  const c=cr[0];
   const ex=await sbQ('GET','market',{id:`eq.${data.caseId}`});
   if(ex?.length){
+    // มีอยู่แล้ว — แค่เปิดใหม่
     const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];
     if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);
-    const patchRes=await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(',')});
-    // ตรวจสอบว่า PATCH ทำงานจริง
-    if(patchRes&&!Array.isArray(patchRes)&&patchRes.code){
-      return{success:false,error:'แก้ไข market ไม่สำเร็จ: '+(patchRes.message||patchRes.code)};
-    }
-    if(Array.isArray(patchRes)&&patchRes.length===0){
-      return{success:false,error:'แก้ไข market ไม่สำเร็จ — ไม่พบ record หรือ Supabase RLS บล็อก (PATCH 0 rows)'};
-    }
+    const res=await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(','),name:c.customername,contact:c.contact,report:c.report,status:c.status});
+    if(res&&res.code)return{success:false,error:'PATCH market error: '+res.message};
   }else{
-    const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
-    if(!cr?.length)return{success:false,error:'ไม่พบเคส '+data.caseId+' ในระบบ'};
-    const c=cr[0];
-    const postRes=await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales,poolstatus:'เปิด'});
-    // ตรวจสอบ error จาก Supabase (เช่น RLS, duplicate key)
-    if(postRes&&!Array.isArray(postRes)&&postRes.code){
-      return{success:false,error:'บันทึก market ไม่สำเร็จ: '+(postRes.message||postRes.code)+' (ตรวจสอบ Supabase RLS → market table → INSERT policy)'};
-    }
-    if(Array.isArray(postRes)&&postRes.length===0){
-      return{success:false,error:'บันทึก market ไม่สำเร็จ — Supabase RLS อาจบล็อก INSERT (กลับมา 0 rows) ตรวจสอบ Policy ที่ market table'};
-    }
+    // ยังไม่มี — INSERT ใหม่
+    const res=await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales||'',poolstatus:'เปิด'});
+    if(res&&res.code)return{success:false,error:'POST market error: '+res.message};
   }
-  // ✅ รอให้ Supabase commit ข้อมูลก่อน verify (ป้องกัน read replica lag)
-  await new Promise(r=>setTimeout(r,400));
-  // ✅ ยืนยันว่าเขียนจริง ก่อน return success
-  let verify=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});
-  // retry 1 ครั้งถ้าไม่เจอ (กรณี eventual consistency)
-  if(!verify?.length){
-    await new Promise(r=>setTimeout(r,600));
-    verify=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});
-  }
-  if(!verify?.length)return{success:false,error:'ส่งตลาดไม่สำเร็จ — ตรวจสอบ Supabase RLS policy สำหรับตาราง market (anon INSERT/PATCH)'};
+  // อัปเดต cases.market = true
+  await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{market:true,updatedat:nowTH()});
   sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');
   return{success:true};
 }
