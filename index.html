@@ -1251,7 +1251,7 @@ function AdminCurrentCases({currentUser,users}){
   const SHOW_MARKET_KEY='admin_show_market';
   const [showMarket,setShowMarket]=useState(false);
   const filtered=safeArray(cases).filter(c=>{
-    if(!showMarket&&marketIds.has(String(c.caseid)))return false; // ซ่อนเคสในตลาด
+    if(!showMarket&&(marketIds.has(String(c.caseid))||c.market===true))return false; // ซ่อนเคสในตลาด
     if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
     if(filter.status&&c.status!==filter.status)return false;
     if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom))return false;}
@@ -2085,7 +2085,7 @@ function SalesCurrentCases({currentUser,users}){
   useEffect(()=>{load();},[load]);
   // ซ่อนเคสที่อยู่ในตลาดออกจากรายการหลัก (แต่ถ้ากด "แสดงเคสปิดแล้ว" จะเห็น)
   const filtered=cases.filter(c=>{
-    if(!showClosed&&marketIds.has(String(c.caseid)))return false;
+    if(!showClosed&&(marketIds.has(String(c.caseid))||c.market===true))return false;
     if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   return <div className="page">
