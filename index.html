@@ -237,6 +237,179 @@ tr.clickable{cursor:pointer;}
 /* ═══════════════════════════════════════
    GLOBAL ANIMATIONS & TRANSITIONS
 ═══════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   🎨 CASEPOOL LIGHT MODE — PREMIUM UPGRADE v2.1
+   
+   วิธีติดตั้ง:
+   1. เปิดไฟล์ HTML หลัก (CasePool)
+   2. หาบรรทัดนี้ใน <style>:
+      /* ═══════════════════════════════════════
+         GLOBAL ANIMATIONS & TRANSITIONS
+   3. วาง CSS ด้านล่างนี้ทั้งหมดไว้ก่อนบรรทัดนั้น
+═══════════════════════════════════════════════════════════ */
+
+/* ── CSS Variables: ลึก + ชัดขึ้น ── */
+body.light {
+  --bg: #f1f5fb;
+  --bg2: #ffffff;
+  --bg3: #f0f4f8;
+  --bg4: #e2e8f0;
+  --border: #dce4ef;
+  --text: #0f172a;
+  --text2: #1e3a5f;
+  --text3: #64748b;
+  --blue: #2563eb;
+  --blue2: #1d4ed8;
+  --green: #15803d;
+  --red: #dc2626;
+  --yellow: #92400e;
+  --purple: #7c3aed;
+  --orange: #c2410c;
+  --shadow: 0 4px 24px rgba(15,23,42,.09);
+}
+
+/* ── Page background ── */
+body.light,
+body.light .page { background: #f1f5fb !important; }
+
+/* ── Card — Glass effect ── */
+body.light .card {
+  background: rgba(255,255,255,.92);
+  border-color: #dce4ef;
+  box-shadow: 0 2px 8px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+  backdrop-filter: blur(10px);
+}
+body.light .stat-card {
+  background: rgba(255,255,255,.92);
+  border: 1px solid #dce4ef;
+  box-shadow: 0 2px 8px rgba(15,23,42,.05);
+}
+
+/* ── Market cards ── */
+body.light .mkc {
+  background: rgba(255,255,255,.92);
+  border-color: #dce4ef;
+  box-shadow: 0 2px 8px rgba(15,23,42,.05);
+}
+body.light .mkc:hover {
+  border-color: #2563eb;
+  box-shadow: 0 4px 20px rgba(37,99,235,.13);
+}
+body.light .market-card {
+  background: #fff;
+  border-color: #dce4ef;
+  box-shadow: 0 1px 6px rgba(15,23,42,.06);
+}
+body.light .market-card:hover {
+  border-color: #2563eb;
+  box-shadow: 0 4px 20px rgba(37,99,235,.1);
+}
+
+/* ── Typography ── */
+body.light .page-title { color: #0f172a; font-weight: 800; }
+body.light label       { color: #1e3a5f; font-weight: 600; }
+body.light .stat-num   { font-weight: 900; }
+body.light .mkc-name   { color: #0f172a; font-weight: 700; }
+body.light .mkc-id     { color: #2563eb; }
+body.light .mkc-report { color: #334155; background: #f0f4f8; }
+
+/* ── Inputs ── */
+body.light input,
+body.light select,
+body.light textarea {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(15,23,42,.05);
+}
+body.light input::placeholder,
+body.light textarea::placeholder { color: #94a3b8; }
+body.light input:focus,
+body.light select:focus,
+body.light textarea:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.18) !important;
+}
+
+/* ── Buttons ── */
+body.light .btn-ghost {
+  color: #334155;
+  border-color: #cbd5e1;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15,23,42,.05);
+}
+body.light .btn-ghost:hover {
+  background: #f0f4f8;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+body.light .btn-primary {
+  box-shadow: 0 4px 14px rgba(37,99,235,.35);
+}
+
+/* ── Sidebar ── */
+body.light .sidebar {
+  background: rgba(255,255,255,.96);
+  border-right: 1px solid #dce4ef;
+  backdrop-filter: blur(12px);
+}
+body.light .nav-item { color: #334155; }
+body.light .nav-item:hover { background: #f0f4f8; color: #0f172a; }
+body.light .nav-item.active {
+  color: #2563eb;
+  background: rgba(37,99,235,.1);
+  border-left-color: #2563eb;
+  font-weight: 700;
+}
+
+/* ── Bottom nav + topbar (glass) ── */
+body.light .bottom-nav,
+body.light .admin-bottom-nav {
+  background: rgba(255,255,255,.96);
+  border-top-color: #dce4ef;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 -2px 12px rgba(15,23,42,.07);
+}
+body.light .admin-topbar {
+  background: rgba(255,255,255,.96);
+  border-bottom-color: #dce4ef;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 2px 12px rgba(15,23,42,.07);
+}
+body.light .bottom-nav-item       { color: #334155; }
+body.light .bottom-nav-item.active { color: #2563eb; }
+
+/* ── Modal ── */
+body.light .modal {
+  background: rgba(255,255,255,.97);
+  border-color: #dce4ef;
+  box-shadow: 0 16px 48px rgba(15,23,42,.16), 0 4px 12px rgba(15,23,42,.08);
+  backdrop-filter: blur(16px);
+}
+body.light .modal-hd { border-bottom-color: #dce4ef; background: #f8fafc; }
+body.light .modal-ft { border-top-color: #dce4ef;   background: #f8fafc; }
+
+/* ── Table ── */
+body.light table th { background: #f0f4f8; color: #334155; font-weight: 700; }
+body.light table td { color: #0f172a; }
+body.light tr:hover td { background: rgba(37,99,235,.04) !important; }
+
+/* ── Badges ── */
+body.light .badge { filter: saturate(1.15) brightness(.82); font-weight: 700; }
+
+/* ── Scrollbar ── */
+body.light ::-webkit-scrollbar-track { background: #f0f4f8; }
+body.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+/* ── page-hd: Refresh button ชิดขวาเสมอ ── */
+.page-hd {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+.page-hd > button:last-child,
+.page-hd > .btn-ghost:last-child { margin-left: auto; }
+  
 @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeInDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideInRight{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
