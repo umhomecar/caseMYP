@@ -1241,8 +1241,9 @@ function AdminCurrentCases({currentUser,users}){
     if(!r.success){setSending(null);showToast('ส่งตลาดไม่สำเร็จ: '+(r.error||'ไม่ทราบสาเหตุ'),'err',5000);return;}
     showToast('ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!','ok',2500);
     setSending(null);
+    // อัปเดต state ทันที — UI เปลี่ยนเลยไม่ต้องรอ
     setMarketIds(prev=>{const s=new Set(prev);s.add(String(caseId));try{localStorage.setItem('marketIds',JSON.stringify(Array.from(s)));}catch(e){}return s;});
-    api('getMarketIds',{}).then(r=>{if(r.success)setMarketIds(new Set(safeArray(r.data)));});
+    setCases(prev=>prev.map(c=>String(c.caseid)===String(caseId)?{...c,market:true}:c));
   }
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=safeArray(r.data);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
