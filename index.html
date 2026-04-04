@@ -2252,412 +2252,73 @@ function LoginPage({onLogin}){
     if(r.success)onLogin(r.user);
     else setError(r.error||'เข้าสู่ระบบไม่สำเร็จ');
   }
-  return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg,#0d1117 0%,#161b22 50%,#0d1117 100%)',padding:16}}>
-    <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:18,padding:'36px 28px',width:'100%',maxWidth:360,boxShadow:'0 20px 60px rgba(0,0,0,.6)',animation:'fadeInUp .5s cubic-bezier(.16,1,.3,1)'}}>
-      <div style={{textAlign:'center',marginBottom:28}}>
-        <div style={{fontSize:48,marginBottom:10,display:'inline-block',animation:'floatY 3s ease-in-out infinite'}}>🚗</div>
-        <div style={{fontSize:26,fontWeight:800,color:'var(--blue)',letterSpacing:.5}}>CasePool</div>
-        <div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ระบบจัดการเคสรถยนต์</div>
-        <div style={{height:1,background:'linear-gradient(90deg,transparent,var(--border),transparent)',marginTop:20}}/>
+  return <div style={{
+    minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',
+    background:'linear-gradient(135deg,#0a0e1a 0%,#0d1b2e 40%,#0a1628 70%,#0e0a1a 100%)',
+    padding:16,position:'relative',overflow:'hidden'
+  }}>
+    {/* Animated blobs */}
+    <div style={{position:'absolute',width:400,height:400,borderRadius:'50%',background:'radial-gradient(circle,rgba(88,166,255,.18) 0%,transparent 70%)',top:'-10%',left:'-10%',filter:'blur(40px)',animation:'floatY 8s ease-in-out infinite'}}/>
+    <div style={{position:'absolute',width:350,height:350,borderRadius:'50%',background:'radial-gradient(circle,rgba(188,140,255,.15) 0%,transparent 70%)',bottom:'-5%',right:'-5%',filter:'blur(40px)',animation:'floatY 10s ease-in-out infinite reverse'}}/>
+    <div style={{position:'absolute',width:250,height:250,borderRadius:'50%',background:'radial-gradient(circle,rgba(63,185,80,.1) 0%,transparent 70%)',top:'50%',right:'20%',filter:'blur(30px)',animation:'floatY 6s ease-in-out infinite 2s'}}/>
+    {/* Card */}
+    <div style={{
+      width:'100%',maxWidth:400,position:'relative',zIndex:1,
+      background:'rgba(255,255,255,.04)',
+      backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',
+      border:'1px solid rgba(255,255,255,.1)',
+      borderRadius:24,padding:'40px 32px',
+      boxShadow:'0 32px 64px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08)',
+    }}>
+      {/* Logo */}
+      <div style={{textAlign:'center',marginBottom:32}}>
+        <div style={{fontSize:52,marginBottom:12,display:'inline-block',animation:'floatY 3s ease-in-out infinite',filter:'drop-shadow(0 0 20px rgba(88,166,255,.5))'}}>🚗</div>
+        <div style={{fontSize:28,fontWeight:900,background:'linear-gradient(135deg,#58a6ff,#a78bfa)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',letterSpacing:.5,marginBottom:4}}>CasePool</div>
+        <div style={{fontSize:13,color:'rgba(255,255,255,.4)',letterSpacing:1}}>ระบบจัดการเคสรถยนต์</div>
+        <div style={{height:1,background:'linear-gradient(90deg,transparent,rgba(88,166,255,.3),transparent)',marginTop:20}}/>
       </div>
-      {error&&<div style={{background:'rgba(218,54,51,.1)',border:'1px solid rgba(218,54,51,.4)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'var(--red)',display:'flex',alignItems:'center',gap:8}}>⚠️ {error}</div>}
-      <div style={{marginBottom:14}}>
-        <label style={{fontSize:12,color:'var(--text2)',fontWeight:600,display:'block',marginBottom:6}}>Username</label>
-        <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Username" autoComplete="username"/>
-      </div>
-      <div style={{marginBottom:20}}>
-        <label style={{fontSize:12,color:'var(--text2)',fontWeight:600,display:'block',marginBottom:6}}>รหัสผ่าน</label>
+      {/* Error */}
+      {error&&<div style={{background:'rgba(248,81,73,.12)',border:'1px solid rgba(248,81,73,.3)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#ff6b6b',display:'flex',alignItems:'center',gap:8}}>⚠️ {error}</div>}
+      {/* Fields */}
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:11,color:'rgba(255,255,255,.5)',fontWeight:700,letterSpacing:1,display:'block',marginBottom:8}}>USERNAME</label>
         <div style={{position:'relative'}}>
-          <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="current-password"/>
-          <button onClick={()=>setShowPass(!showPass)} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--text2)',cursor:'pointer',fontSize:16,padding:4}}>{showPass?'🙈':'👁'}</button>
+          <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:16,opacity:.4}}>👤</span>
+          <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Username" autoComplete="username"
+            style={{paddingLeft:42,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,color:'#fff',fontSize:14,height:48,width:'100%',boxSizing:'border-box',transition:'all .2s'}}
+            onFocus={e=>{e.target.style.borderColor='rgba(88,166,255,.5)';e.target.style.background='rgba(88,166,255,.08)';}}
+            onBlur={e=>{e.target.style.borderColor='rgba(255,255,255,.1)';e.target.style.background='rgba(255,255,255,.06)';}}
+          />
         </div>
       </div>
-      <button onClick={submit} disabled={loading} style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,borderRadius:10,border:'none',cursor:loading?'wait':'pointer',background:loading?'var(--bg3)':'linear-gradient(135deg,#1f6feb,#388bfd)',color:loading?'var(--text2)':'#fff',boxShadow:loading?'none':'0 6px 20px rgba(31,111,235,.4)',transition:'all .2s'}}>
-        {loading?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}><span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/> กำลังเข้าสู่ระบบ...</span>:'เข้าสู่ระบบ →'}
+      <div style={{marginBottom:24}}>
+        <label style={{fontSize:11,color:'rgba(255,255,255,.5)',fontWeight:700,letterSpacing:1,display:'block',marginBottom:8}}>PASSWORD</label>
+        <div style={{position:'relative'}}>
+          <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:16,opacity:.4}}>🔒</span>
+          <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="current-password"
+            style={{paddingLeft:42,paddingRight:48,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,color:'#fff',fontSize:14,height:48,width:'100%',boxSizing:'border-box',transition:'all .2s'}}
+            onFocus={e=>{e.target.style.borderColor='rgba(88,166,255,.5)';e.target.style.background='rgba(88,166,255,.08)';}}
+            onBlur={e=>{e.target.style.borderColor='rgba(255,255,255,.1)';e.target.style.background='rgba(255,255,255,.06)';}}
+          />
+          <button onClick={()=>setShowPass(!showPass)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:16,opacity:.5,padding:4}}>{showPass?'🙈':'👁'}</button>
+        </div>
+      </div>
+      {/* Submit */}
+      <button onClick={submit} disabled={loading} style={{
+        width:'100%',height:50,borderRadius:12,border:'none',cursor:loading?'wait':'pointer',
+        background:loading?'rgba(255,255,255,.1)':'linear-gradient(135deg,#1f6feb 0%,#a78bfa 100%)',
+        color:loading?'rgba(255,255,255,.4)':'#fff',fontSize:15,fontWeight:700,letterSpacing:.5,
+        boxShadow:loading?'none':'0 8px 24px rgba(31,111,235,.4)',
+        transition:'all .2s',
+      }}>
+        {loading
+          ?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+            <span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.2)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/>
+            กำลังเข้าสู่ระบบ...
+          </span>
+          :'เข้าสู่ระบบ →'}
       </button>
-      <div style={{textAlign:'center',marginTop:16,fontSize:11,color:'var(--text3)'}}>CasePool v2.0</div>
+      <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'rgba(255,255,255,.2)',letterSpacing:1}}>CasePool v2.0 · Powered by Claude</div>
     </div>
   </div>;
 }
-
-// ============================================================
-// 🎯 ADMIN TEAM HQ
-// ============================================================
-function AdminFollowupsContent({users,neon='#00f5ff'}){
-  const [history,setHistory]=useState([]);
-  const [loading,setLoading]=useState(true);
-  const [filterSales,setFilterSales]=useState('all');
-  const [filterType,setFilterType]=useState('all');
-  const [dateFrom,setDateFrom]=useState('');
-  const [dateTo,setDateTo]=useState('');
-  const salesList=(users||[]).filter(u=>u.role==='Sales');
-  const load=useCallback(()=>{
-    setLoading(true);
-    sbQ('GET','history',{order:'createdat.desc',limit:'500'}).then(rows=>{
-      const f=safeArray(rows).filter(r=>String(r.detail||'').includes('นัด Follow-up')||String(r.detail||'').includes('📝 Note:'));
-      setHistory(f);setLoading(false);
-    }).catch(()=>setLoading(false));
-  },[]);
-  useEffect(()=>{load();},[load]);
-  const today=new Date().toISOString().slice(0,10);
-  function parseHD(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
-  const filtered=history.filter(r=>{
-    if(filterSales!=='all'&&r.sales!==filterSales)return false;
-    if(filterType==='followup'&&!String(r.detail||'').includes('นัด Follow-up'))return false;
-    if(filterType==='note'&&!String(r.detail||'').includes('📝 Note:'))return false;
-    if(dateFrom){const d=parseHD(r.createdat);if(!d||d<new Date(dateFrom))return false;}
-    if(dateTo){const d=parseHD(r.createdat);const to=new Date(dateTo);to.setHours(23,59,59);if(!d||d>to)return false;}
-    return true;
-  });
-  const overdue=filtered.filter(r=>{const m=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m&&m[1]<today;}).length;
-  const todayCount=filtered.filter(r=>{const m=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m&&m[1]===today;}).length;
-  return <div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
-      {[['ทั้งหมด',filtered.length,neon],['วันนี้',todayCount,'#ffd700'],['เลยกำหนด',overdue,'#ff2d78']].map(([l,v,c])=>
-        <div key={l} style={{background:c+'15',border:'1px solid '+c+'40',borderRadius:12,padding:'14px 10px',textAlign:'center'}}>
-          <div style={{fontSize:26,fontWeight:900,color:c}}>{v}</div>
-          <div style={{fontSize:11,color:c+'80',marginTop:2}}>{l}</div>
-        </div>)}
-    </div>
-    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
-      <select value={filterSales} onChange={e=>setFilterSales(e.target.value)} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',padding:'8px 12px',fontSize:13}}>
-        <option value="all">ทุกเซลส์</option>
-        {salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
-      </select>
-      <div style={{display:'flex',gap:4,background:'var(--bg3)',borderRadius:20,padding:4}}>
-        {[['all','ทั้งหมด'],['followup','📅 นัด'],['note','📝 Note']].map(([v,l])=>
-          <button key={v} onClick={()=>setFilterType(v)} style={{padding:'5px 12px',borderRadius:16,border:'none',cursor:'pointer',fontSize:12,fontWeight:700,background:filterType===v?neon:'transparent',color:filterType===v?'#000':'var(--text2)',transition:'all .2s'}}>{l}</button>
-        )}
-      </div>
-      <button onClick={load} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text2)',padding:'7px 12px',cursor:'pointer',fontSize:13,marginLeft:'auto'}}>🔄</button>
-    </div>
-    {loading?<Loading/>:filtered.length===0?
-      <div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}><div style={{fontSize:40,marginBottom:10}}>📭</div><div>ยังไม่มีข้อมูล</div><div style={{fontSize:12,marginTop:6,color:'var(--text3)'}}>เซลส์ต้องบันทึกนัดหรือ note ผ่านหน้าเคสก่อน</div></div>:
-      <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        {filtered.map((r,i)=>{
-          const isFollowup=String(r.detail||'').includes('นัด Follow-up');
-          const fuDateM=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);
-          const fuDate=fuDateM?fuDateM[1]:'';
-          const noteText=String(r.detail||'').replace('📝 Note: ','');
-          const fuNoteM=String(r.detail||'').match(/— (.+)$/);
-          const fuNote=fuNoteM?fuNoteM[1]:'';
-          const isOverdue=fuDate&&fuDate<today;
-          const cardC=isOverdue?'#ff2d78':isFollowup?'#00ff88':neon;
-          return<div key={i} style={{background:cardC+'08',border:'1px solid '+cardC+'30',borderLeft:'3px solid '+cardC,borderRadius:'0 10px 10px 0',padding:'10px 14px'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4,flexWrap:'wrap',gap:4}}>
-              <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                <span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20,background:cardC+'20',color:cardC}}>{isFollowup?'📅 นัด':'📝 NOTE'}</span>
-                <span style={{color:'var(--blue)',fontWeight:700,fontSize:12}}>{r.caseid}</span>
-                <span style={{fontSize:11,color:'var(--purple)'}}>{r.sales}</span>
-              </div>
-              {fuDate&&<span style={{fontSize:11,fontWeight:700,color:cardC}}>{isOverdue?'⚠️ ':''}{fuDate}</span>}
-            </div>
-            <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5}}>{isFollowup?fuNote||'ไม่มีหมายเหตุ':noteText}</div>
-          </div>;
-        })}
-      </div>
-    }
-  </div>;
-}
-
-function AdminTargetContent({users,neon='#ff2d78'}){
-  const TG_KEY='cp_targets';
-  const [targets,setTargets]=useState(()=>{try{return JSON.parse(localStorage.getItem(TG_KEY)||'{}');}catch(e){return{};}});
-  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);
-  const d=new Date();const monthKey=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
-  const MONTH_NAMES=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  const monthLabel=MONTH_NAMES[d.getMonth()]+' 25'+String(d.getFullYear()).slice(-2);
-  const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
-  useEffect(()=>{
-    Promise.all([
-      api('getCases',{}),
-      sbQ('GET','targets',{month_key:'eq.'+monthKey})
-    ]).then(([r,tRows])=>{
-      if(r.success)setCases(safeArray(r.data));
-      // โหลด targets จาก Supabase ทับ localStorage
-      if(tRows&&tRows.length){
-        const fromDB={};
-        tRows.forEach(t=>{fromDB[t.month_key+'_'+t.sales_name]=t.target_value;});
-        setTargets(prev=>({...prev,...fromDB}));
-        try{localStorage.setItem(TG_KEY,JSON.stringify({...targets,...fromDB}));}catch(e){}
-      }
-      setLoading(false);
-    });
-  },[]);
-  async function setTgt(name,val){
-    const v=parseInt(val)||0;
-    const upd={...targets,[monthKey+'_'+name]:v};
-    setTargets(upd);
-    try{localStorage.setItem(TG_KEY,JSON.stringify(upd));}catch(e){}
-    // sync ขึ้น Supabase — ลอง PATCH ก่อน ถ้าไม่มีค่อย POST
-    const existing=await sbQ('GET','targets',{sales_name:'eq.'+name,month_key:'eq.'+monthKey});
-    if(existing&&existing.length>0){
-      await sbQ('PATCH','targets',{sales_name:'eq.'+name,month_key:'eq.'+monthKey},{target_value:v,updated_at:new Date().toISOString()});
-    }else{
-      await sbQ('POST','targets',{},{sales_name:name,month_key:monthKey,target_value:v,updated_at:new Date().toISOString()});
-    }
-  }
-  function getTarget(name){return targets[monthKey+'_'+name]||0;}
-  const totalSold=salesList.reduce((s,u)=>s+cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length,0);
-  const totalTarget=salesList.reduce((s,u)=>s+getTarget(u.name),0);
-  return <div>
-    <div style={{background:neon+'12',border:'1px solid '+neon+'35',borderRadius:12,padding:'14px 16px',marginBottom:16,display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
-      <div style={{flex:1}}>
-        <div style={{fontSize:11,color:neon+'80',letterSpacing:1,marginBottom:4}}>เดือน {monthLabel} — ภาพรวมทีม</div>
-        <div style={{fontSize:24,fontWeight:900,color:neon}}>{totalSold}<span style={{fontSize:14,fontWeight:400,color:neon+'70',marginLeft:6}}>/ {totalTarget} คัน</span></div>
-      </div>
-      {totalTarget>0&&<div style={{textAlign:'center'}}><div style={{fontSize:32,fontWeight:900,color:neon}}>{Math.min(Math.round(totalSold/totalTarget*100),100)}%</div><div style={{fontSize:10,color:neon+'60'}}>Win Rate</div></div>}
-    </div>
-    {loading?<Loading/>:<div style={{display:'grid',gap:10}}>
-      {salesList.map((u,idx)=>{
-        const sold=cases.filter(c=>c.sales===u.name&&c.status==='ปล่อยแล้ว').length;
-        const tg=getTarget(u.name);const pct=tg>0?Math.min(Math.round(sold/tg*100),100):0;
-        const barC=pct>=100?'#00ff88':pct>=70?neon:'#ffd700';
-        return<div key={u.userId} className="card">
-          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:tg>0?10:0}}>
-            <div style={{width:40,height:40,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>{u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
-            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{u.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>ปล่อยแล้ว {sold} คัน</div></div>
-            <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <input type="number" value={tg||''} onChange={e=>setTgt(u.name,e.target.value)} min={0} placeholder="เป้า" style={{width:60,textAlign:'center',fontSize:14,fontWeight:700,padding:'4px 8px'}}/>
-              <span style={{fontSize:11,color:'var(--text2)'}}>คัน</span>
-            </div>
-          </div>
-          {tg>0&&<><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:11,color:'var(--text2)'}}>{sold}/{tg}</span><span style={{fontSize:13,fontWeight:700,color:barC}}>{pct}%</span></div><div style={{height:5,background:'var(--bg3)',borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',borderRadius:3,width:pct+'%',background:barC,transition:'width .4s'}}/></div>{pct>=100&&<div style={{fontSize:11,color:'#00ff88',marginTop:4,fontWeight:700}}>🎉 บรรลุเป้าแล้ว!</div>}</>}
-        </div>;
-      })}
-    </div>}
-  </div>;
-}
-
-function AdminBroadcastContent({users,neon='#a855f7'}){
-  const [target,setTarget]=useState('all');const [msg,setMsg]=useState('');const [sending,setSending]=useState(false);const [done,setDone]=useState('');
-  const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
-  async function send(){if(!msg.trim())return showToast('กรุณาพิมพ์ข้อความก่อนส่ง','warn');setSending(true);setDone('');const r=await api('broadcast',{sales:target,message:msg});setSending(false);if(r.success){setDone('✅ ส่งถึง '+r.sent+' คน');setMsg('');}else setDone('❌ '+(r.error||'เกิดข้อผิดพลาด'));}
-  return <div>
-    <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:16,marginBottom:14}}>
-      <div className="form-group"><label>ส่งถึง</label><select value={target} onChange={e=>setTarget(e.target.value)}><option value="all">ทุกคน ({salesList.length} คน)</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
-      <div className="form-group"><label>ข้อความ</label><textarea rows={4} value={msg} onChange={e=>setMsg(e.target.value)} placeholder="พิมพ์ข้อความ..."/></div>
-      {done&&<div style={{background:done.startsWith('✅')?'rgba(63,185,80,.1)':'rgba(248,81,73,.1)',border:'1px solid '+(done.startsWith('✅')?'var(--green)':'var(--red)'),borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:13}}>{done}</div>}
-      <button className="btn btn-primary" style={{width:'100%',padding:12,fontSize:15,fontWeight:700}} onClick={send} disabled={sending}>{sending?'กำลังส่ง...':'📢 ส่งข้อความ'}</button>
-    </div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
-      {[['📌','แจ้งนโยบาย'],['🎯','ตั้งเป้าหมาย'],['⚠️','เตือนด่วน'],['🎉','ประกาศผล']].map(([ic,l])=>
-        <div key={l} className="card" style={{textAlign:'center',cursor:'pointer',padding:12}} onClick={()=>setMsg(m=>m+(m?'\n':'')+l)}>
-          <div style={{fontSize:22,marginBottom:4}}>{ic}</div>
-          <div style={{fontSize:11,color:'var(--text2)',fontWeight:600}}>{l}</div>
-        </div>
-      )}
-    </div>
-  </div>;
-}
-
-function AdminTeam({users,currentUser}){
-  const [tab,setTab]=useState('followup');
-  const TABS=[
-    {k:'followup',label:'📅 Followup',neon:'#00f5ff'},
-    {k:'target',label:'🎯 Target',neon:'#ff2d78'},
-    {k:'broadcast',label:'📢 Broadcast',neon:'#a855f7'},
-  ];
-  const cur=TABS.find(t=>t.k===tab)||TABS[0];
-  return <div className="page">
-    <div className="page-hd"><div><div className="page-title">🎯 TEAM HQ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Followup · Target · Broadcast</div></div></div>
-    <div style={{display:'flex',gap:4,marginBottom:18,borderBottom:'1px solid var(--border)',paddingBottom:10}}>
-      {TABS.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'7px 16px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,background:tab===t.k?t.neon:'var(--bg3)',color:tab===t.k?'#000':'var(--text2)',transition:'all .2s'}}>{t.label}</button>)}
-    </div>
-    {tab==='followup'&&<AdminFollowupsContent users={users} neon="#00f5ff"/>}
-    {tab==='target'&&<AdminTargetContent users={users} neon="#ff2d78"/>}
-    {tab==='broadcast'&&<AdminBroadcastContent users={users} neon="#a855f7"/>}
-  </div>;
-}
-
-
-function AdminApp({currentUser,onLogout}){
-  const [page,setPage]=useState('cases');
-  const [users,setUsers]=useState([]);
-  const [showNotif,setShowNotif]=useState(false);
-  const [notifCount,setNotifCount]=useState(0);
-
-  useEffect(()=>{
-    api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});
-    api('getNotifications',{sales:'admin'}).then(r=>{if(r.success){const u=r.data.filter(n=>n['สถานะ']==='unread');setNotifCount(u.length);}});
-  },[]);
-
-  const pages={
-    cases:<AdminCurrentCases currentUser={currentUser} users={users}/>,
-    market:<AdminMarket currentUser={currentUser} users={users}/>,
-    dashboard:<AdminDashboard currentUser={currentUser}/>,
-    bookings:<AdminBookings currentUser={currentUser} users={users}/>,
-    followups:<AdminTeam users={users} currentUser={currentUser}/>,
-    users:<AdminUsers currentUser={currentUser}/>,
-    team:<AdminTeam users={users} currentUser={currentUser}/>,
-    ai:<AdminAIPage currentUser={currentUser}/>,
-    analytics:<AdminAnalytics currentUser={currentUser}/>,
-  };
-
-  const allNavItems=[
-    {key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},
-    {key:'market',icon:<Ico.market/>,label:'ตลาดเคส'},
-    {key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},
-    {key:'bookings',icon:<Ico.book/>,label:'การจอง'},
-    {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
-    {key:'team',icon:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,label:'ทีม'},
-  ];
-
-  const bottomNavItems=[
-    {key:'cases',icon:<Ico.home/>,label:'เคส'},
-    {key:'market',icon:<Ico.market/>,label:'ตลาด'},
-    {key:'dashboard',icon:<Ico.dash/>,label:'Dash'},
-    {key:'team',icon:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,label:'ทีม'},
-    {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
-  ];
-
-  return <div>
-    <div className="sidebar">
-      <div className="sidebar-logo"><div style={{fontWeight:800,fontSize:18,color:'var(--blue)'}}>🚗 CasePool</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Admin Panel</div></div>
-      <nav className="sidebar-nav">{allNavItems.map(n=><div key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)}>{n.icon}<span>{n.label}</span></div>)}</nav>
-      <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-          <div style={{width:36,height:36,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{currentUser.avatar?<img src={currentUser.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
-          <div><div style={{fontWeight:600,fontSize:13}}>{currentUser.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Admin</div></div>
-        </div>
-        <div style={{display:'flex',gap:6}}>
-          <button className="btn btn-ghost" style={{flex:1,fontSize:12,position:'relative'}} onClick={()=>setShowNotif(!showNotif)}><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:2,right:4,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
-          <button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={toggleTheme}>🌓</button>
-          <button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={onLogout}><Ico.logout/></button>
-        </div>
-      </div>
-    </div>
-    <div className="admin-topbar">
-      <div style={{fontWeight:800,color:'var(--blue)',display:'flex',alignItems:'center',gap:8}}>🚗 CasePool <span style={{fontSize:11,color:'var(--text3)',fontWeight:400,background:'var(--bg3)',padding:'2px 8px',borderRadius:20}}>Admin</span></div>
-      <div style={{display:'flex',alignItems:'center',gap:6}}>
-        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={toggleTheme}>🌓</button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)}><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onLogout}><Ico.logout/></button>
-      </div>
-    </div>
-    <div className="admin-mobile-content"><ErrorBoundary>{pages[page]||pages.cases}</ErrorBoundary></div>
-    <div className="admin-bottom-nav">
-      {bottomNavItems.map(n=><div key={n.key} className={`bottom-nav-item ${page===n.key?'active':''}`} onClick={()=>{if(page!==n.key)setPage(n.key);}}>{n.icon}<span>{n.label}</span></div>)}
-    </div>
-    {showNotif&&<NotifPanel user={currentUser} onClose={()=>setShowNotif(false)} onCountChange={setNotifCount}/>}
-  </div>;
-}
-
-// ============================================================
-// 📅 SALES FOLLOWUPS
-// ============================================================
-function SalesFollowups({currentUser}){
-  const today=new Date().toISOString().slice(0,10);
-  const [allFollowups,setAllFollowups]=useState([]);
-
-  useEffect(()=>{
-    const all=[];
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(k&&k.startsWith('cp_followup_')){
-        try{const fus=JSON.parse(localStorage.getItem(k)||'[]');fus.forEach(f=>{if(!f.done&&f.by===currentUser.name)all.push(f);});}catch(e){}
-      }
-    }
-    all.sort((a,b)=>a.date.localeCompare(b.date));
-    setAllFollowups(all);
-  },[currentUser.name]);
-
-  const todayFU=allFollowups.filter(f=>f.date===today);
-  const upcoming=allFollowups.filter(f=>f.date>today);
-  const overdue=allFollowups.filter(f=>f.date<today);
-
-  function FUList({items,color,title}){
-    if(!items.length)return null;
-    return<div style={{marginBottom:14}}>
-      <div style={{fontWeight:700,fontSize:13,color,marginBottom:8}}>{title} ({items.length})</div>
-      {items.map((f,i)=><div key={i} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:8}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
-          <div style={{fontWeight:600,fontSize:14}}>{f.customername||f.caseid}</div>
-          <span style={{fontSize:12,fontWeight:700,color,background:color+'22',padding:'2px 8px',borderRadius:20}}>{f.date}</span>
-        </div>
-        <div style={{fontSize:12,color:'var(--text2)'}}>{f.note||'ไม่มีหมายเหตุ'}</div>
-        <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>รหัสเคส: {f.caseid}</div>
-      </div>)}
-    </div>;
-  }
-
-  return<div className="page">
-    <div className="page-hd"><div><div className="page-title">📅 Follow-up</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>นัดหมายที่ตั้งไว้</div></div></div>
-    {allFollowups.length===0?
-      <div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}>
-        <div style={{fontSize:48,marginBottom:12}}>📅</div>
-        <div style={{fontWeight:600,fontSize:16,marginBottom:6}}>ยังไม่มีนัดหมาย</div>
-        <div style={{fontSize:13,color:'var(--text3)'}}>กดเข้าไปที่เคสแล้วตั้งนัด Follow-up ได้เลยครับ</div>
-      </div>:
-      <>
-        <FUList items={overdue} color="var(--red)" title="⚠️ เลยกำหนดแล้ว"/>
-        <FUList items={todayFU} color="var(--yellow)" title="📌 วันนี้"/>
-        <FUList items={upcoming} color="var(--blue)" title="🔜 กำลังจะมา"/>
-      </>
-    }
-  </div>;
-}
-
-
-function SalesApp({currentUser,onLogout}){
-  const [page,setPage]=useState('focus');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);const [showSearch,setShowSearch]=useState(false);const [showOnboarding,setShowOnboarding]=useState(false);
-  usePushNotif(API_URL,currentUser.name);
-  useEffect(()=>{api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});function refreshNotif(){api('getNotifications',{sales:currentUser.name}).then(r=>{if(r.success){const u=r.data.filter(n=>n['สถานะ']==='unread');setNotifCount(u.length);}});}refreshNotif();const t=setInterval(refreshNotif,30000);try{if(!localStorage.getItem('cp_onboarded_'+currentUser.userId))setShowOnboarding(true);}catch(e){}return()=>clearInterval(t);},[currentUser.name,currentUser.userId]);
-  const pages={focus:<><PushNotifBanner currentUser={currentUser}/><DailyFocusPage currentUser={currentUser} onNavigate={k=>setPage(k)}/></>,market:<SalesMarket currentUser={currentUser}/>,cases:<SalesCurrentCases currentUser={currentUser} users={users}/>,claimed:<SalesClaimedCases currentUser={currentUser} users={users}/>,ai:<AIAdvisorPage currentUser={currentUser}/>,dashboard:<SalesDashboard currentUser={currentUser}/>,followup:<SalesFollowups currentUser={currentUser}/>};
-  const navItems=[{key:'focus',icon:<Ico.focus/>,label:'วันนี้'},{key:'market',icon:<Ico.market/>,label:'ตลาด'},{key:'cases',icon:<Ico.home/>,label:'เคสของฉัน'},{key:'claimed',icon:<Ico.inbox/>,label:'รับตลาด'},{key:'dashboard',icon:<Ico.trophy/>,label:'แดชบอร์ด'}];
-  return <div>
-    {showOnboarding&&<OnboardingTour currentUser={currentUser} onDone={()=>setShowOnboarding(false)}/>}
-    {showSearch&&<GlobalSearch currentUser={currentUser} onClose={()=>setShowSearch(false)} onNavigate={k=>{setPage(k);setShowSearch(false);}}/>}
-    <div style={{position:'fixed',top:0,left:0,right:0,height:56,background:'var(--bg2)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',zIndex:9999}}>
-      <div style={{fontWeight:800,color:'var(--blue)',display:'flex',alignItems:'center',gap:8}}>🚗 CasePool</div>
-      <div style={{display:'flex',alignItems:'center',gap:8}}>
-        <button className="btn btn-ghost" style={{padding:'5px 8px'}} onClick={()=>setShowSearch(true)}><Ico.gsearch/></button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={toggleTheme}>🌓</button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)}><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onLogout}><Ico.logout/></button>
-      </div>
-    </div>
-    <div className="sales-content" style={{paddingTop:56}}><ErrorBoundary>{pages[page]||pages.focus}</ErrorBoundary></div>
-    <div className="bottom-nav">{navItems.map(n=><div key={n.key} className={`bottom-nav-item ${page===n.key?'active':''}`} onClick={()=>{if(page!==n.key)setPage(n.key);}}>{n.icon}<span>{n.label}</span></div>)}</div>
-    {showNotif&&<NotifPanel user={currentUser} onClose={()=>setShowNotif(false)} onCountChange={setNotifCount}/>}
-  </div>;
-}
-
-class ErrorBoundary extends React.Component{
-  constructor(p){super(p);this.state={error:null};}
-  static getDerivedStateFromError(e){return{error:e};}
-  componentDidCatch(e,info){}
-  render(){
-    if(this.state.error){
-      return <div style={{padding:24,textAlign:'center',color:'var(--text)',background:'var(--bg)',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
-        <div style={{fontSize:48}}>⚠️</div>
-        <div style={{fontWeight:700,fontSize:18}}>เกิดข้อผิดพลาด</div>
-        <div style={{fontSize:13,color:'var(--text2)',maxWidth:300,lineHeight:1.6}}>{String(this.state.error.message||'')}</div>
-        <button onClick={()=>this.setState({error:null})} style={{background:'var(--blue2)',color:'#fff',border:'none',borderRadius:8,padding:'10px 24px',cursor:'pointer',fontSize:14,fontWeight:700}}>🔄 ลองใหม่</button>
-      </div>;
-    }
-    return this.props.children;
-  }
-}
-
-function App(){
-  const [user,setUser]=useState(()=>{try{const s=sessionStorage.getItem('casepool_user');return s?JSON.parse(s):null;}catch{return null;}});
-  const [showLogoutConfirm,setShowLogoutConfirm]=useState(false);
-  useEffect(()=>{const el=document.getElementById('app-loader');if(el){el.style.pointerEvents='none';el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),400);}},[]);
-  function handleLogin(u){sessionStorage.setItem('casepool_user',JSON.stringify(u));setUser(u);setTimeout(()=>initFCM(),2000);}
-  function handleLogout(){sessionStorage.removeItem('casepool_user');Object.keys(_cache).forEach(k=>delete _cache[k]);setUser(null);setShowLogoutConfirm(false);}
-  if(!user)return <LoginPage onLogin={handleLogin}/>;
-  const logoutConfirmModal=showLogoutConfirm&&<div className="overlay" style={{zIndex:9999}}><div className="modal" style={{maxWidth:320}}><div className="modal-bd" style={{textAlign:'center',padding:'32px 24px'}}><div style={{fontSize:40,marginBottom:12}}>👋</div><div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ออกจากระบบ?</div><div style={{fontSize:13,color:'var(--text2)',marginBottom:24}}>{user.name} · {user.role}</div><div style={{display:'flex',gap:10}}><button className="btn btn-ghost" style={{flex:1,padding:'10px'}} onClick={()=>setShowLogoutConfirm(false)}>ยกเลิก</button><button className="btn btn-danger" style={{flex:1,padding:'10px'}} onClick={handleLogout}>ออกจากระบบ</button></div></div></div></div>;
-  if(user.role==='Admin')return <>{logoutConfirmModal}<AdminApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
-  return <>{logoutConfirmModal}<SalesApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
-}
-
-try{
-  ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App/></ErrorBoundary>);
-}catch(e){
-  document.getElementById('root').innerHTML='<div style="padding:32px;text-align:center;color:#fff;background:#0d1117;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px"><div style="font-size:48px">⚠️</div><div style="font-weight:700;font-size:18px">โหลดแอปไม่ได้</div><div style="font-size:13px;color:#8b949e;margin-top:8px">'+e.message+'</div><button onclick="location.reload()" style="background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px 24px;cursor:pointer;font-size:14px;margin-top:8px">🔄 โหลดใหม่</button></div>';
-}
-
-</script>
-</body>
-</html>
