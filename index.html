@@ -29,7 +29,6 @@ window.addEventListener('load',function(){
     if(el){el.style.pointerEvents='none';el.style.opacity='0';setTimeout(function(){el.remove();},400);}
   },4000);
 });
-  
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <style>
@@ -1231,33 +1230,19 @@ function AdminCurrentCases({currentUser,users}){
     }
     setLoading(false);
   }).catch(()=>{setCases([]);setLoading(false);});},[]);
-async function sendToMarketDirect(caseId,salesName){
-  setSending(null);
-  setConfirmMarket({caseId,salesName});
-}
-async function doSendToMarket(caseId,salesName){
-  setConfirmMarket(null); // ปิด modal ทันที
-  setSending(caseId);
-  const r = await api('sendToMarket',{caseId,sales:salesName});
-
-  if(!r.success){
+  async function sendToMarketDirect(caseId,salesName){
     setSending(null);
-    showToast('ส่งตลาดไม่สำเร็จ: '+(r.error||'ไม่ทราบสาเหตุ'),'err',5000);
-    return;
+    setConfirmMarket({caseId,salesName});
   }
-
-  // ✅ สำเร็จ — อัปเดท marketIds ทันที
-  showToast('ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!','ok',2500);
-  setSending(null);
-  // อัปเดต marketIds ใน state ทันที ไม่ต้อง reload ทั้งหมด
-  setMarketIds(prev=>{
-    const s=new Set(prev);
-    s.add(String(caseId));
-    try{localStorage.setItem('marketIds',JSON.stringify(Array.from(s)));}catch(e){}
-    return s;
-  });
-  // refresh marketIds จาก server ใน background
-  api('getMarketIds',{}).then(r=>{if(r.success)setMarketIds(new Set(safeArray(r.data)));});
+  async function doSendToMarket(caseId,salesName){
+    setConfirmMarket(null);
+    setSending(caseId);
+    const r=await api('sendToMarket',{caseId,sales:salesName});
+    if(!r.success){setSending(null);showToast('ส่งตลาดไม่สำเร็จ: '+(r.error||'ไม่ทราบสาเหตุ'),'err',5000);return;}
+    showToast('ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!','ok',2500);
+    setSending(null);
+    setMarketIds(prev=>{const s=new Set(prev);s.add(String(caseId));try{localStorage.setItem('marketIds',JSON.stringify(Array.from(s)));}catch(e){}return s;});
+    api('getMarketIds',{}).then(r=>{if(r.success)setMarketIds(new Set(safeArray(r.data)));});
   }
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=safeArray(r.data);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
@@ -1404,9 +1389,7 @@ async function doSendToMarket(caseId,salesName){
 }
 
 function daysAgo(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return 0;const dt=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return Math.floor((Date.now()-dt.getTime())/86400000);}
-function parseHistDate(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
-function formatDate(d){const s=String(d||'');if(s.includes('T')){const dt=new Date(s);if(!isNaN(dt)){return[String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+'/'+String(dt.getFullYear()).slice(-2),String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')];}}const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m)return[m[1]+'/'+m[2]+'/'+String(m[3]).slice(-2),m[4]+':'+m[5]];return[s,''];}
-function getDateBadge(c){const id=String(c.ID||'');if(id.length>=6){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
+function parseHistDate(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}function getDateBadge(c){const id=String(c.ID||'');if(id.length>=6){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
 
 function AdminMarket({currentUser,users}){
   const [cases,setCases]=useState(()=>{
