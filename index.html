@@ -100,7 +100,7 @@ input,select,textarea{background:var(--bg3);border:1px solid var(--border);borde
 input:focus,select:focus,textarea:focus{border-color:var(--blue);}
 select option{background:var(--bg3);}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;}
-.modal{background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;}
 .modal-hd{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
 .modal-bd{padding:20px;}
 .modal-ft{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
@@ -1227,7 +1227,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
     <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal" style={{maxWidth:480,borderRadius:14,display:'flex',flexDirection:'column',maxHeight:'90vh'}}>
+      <div className="modal" style={{maxWidth:480,borderRadius:14}}>
         <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}><div style={{width:4,height:22,background:'var(--blue)',borderRadius:2,flexShrink:0}}/><span style={{fontWeight:700,fontSize:15}}>ข้อมูลลูกค้า</span><button className="btn btn-ghost" style={{padding:'4px 8px',marginLeft:'auto'}} onClick={onClose}><Ico.x/></button></div>
         <div style={{padding:'16px 20px',overflowY:'auto',flex:1,minHeight:0}}>
           <div style={{marginBottom:14,display:'grid',gap:9}}>
