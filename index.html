@@ -1227,9 +1227,9 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
     <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal" style={{maxWidth:480,borderRadius:14}}>
+      <div className="modal" style={{maxWidth:480,borderRadius:14,display:'flex',flexDirection:'column',maxHeight:'90vh'}}>
         <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}><div style={{width:4,height:22,background:'var(--blue)',borderRadius:2,flexShrink:0}}/><span style={{fontWeight:700,fontSize:15}}>ข้อมูลลูกค้า</span><button className="btn btn-ghost" style={{padding:'4px 8px',marginLeft:'auto'}} onClick={onClose}><Ico.x/></button></div>
-        <div style={{padding:'16px 20px',overflowY:'auto',maxHeight:'calc(90vh - 190px)'}}>
+        <div style={{padding:'16px 20px',overflowY:'auto',flex:1,minHeight:0}}>
           <div style={{marginBottom:14,display:'grid',gap:9}}>
             <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>รหัสเคส: </span><span style={{fontWeight:700,color:'var(--blue)'}}>{caseId}</span><button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseId)}>Copy</button></div>
             <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ชื่อเฟส: </span><span style={{fontWeight:600}}>{caseData.customername||caseData.name||'-'}</span>{(caseData.customername||caseData.name)&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseData.customername||caseData.name||'')}>Copy</button>}</div>
