@@ -99,7 +99,6 @@ tr.clickable{cursor:pointer;}
 .s-release{background:#0a2418;color:#3fb950;}
 .s-other{background:#2d1500;color:#ffa657;}
 .s-throw{background:#3d2e00;color:#ffd700;}
-.s-calling{background:#3d1f00;color:#ff9500;}
 .market-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;}
 .market-card:hover{border-color:var(--blue2);}
 .mk-page{display:flex;flex-direction:column;min-height:100vh;}
@@ -170,61 +169,34 @@ tr.clickable{cursor:pointer;}
   background-size:400% 400%;animation:gradientMove 12s ease infinite;
   padding:16px;overflow:hidden;position:relative;
 }
-.login-blob{
-  position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none;
-  animation:floatY 8s ease-in-out infinite;
-}
+.login-blob{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none;animation:floatY 8s ease-in-out infinite;}
 .login-canvas{position:absolute;inset:0;opacity:.35;pointer-events:none;}
 .login-card{
   backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
   padding:40px 32px;border-radius:20px;width:100%;max-width:380px;
-  box-shadow:0 0 40px rgba(88,166,255,.12),0 24px 64px rgba(0,0,0,.6),
-             inset 0 1px 0 rgba(255,255,255,.07);
+  box-shadow:0 0 40px rgba(88,166,255,.12),0 24px 64px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.07);
   text-align:center;color:#fff;position:relative;z-index:1;
   animation:fadeInUp .65s cubic-bezier(.16,1,.3,1);
 }
-.login-card h2{
-  font-size:30px;font-weight:900;
-  background:linear-gradient(135deg,#58a6ff,#a78bfa);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  background-clip:text;margin:0 0 4px;
-  animation:floatY 3s ease-in-out infinite;
-}
+.login-card h2{font-size:30px;font-weight:900;background:linear-gradient(135deg,#58a6ff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0 0 4px;animation:floatY 3s ease-in-out infinite;}
 .login-card .login-sub{font-size:13px;color:rgba(255,255,255,.38);margin-bottom:22px;letter-spacing:.5px;}
 .login-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(88,166,255,.4),rgba(167,139,250,.3),transparent);margin-bottom:22px;}
 .login-label{font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.2px;text-align:left;display:block;margin-bottom:6px;}
 .login-input-wrap{position:relative;margin-bottom:14px;}
 .login-input-wrap .login-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.35;pointer-events:none;}
-.login-input-wrap input{
-  width:100%;padding:13px 14px 13px 42px;
-  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
-  border-radius:10px;color:#fff;font-size:14px;
-  transition:border-color .2s,background .2s,box-shadow .2s;box-sizing:border-box;
-}
+.login-input-wrap input{width:100%;padding:13px 14px 13px 42px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font-size:14px;transition:border-color .2s,background .2s,box-shadow .2s;box-sizing:border-box;}
 .login-input-wrap input::placeholder{color:rgba(255,255,255,.25);}
-.login-input-wrap input:focus{
-  outline:none;border-color:rgba(88,166,255,.55);
-  background:rgba(88,166,255,.08);
-  box-shadow:0 0 0 3px rgba(88,166,255,.15);
-}
+.login-input-wrap input:focus{outline:none;border-color:rgba(88,166,255,.55);background:rgba(88,166,255,.08);box-shadow:0 0 0 3px rgba(88,166,255,.15);}
 .login-input-wrap .login-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;opacity:.4;padding:4px;color:#fff;}
 .login-input-wrap.has-eye input{padding-right:44px;}
-.btn-login{
-  margin-top:10px;width:100%;padding:14px;border:none;border-radius:12px;
-  background:linear-gradient(135deg,#1f6feb 0%,#a78bfa 100%);
-  color:#fff;font-weight:700;font-size:15px;cursor:pointer;letter-spacing:.3px;
-  transition:transform .2s,box-shadow .2s;
-  box-shadow:0 8px 24px rgba(31,111,235,.45);
-}
+.btn-login{margin-top:10px;width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#1f6feb 0%,#a78bfa 100%);color:#fff;font-weight:700;font-size:15px;cursor:pointer;letter-spacing:.3px;transition:transform .2s,box-shadow .2s;box-shadow:0 8px 24px rgba(31,111,235,.45);}
 .btn-login:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 32px rgba(31,111,235,.6);}
 .btn-login:active:not(:disabled){transform:scale(.97);}
 .btn-login:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);box-shadow:none;cursor:not-allowed;}
 .login-error{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.35);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#ff8080;text-align:left;display:flex;align-items:center;gap:8px;}
 .login-footer{margin-top:20px;font-size:11px;color:rgba(255,255,255,.16);letter-spacing:.5px;}
 @keyframes gradientMove{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 </style>
 </head>
 <body>
@@ -307,12 +279,12 @@ async function pushNotif(salesName,title,body,data={}){
   }catch(e){console.warn('Push failed:',e);}
 }
 
-// ── LINE Messaging API — ส่งแจ้งเตือนผ่าน Line Bot ──
+// ── LINE Messaging API ──
 async function pushLine(salesName, message){
   try{
     const rows = await sbQ('GET','users',{name:`eq.${salesName}`,select:'line_user_id'});
     const lineId = rows?.[0]?.line_user_id;
-    if(!lineId) return; // ยังไม่ได้ตั้งค่า line_user_id
+    if(!lineId) return;
     await fetch(LINE_EDGE_URL,{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
@@ -464,7 +436,7 @@ async function sbApi(action,data){
     case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate','line_user_id'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');
-      // ✅ แจ้งเตือน LINE เฉพาะเคสปกติ (ไม่ส่งถ้าเป็นส่วนตัว)
+      // ✅ แจ้งเตือน LINE เฉพาะเคสปกติ
       if((data.sent||'ปกติ')==='ปกติ'&&assignedSales){
         const lineMsg='📋 มีเคสใหม่มอบหมายให้คุณ!\n'+'รหัสเคส: '+id+'\nลูกค้า: '+data.customername+'\nสถานะ: '+(data.status||'รอข้อมูล')+(data.report?'\nรีพอร์ต: '+String(data.report).slice(0,80):'');
         pushLine(assignedSales, lineMsg);
@@ -1458,7 +1430,7 @@ function AdminUsers({currentUser}){
   return <div className="page">
     <div className="page-hd"><div className="page-title">👥 จัดการผู้ใช้</div><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มผู้ใช้</button></div>
     <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>ID</th><th>Username</th><th>ชื่อ</th><th>Role</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:users.map((u,i)=><tr key={i}>
-      <td style={{fontSize:12,color:'var(--text2)'}}>{u.userId}<br/><span style={{fontSize:11,fontWeight:700,color:u.line_user_id?'#06c755':'var(--text3)'}}>{u.line_user_id?'💚 LINE':'⬜ ไม่มี LINE'}</span></td>
+      <td style={{fontSize:12,color:'var(--text2)'}}>{u.userId}<br/><span style={{fontSize:10,fontWeight:700,color:u.line_user_id?'#06c755':'var(--text3)'}}>{u.line_user_id?'💚 LINE':'⬜ ไม่มี LINE'}</span></td>
       <td><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:32,height:32,borderRadius:'50%',background:'var(--bg3)',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:'👤'}</div><span style={{fontWeight:600}}>{u.username}</span></div></td>
       <td>{u.name}</td>
       <td><span className={`badge ${u.role==='Admin'?'s-approve':'s-book'}`}>{u.role}</span></td>
@@ -1502,9 +1474,9 @@ function AdminUsers({currentUser}){
           <input type="text" value={editForm.password} onChange={e=>setE('password',e.target.value)} placeholder="กรอกรหัสใหม่ หรือปล่อยว่าง"/>
         </div>
         <div className="form-group">
-          <label style={{display:'flex',alignItems:'center',gap:6}}>💚 LINE User ID <span style={{fontSize:11,color:'var(--text3)',fontWeight:400}}>— สำหรับแจ้งเตือนเคสใหม่</span></label>
+          <label style={{display:'flex',alignItems:'center',gap:6}}>💚 LINE User ID <span style={{fontSize:11,color:'var(--text3)',fontWeight:400}}>— แจ้งเตือนเคสใหม่</span></label>
           <input value={editForm.line_user_id||''} onChange={e=>setE('line_user_id',e.target.value)} placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"/>
-          <div style={{fontSize:11,color:'var(--text3)',marginTop:4,lineHeight:1.6}}>วิธีหา: เซลส์ส่งข้อความหา Bot แล้ว Admin ดูใน LINE Developers → Webhook log</div>
+          <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>วิธีหา: Add Bot → ส่งข้อความ → Admin ดูใน LINE Developers Webhook log</div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
           <div className="form-group"><label>Role</label><select value={editForm.role} onChange={e=>setE('role',e.target.value)}><option>Sales</option><option>Admin</option></select></div>
@@ -1934,7 +1906,6 @@ function LoginPage({onLogin}){
   const [error,setError]=useState('');
   const canvasRef=useRef();
 
-  // Particle canvas background
   useEffect(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
     const ctx=canvas.getContext('2d');
@@ -1942,8 +1913,7 @@ function LoginPage({onLogin}){
     resize();window.addEventListener('resize',resize);
     const pts=Array.from({length:55},()=>({
       x:Math.random()*canvas.width,y:Math.random()*canvas.height,
-      vx:(Math.random()-.5)*.45,vy:(Math.random()-.5)*.45,
-      r:Math.random()*2+.5
+      vx:(Math.random()-.5)*.45,vy:(Math.random()-.5)*.45,r:Math.random()*2+.5
     }));
     let raf;
     function draw(){
