@@ -162,37 +162,24 @@ tr.clickable{cursor:pointer;}
 .api-key-banner.warning{background:rgba(248,81,73,.08);border-color:rgba(248,81,73,.3);}
 .api-key-banner.success{background:rgba(63,185,80,.08);border-color:rgba(63,185,80,.3);}
 
-/* ─── Login Page — Glassmorphism ─── */
-.login-page{
-  height:100vh;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(-45deg,#0a0e1a,#0d1b2e,#0f2233,#0e0a1a);
-  background-size:400% 400%;animation:gradientMove 12s ease infinite;
-  padding:16px;overflow:hidden;position:relative;
-}
+/* ─── Login Glassmorphism ─── */
+.login-page{height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(-45deg,#0a0e1a,#0d1b2e,#0f2233,#0e0a1a);background-size:400% 400%;animation:gradientMove 12s ease infinite;padding:16px;overflow:hidden;position:relative;}
 .login-blob{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none;animation:floatY 8s ease-in-out infinite;}
 .login-canvas{position:absolute;inset:0;opacity:.35;pointer-events:none;}
-.login-card{
-  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
-  padding:40px 32px;border-radius:20px;width:100%;max-width:380px;
-  box-shadow:0 0 40px rgba(88,166,255,.12),0 24px 64px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.07);
-  text-align:center;color:#fff;position:relative;z-index:1;
-  animation:fadeInUp .65s cubic-bezier(.16,1,.3,1);
-}
+.login-card{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);padding:40px 32px;border-radius:20px;width:100%;max-width:380px;box-shadow:0 0 40px rgba(88,166,255,.12),0 24px 64px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.07);text-align:center;color:#fff;position:relative;z-index:1;animation:fadeInUp .65s cubic-bezier(.16,1,.3,1);}
 .login-card h2{font-size:30px;font-weight:900;background:linear-gradient(135deg,#58a6ff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0 0 4px;animation:floatY 3s ease-in-out infinite;}
-.login-card .login-sub{font-size:13px;color:rgba(255,255,255,.38);margin-bottom:22px;letter-spacing:.5px;}
+.login-sub{font-size:13px;color:rgba(255,255,255,.38);margin-bottom:22px;letter-spacing:.5px;}
 .login-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(88,166,255,.4),rgba(167,139,250,.3),transparent);margin-bottom:22px;}
 .login-label{font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.2px;text-align:left;display:block;margin-bottom:6px;}
 .login-input-wrap{position:relative;margin-bottom:14px;}
-.login-input-wrap .login-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.35;pointer-events:none;}
+.login-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.35;pointer-events:none;}
 .login-input-wrap input{width:100%;padding:13px 14px 13px 42px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font-size:14px;transition:border-color .2s,background .2s,box-shadow .2s;box-sizing:border-box;}
 .login-input-wrap input::placeholder{color:rgba(255,255,255,.25);}
 .login-input-wrap input:focus{outline:none;border-color:rgba(88,166,255,.55);background:rgba(88,166,255,.08);box-shadow:0 0 0 3px rgba(88,166,255,.15);}
-.login-input-wrap .login-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;opacity:.4;padding:4px;color:#fff;}
-.login-input-wrap.has-eye input{padding-right:44px;}
-.btn-login{margin-top:10px;width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#1f6feb 0%,#a78bfa 100%);color:#fff;font-weight:700;font-size:15px;cursor:pointer;letter-spacing:.3px;transition:transform .2s,box-shadow .2s;box-shadow:0 8px 24px rgba(31,111,235,.45);}
-.btn-login:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 32px rgba(31,111,235,.6);}
-.btn-login:active:not(:disabled){transform:scale(.97);}
+.login-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;opacity:.4;padding:4px;color:#fff;}
+.has-eye input{padding-right:44px;}
+.btn-login{margin-top:10px;width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#1f6feb 0%,#a78bfa 100%);color:#fff;font-weight:700;font-size:15px;cursor:pointer;transition:transform .2s,box-shadow .2s;box-shadow:0 8px 24px rgba(31,111,235,.45);}
+.btn-login:hover:not(:disabled){transform:translateY(-2px);}
 .btn-login:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);box-shadow:none;cursor:not-allowed;}
 .login-error{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.35);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#ff8080;text-align:left;display:flex;align-items:center;gap:8px;}
 .login-footer{margin-top:20px;font-size:11px;color:rgba(255,255,255,.16);letter-spacing:.5px;}
@@ -221,12 +208,11 @@ const {useState,useEffect,useCallback,useRef,createContext,useContext} = React;
 // ============================================================
 // ⚙️ CONFIG
 // ============================================================
-const SUPA_URL = 'https://lhmycnzarbcmweavhnxh.supabase.co';
+const SUPA_URL = 'https://jdodhaxxdvukwhodgogj.supabase.co';
 
 // ── FCM Push Notification Setup ──
 const FCM_VAPID = 'BDE3zFoypE16kiLHPFXlF5maeVfvwbp7cnRFdIgxcsi1xVuZmRazyl9ZxsVyTXTdTFVrFXTPpaFQrYht0xM6io0';
 const FCM_EDGE_URL = 'https://lhmycnzarbcmweavhnxh.supabase.co/functions/v1/send-fcm';
-const LINE_EDGE_URL = 'https://lhmycnzarbcmweavhnxh.supabase.co/functions/v1/send-line';
 const FB_CONFIG = {
   apiKey: "AIzaSyC1bnlkqxibYxA4T_giYeN7dyZHcSN5Dek",
   authDomain: "casepool-11685.firebaseapp.com",
@@ -278,21 +264,7 @@ async function pushNotif(salesName,title,body,data={}){
     });
   }catch(e){console.warn('Push failed:',e);}
 }
-
-// ── LINE Messaging API ──
-async function pushLine(salesName, message){
-  try{
-    const rows = await sbQ('GET','users',{name:`eq.${salesName}`,select:'line_user_id'});
-    const lineId = rows?.[0]?.line_user_id;
-    if(!lineId) return;
-    await fetch(LINE_EDGE_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
-      body:JSON.stringify({line_user_id:lineId, message}),
-    });
-  }catch(e){}
-}
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobXljbnphcmJjbXdlYXZobnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNzk5NTQsImV4cCI6MjA4OTY1NTk1NH0.t7nbVArhxbsTBYXnAPwNQKfu6xxid2G4bDdAVVZHB9s';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkb2RoYXh4ZHZ1a3dob2Rnb2dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3Njg0MjgsImV4cCI6MjA5MDM0NDQyOH0.TzSNHVcRYa74MSrxImL1VLcLprxRMziUlKGm95B7sXk';
 const API_URL  = SUPA_URL;
 
 // ── ✅ FIX: Anthropic Key helpers ──
@@ -431,22 +403,14 @@ async function sbApi(action,data){
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   switch(action){
     case 'login':{const rows=await sbQ('GET','users',{username:`eq.${data.username}`,password:`eq.${data.password}`,status:'eq.active'});if(!rows?.length)return{success:false,error:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'};const u=rows[0];return{success:true,user:{userId:u.userid,username:u.username,name:u.name,role:u.role,avatar:u.avatar||'',startdate:u.startdate||''}};}
-    case 'getUsers':{const rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate,line_user_id',order:'userid.asc'});return{success:true,data:(rows||[]).map(u=>({userId:u.userid,username:u.username,name:u.name,role:u.role,status:u.status,avatar:u.avatar||'',startdate:u.startdate||'',line_user_id:u.line_user_id||''}))};}
+    case 'getUsers':{const rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate',order:'userid.asc'});return{success:true,data:(rows||[]).map(u=>({userId:u.userid,username:u.username,name:u.name,role:u.role,status:u.status,avatar:u.avatar||'',startdate:u.startdate||''}))};}
     case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbQ('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
-    case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate','line_user_id'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
+    case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:data.sortBy==='updatedat'?'updatedat.desc':'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
-    case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');
-      // ✅ แจ้งเตือน LINE เฉพาะเคสปกติ
-      if((data.sent||'ปกติ')==='ปกติ'&&assignedSales){
-        const lineMsg='📋 มีเคสใหม่มอบหมายให้คุณ!\n'+'รหัสเคส: '+id+'\nลูกค้า: '+data.customername+'\nสถานะ: '+(data.status||'รอข้อมูล')+(data.report?'\nรีพอร์ต: '+String(data.report).slice(0,80):'');
-        pushLine(assignedSales, lineMsg);
-      }
-      return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
+    case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
     case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);
-      // ✅ ถ้าปิดเคส → เอาออกจากตลาดด้วย
-      if(data.status==='ปิดเคส'){
-        await sbQ('PATCH','market',{id:`eq.${data.caseid}`},{poolstatus:'ปิด'});
-      }
+      // ✅ ปิดเคส → auto remove จากตลาด
+      if(data.status==='ปิดเคส'){await sbQ('PATCH','market',{id:`eq.${data.caseid}`},{poolstatus:'ปิด'});}
       // Push notification ถ้าเปลี่ยน sales (assign)
       if(data.sales&&data.sales!==data.changedBy){
         sbNotif(data.sales,data.caseid,'📋 ได้รับมอบหมายเคส '+data.caseid+' ('+(data.customername||'')+')');
@@ -899,17 +863,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     onUpdated(optimisticData);onClose();
     try{if(isClaimed){await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});}else{const upd={caseid:caseId,status,sent:sentType,changedBy:currentUser.name,detail:'เปลี่ยนสถานะเป็น '+status};if(editReport)upd.report=report;await api('updateCase',upd);if(isAdmin&&newSales&&newSales!==caseData.sales)await api('adminChangeSales',{caseId,newSales});}}catch(e){}
   }
-  async function saveReport(){
-    if(!report.trim())return;
-    setEditReport(false);
-    onClose();
-    try{
-      await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});
-    }catch(e){}
-    cacheClear(['getCases']);
-    onUpdated();
-  }
-
+  async function saveReport(){if(!report.trim())return;setEditReport(false);onClose();try{await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});}catch(e){}cacheClear(['getCases']);onUpdated();}
   async function doDelete(){onClose();const r=await api('deleteCase',{caseId,caseid:caseId,deletedBy:currentUser.name});cacheClear(['getCases','getMarket','getDashboard','getClaimedCases','getHistory','getNotifications']);if(r.success){onUpdated();}else{alert('เกิดข้อผิดพลาด: '+(r.error||'ไม่สามารถลบได้'));}}
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
@@ -1067,8 +1021,8 @@ function AdminCurrentCases({currentUser,users}){
   const [showExportModal,setShowExportModal]=useState(false);
   const [showExport,setShowExport]=useState(false);
   const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
-  const [showMarket,setShowMarket]=useState(false);
   const [showClosed,setShowClosed]=useState(false);
+  const [showMarket,setShowMarket]=useState(false);
   const CLOSED_ST=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   const [marketIds,setMarketIds]=useState(()=>{
     try {
@@ -1165,6 +1119,7 @@ async function sendToMarketDirect(caseId,salesName){
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=getData(r);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
   const closedCount=safeArray(cases).filter(c=>CLOSED_ST.includes(c.status)).length;
+  const marketCount2=safeArray(cases).filter(c=>marketIds.has(String(c.caseid))).length;
   const filtered=safeArray(cases).filter(c=>{
     if(!showMarket&&(marketIds.has(String(c.caseid))||c.market===true))return false;
     if(!showClosed&&CLOSED_ST.includes(c.status))return false;
@@ -1206,14 +1161,7 @@ async function sendToMarketDirect(caseId,salesName){
     return rows;
   }
   return <div className="page">
-    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          <button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>setShowClosed(v=>!v)}>
-            {showClosed?'🔴 ซ่อนเคสปิด':`⚫ เคสปิด${closedCount>0?' ('+closedCount+')':''}`}
-          </button>
-          <button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button>
-          <button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button>
-          <button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button>
-        </div></div>
+    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showMarket?'var(--purple)':'var(--border)'}`,color:showMarket?'var(--purple)':'var(--text2)'}} onClick={()=>setShowMarket(v=>!v)}>{showMarket?'🏪 ซ่อนตลาด':`🏪 ตลาด${marketCount2>0?' ('+marketCount2+')':''}`}</button><button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>setShowClosed(v=>!v)}>{showClosed?'🔴 ซ่อนปิดแล้ว':`⚫ ปิดแล้ว${closedCount>0?' ('+closedCount+')':''}`}</button><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
@@ -1438,14 +1386,13 @@ function AdminUsers({currentUser}){
   const load=()=>{setLoading(true);api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);setLoading(false);});};
   useEffect(()=>{load();},[]);
   async function addUser(){if(!form.username||!form.name)return alert('กรอกชื่อและ username');await api('addUser',form);load();setShowAdd(false);setForm({username:'',password:'1234',name:'',role:'Sales'});}
-  function openEdit(u){setEditUser(u);setEditForm({name:u.name||'',password:'',status:u.status||'active',role:u.role||'Sales',avatar:u.avatar||'',startdate:u.startdate||'',line_user_id:u.line_user_id||''});}
+  function openEdit(u){setEditUser(u);setEditForm({name:u.name||'',password:'',status:u.status||'active',role:u.role||'Sales',avatar:u.avatar||'',startdate:u.startdate||''});}
   async function saveEdit(){
     if(!editForm.name)return alert('กรุณากรอกชื่อ');
     setSaving(true);
     const upd={name:editForm.name,status:editForm.status,role:editForm.role,avatar:editForm.avatar||''};
     if(editForm.password.trim())upd.password=editForm.password.trim();
     if(editForm.startdate)upd.startdate=editForm.startdate;
-    if(editForm.line_user_id!==undefined)upd.line_user_id=editForm.line_user_id||'';
     await api('updateUser',{userId:editUser.userId,...upd});
     setSaving(false);setEditUser(null);load();
   }
@@ -1457,7 +1404,7 @@ function AdminUsers({currentUser}){
   return <div className="page">
     <div className="page-hd"><div className="page-title">👥 จัดการผู้ใช้</div><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มผู้ใช้</button></div>
     <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th>ID</th><th>Username</th><th>ชื่อ</th><th>Role</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:users.map((u,i)=><tr key={i}>
-      <td style={{fontSize:12,color:'var(--text2)'}}>{u.userId}<br/><span style={{fontSize:10,fontWeight:700,color:u.line_user_id?'#06c755':'var(--text3)'}}>{u.line_user_id?'💚 LINE':'⬜ ไม่มี LINE'}</span></td>
+      <td style={{fontSize:12,color:'var(--text2)'}}>{u.userId}</td>
       <td><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:32,height:32,borderRadius:'50%',background:'var(--bg3)',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:'👤'}</div><span style={{fontWeight:600}}>{u.username}</span></div></td>
       <td>{u.name}</td>
       <td><span className={`badge ${u.role==='Admin'?'s-approve':'s-book'}`}>{u.role}</span></td>
@@ -1499,11 +1446,6 @@ function AdminUsers({currentUser}){
         <div className="form-group">
           <label>รหัสผ่านใหม่ <span style={{fontSize:11,color:'var(--text3)'}}>(ถ้าไม่เปลี่ยน ปล่อยว่างไว้)</span></label>
           <input type="text" value={editForm.password} onChange={e=>setE('password',e.target.value)} placeholder="กรอกรหัสใหม่ หรือปล่อยว่าง"/>
-        </div>
-        <div className="form-group">
-          <label style={{display:'flex',alignItems:'center',gap:6}}>💚 LINE User ID <span style={{fontSize:11,color:'var(--text3)',fontWeight:400}}>— แจ้งเตือนเคสใหม่</span></label>
-          <input value={editForm.line_user_id||''} onChange={e=>setE('line_user_id',e.target.value)} placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"/>
-          <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>วิธีหา: Add Bot → ส่งข้อความ → Admin ดูใน LINE Developers Webhook log</div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
           <div className="form-group"><label>Role</label><select value={editForm.role} onChange={e=>setE('role',e.target.value)}><option>Sales</option><option>Admin</option></select></div>
@@ -1824,16 +1766,7 @@ function SalesCurrentCases({currentUser,users}){
   // ซ่อนเคสที่อยู่ในตลาดออกจากรายการหลัก (แต่ถ้ากด "แสดงเคสปิดแล้ว" จะเห็น)
   const filtered=cases.filter(c=>{
     if(!showClosed&&marketIds.has(String(c.caseid)))return false;
-    if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{
-    if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);
-    // ✅ default: เรียง updatedat desc — เคสที่เพิ่ง assign มาอยู่บนสุด
-    if(sortDir==='desc'||sortDir==='asc'){
-      const au=String(a.updatedat||a.createdat||'');
-      const bu=String(b.updatedat||b.createdat||'');
-      return sortDir==='desc'?bu.localeCompare(au):au.localeCompare(bu);
-    }
-    return 0;
-  });
+    if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   function formatDate(d){const s=String(d||'');if(s.includes('T')){const dt=new Date(s);if(!isNaN(dt)){return`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getFullYear()).slice(-2)} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;}}const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m)return`${m[1]}/${m[2]}/${String(m[3]).slice(-2)} ${m[4]}:${m[5]}`;return s.split(' ')[0]||'-';}
   return <div className="page">
@@ -1941,86 +1874,41 @@ function LoginPage({onLogin}){
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
   const canvasRef=useRef();
-
   useEffect(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
     const ctx=canvas.getContext('2d');
     const resize=()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;};
     resize();window.addEventListener('resize',resize);
-    const pts=Array.from({length:55},()=>({
-      x:Math.random()*canvas.width,y:Math.random()*canvas.height,
-      vx:(Math.random()-.5)*.45,vy:(Math.random()-.5)*.45,r:Math.random()*2+.5
-    }));
+    const pts=Array.from({length:55},()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,vx:(Math.random()-.5)*.45,vy:(Math.random()-.5)*.45,r:Math.random()*2+.5}));
     let raf;
-    function draw(){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      pts.forEach(p=>{
-        p.x+=p.vx;p.y+=p.vy;
-        if(p.x<0||p.x>canvas.width)p.vx*=-1;
-        if(p.y<0||p.y>canvas.height)p.vy*=-1;
-        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-        ctx.fillStyle='rgba(88,166,255,.5)';ctx.fill();
-      });
-      pts.forEach((a,i)=>pts.slice(i+1).forEach(b=>{
-        const d=Math.hypot(a.x-b.x,a.y-b.y);
-        if(d<120){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-          ctx.strokeStyle='rgba(88,166,255,'+(1-d/120)*.15+')';ctx.stroke();}
-      }));
-      raf=requestAnimationFrame(draw);
-    }
-    draw();
-    return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',resize);};
+    function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>canvas.width)p.vx*=-1;if(p.y<0||p.y>canvas.height)p.vy*=-1;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(88,166,255,.5)';ctx.fill();});pts.forEach((a,i)=>pts.slice(i+1).forEach(b=>{const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<120){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle='rgba(88,166,255,'+(1-d/120)*.15+')';ctx.stroke();}}));raf=requestAnimationFrame(draw);}
+    draw();return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',resize);};
   },[]);
-
-  async function submit(){
-    if(!username||!password)return setError('กรุณากรอกข้อมูลให้ครบ');
-    setLoading(true);setError('');
-    const r=await api('login',{username,password});
-    setLoading(false);
-    if(r.success)onLogin(r.user);
-    else setError(r.error||'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-  }
-
+  async function submit(){if(!username||!password)return setError('กรุณากรอกข้อมูลให้ครบ');setLoading(true);setError('');const r=await api('login',{username,password});setLoading(false);if(r.success)onLogin(r.user);else setError(r.error||'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');}
   return <div className="login-page">
     <canvas ref={canvasRef} className="login-canvas"/>
     <div className="login-blob" style={{width:420,height:420,background:'radial-gradient(circle,rgba(88,166,255,.22) 0%,transparent 70%)',top:'-130px',left:'-130px'}}/>
     <div className="login-blob" style={{width:360,height:360,background:'radial-gradient(circle,rgba(188,140,255,.18) 0%,transparent 70%)',bottom:'-110px',right:'-90px',animationDelay:'3s'}}/>
     <div className="login-blob" style={{width:200,height:200,background:'radial-gradient(circle,rgba(63,185,80,.1) 0%,transparent 70%)',top:'38%',right:'22%',animationDelay:'1.5s'}}/>
     <div className="login-card">
-      <img src="https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png"
-        style={{width:58,height:58,marginBottom:10,borderRadius:'50%',boxShadow:'0 0 20px rgba(88,166,255,.5)',objectFit:'cover'}}
-        onError={e=>{e.target.style.display='none';}}/>
+      <img src="https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png" style={{width:58,height:58,marginBottom:10,borderRadius:'50%',boxShadow:'0 0 20px rgba(88,166,255,.5)',objectFit:'cover'}} onError={e=>{e.target.style.display='none';}}/>
       <h2>CasePool</h2>
       <p className="login-sub">ระบบจัดการเคสรถยนต์</p>
       <div className="login-divider"/>
       {error&&<div className="login-error">⚠️ <span>{error}</span></div>}
-      <div>
-        <label className="login-label">USERNAME</label>
-        <div className="login-input-wrap">
-          <span className="login-icon">👤</span>
-          <input value={username} onChange={e=>setUsername(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&submit()}
-            placeholder="กรอก Username" autoComplete="username"/>
+      <div><label className="login-label">USERNAME</label>
+        <div className="login-input-wrap"><span className="login-icon">👤</span>
+          <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Username" autoComplete="username"/>
         </div>
       </div>
-      <div>
-        <label className="login-label">PASSWORD</label>
-        <div className="login-input-wrap has-eye">
-          <span className="login-icon">🔒</span>
-          <input type={showPass?'text':'password'} value={password}
-            onChange={e=>setPassword(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&submit()}
-            placeholder="กรอก Password" autoComplete="current-password"/>
+      <div><label className="login-label">PASSWORD</label>
+        <div className="login-input-wrap has-eye"><span className="login-icon">🔒</span>
+          <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Password" autoComplete="current-password"/>
           <button className="login-eye" onClick={()=>setShowPass(v=>!v)}>{showPass?'🙈':'👁'}</button>
         </div>
       </div>
       <button className="btn-login" onClick={submit} disabled={loading}>
-        {loading
-          ?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-              <span className="spin" style={{width:15,height:15,borderWidth:2,display:'inline-block'}}/>
-              กำลังเข้าสู่ระบบ...
-            </span>
-          :'เข้าสู่ระบบ →'}
+        {loading?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><span className="spin" style={{width:15,height:15,borderWidth:2,display:'inline-block'}}/>กำลังเข้าสู่ระบบ...</span>:'เข้าสู่ระบบ →'}
       </button>
       <div className="login-footer">CasePool v2.0 · Powered by Claude</div>
     </div>
