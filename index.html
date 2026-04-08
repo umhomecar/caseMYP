@@ -434,7 +434,7 @@ async function sbApi(action,data){
     case 'getUsers':{const rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate,line_user_id',order:'userid.asc'});return{success:true,data:(rows||[]).map(u=>({userId:u.userid,username:u.username,name:u.name,role:u.role,status:u.status,avatar:u.avatar||'',startdate:u.startdate||'',line_user_id:u.line_user_id||''}))};}
     case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbQ('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
     case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate','line_user_id'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
-    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
+    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:data.sortBy==='updatedat'?'updatedat.desc':'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ'});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');
       // ✅ แจ้งเตือน LINE เฉพาะเคสปกติ
       if((data.sent||'ปกติ')==='ปกติ'&&assignedSales){
@@ -443,6 +443,10 @@ async function sbApi(action,data){
       }
       return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
     case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);
+      // ✅ ถ้าปิดเคส → เอาออกจากตลาดด้วย
+      if(data.status==='ปิดเคส'){
+        await sbQ('PATCH','market',{id:`eq.${data.caseid}`},{poolstatus:'ปิด'});
+      }
       // Push notification ถ้าเปลี่ยน sales (assign)
       if(data.sales&&data.sales!==data.changedBy){
         sbNotif(data.sales,data.caseid,'📋 ได้รับมอบหมายเคส '+data.caseid+' ('+(data.customername||'')+')');
@@ -536,7 +540,7 @@ async function sbApi(action,data){
     case 'getNotifications':{const q={order:'id.desc'};if(data.sales)q.sales=`eq.${data.sales}`;const rows=await sbQ('GET','notifications',q);return{success:true,data:(rows||[]).map(mapNotif)};}
     case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');await sbQ('PATCH','notifications',{id:`eq.${id}`},{status:'read'});return{success:true};}
     case 'deleteCase':{const cid=data.caseId||data.caseid;await Promise.all([sbQ('DELETE','cases',{caseid:`eq.${cid}`}),sbQ('DELETE','market',{id:`eq.${cid}`}),sbQ('DELETE','claimedcases',{caseid:`eq.${cid}`})]);sbHist(cid,data.deletedBy||'แอดมิน','ลบเคส','ลบเคสออกจากระบบ');return{success:true};}
-    case 'adminPullCase':case 'adminChangeSales':{await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{sales:data.newSales,updatedat:nowTH()});sbHist(data.caseId,'แอดมิน',action==='adminPullCase'?'ดึงเคส':'เปลี่ยนเซลส์','เปลี่ยนเป็น '+data.newSales);return{success:true};}
+    case 'adminPullCase':case 'adminChangeSales':{const ts=nowTH();await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{sales:data.newSales,updatedat:ts});sbHist(data.caseId,'แอดมิน',action==='adminPullCase'?'ดึงเคส':'เปลี่ยนเซลส์','เปลี่ยนเป็น '+data.newSales);if(data.newSales){sbNotif(data.newSales,data.caseId,'📋 ได้รับมอบหมายเคส '+data.caseId+' จากแอดมิน');}return{success:true};}
     case 'getSmartAssign':{const sales=await getSmartAssignSales();return{success:true,sales};}
 
     case 'broadcast':{
@@ -895,7 +899,17 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     onUpdated(optimisticData);onClose();
     try{if(isClaimed){await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});}else{const upd={caseid:caseId,status,sent:sentType,changedBy:currentUser.name,detail:'เปลี่ยนสถานะเป็น '+status};if(editReport)upd.report=report;await api('updateCase',upd);if(isAdmin&&newSales&&newSales!==caseData.sales)await api('adminChangeSales',{caseId,newSales});}}catch(e){}
   }
-  async function saveReport(){if(!report.trim())return;setEditReport(false);onUpdated({...caseData,report});onClose();try{await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});}catch(e){}}
+  async function saveReport(){
+    if(!report.trim())return;
+    setEditReport(false);
+    onClose();
+    try{
+      await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});
+    }catch(e){}
+    cacheClear(['getCases']);
+    onUpdated();
+  }
+
   async function doDelete(){onClose();const r=await api('deleteCase',{caseId,caseid:caseId,deletedBy:currentUser.name});cacheClear(['getCases','getMarket','getDashboard','getClaimedCases','getHistory','getNotifications']);if(r.success){onUpdated();}else{alert('เกิดข้อผิดพลาด: '+(r.error||'ไม่สามารถลบได้'));}}
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
@@ -1053,6 +1067,9 @@ function AdminCurrentCases({currentUser,users}){
   const [showExportModal,setShowExportModal]=useState(false);
   const [showExport,setShowExport]=useState(false);
   const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
+  const [showMarket,setShowMarket]=useState(false);
+  const [showClosed,setShowClosed]=useState(false);
+  const CLOSED_ST=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   const [marketIds,setMarketIds]=useState(()=>{
     try {
       const saved = localStorage.getItem('marketIds');
@@ -1147,7 +1164,10 @@ async function sendToMarketDirect(caseId,salesName){
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=getData(r);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+  const closedCount=safeArray(cases).filter(c=>CLOSED_ST.includes(c.status)).length;
   const filtered=safeArray(cases).filter(c=>{
+    if(!showMarket&&(marketIds.has(String(c.caseid))||c.market===true))return false;
+    if(!showClosed&&CLOSED_ST.includes(c.status))return false;
     if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
     if(filter.status&&c.status!==filter.status)return false;
     if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom))return false;}
@@ -1186,7 +1206,14 @@ async function sendToMarketDirect(caseId,salesName){
     return rows;
   }
   return <div className="page">
-    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>เดือนนี้ทั้งหมด {filtered.length} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>setShowClosed(v=>!v)}>
+            {showClosed?'🔴 ซ่อนเคสปิด':`⚫ เคสปิด${closedCount>0?' ('+closedCount+')':''}`}
+          </button>
+          <button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button>
+          <button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button>
+          <button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button>
+        </div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
@@ -1792,12 +1819,21 @@ function SalesCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
   const CLOSED_STATUSES=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'];
   const [marketIds,setMarketIds]=useState(new Set());
-  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getMarketIds',{})]).then(([r,mr])=>{if(r.success)setCases(safeArray(r.data));setMarketIds(new Set(safeArray(mr.data)));setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[currentUser.name]);
+  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true',sortBy:'updatedat'}),api('getMarketIds',{})]).then(([r,mr])=>{if(r.success)setCases(safeArray(r.data));setMarketIds(new Set(safeArray(mr.data)));setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   // ซ่อนเคสที่อยู่ในตลาดออกจากรายการหลัก (แต่ถ้ากด "แสดงเคสปิดแล้ว" จะเห็น)
   const filtered=cases.filter(c=>{
     if(!showClosed&&marketIds.has(String(c.caseid)))return false;
-    if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
+    if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{
+    if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);
+    // ✅ default: เรียง updatedat desc — เคสที่เพิ่ง assign มาอยู่บนสุด
+    if(sortDir==='desc'||sortDir==='asc'){
+      const au=String(a.updatedat||a.createdat||'');
+      const bu=String(b.updatedat||b.createdat||'');
+      return sortDir==='desc'?bu.localeCompare(au):au.localeCompare(bu);
+    }
+    return 0;
+  });
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   function formatDate(d){const s=String(d||'');if(s.includes('T')){const dt=new Date(s);if(!isNaN(dt)){return`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getFullYear()).slice(-2)} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;}}const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m)return`${m[1]}/${m[2]}/${String(m[3]).slice(-2)} ${m[4]}:${m[5]}`;return s.split(' ')[0]||'-';}
   return <div className="page">
