@@ -1218,11 +1218,17 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   }
   function deleteNote(i){const upd=notes.filter((_,idx)=>idx!==i);setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}}
   async function save(){
-    const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:editReport?report:caseData.report,sales:(isAdmin&&newSales)?newSales:caseData.sales};
+    const finalReport=report; // ใช้ค่าจาก state เสมอ ไม่ว่าจะ editReport หรือเปล่า
+    const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:finalReport,sales:(isAdmin&&newSales)?newSales:caseData.sales};
     onUpdated(optimisticData);onClose();
-    try{if(isClaimed){await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});}else{const upd={caseid:caseId,status,sent:sentType,changedBy:currentUser.name,detail:'เปลี่ยนสถานะเป็น '+status};if(editReport)upd.report=report;await api('updateCase',upd);if(isAdmin&&newSales&&newSales!==caseData.sales)await api('adminChangeSales',{caseId,newSales});}}catch(e){}
+    try{if(isClaimed){await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});}else{const upd={caseid:caseId,status,sent:sentType,report:finalReport,changedBy:currentUser.name,detail:'เปลี่ยนสถานะเป็น '+status};await api('updateCase',upd);if(isAdmin&&newSales&&newSales!==caseData.sales)await api('adminChangeSales',{caseId,newSales});}}catch(e){}
   }
-  async function saveReport(){if(!report.trim())return;setEditReport(false);onUpdated({...caseData,report});onClose();try{await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});}catch(e){}}
+  async function saveReport(){
+    if(!report.trim())return;
+    setEditReport(false);
+    try{await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});}catch(e){}
+    onUpdated({...caseData,report});onClose();
+  }
   async function doDelete(){onClose();const r=await api('deleteCase',{caseId,caseid:caseId,deletedBy:currentUser.name});cacheClear(['getCases','getMarket','getDashboard','getClaimedCases','getHistory','getNotifications']);if(r.success){onUpdated();}else{alert('เกิดข้อผิดพลาด: '+(r.error||'ไม่สามารถลบได้'));}}
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
@@ -1435,10 +1441,12 @@ function AdminCurrentCases({currentUser,users}){
   useEffect(()=>{load();},[load]);
   async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=safeArray(r.data);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
-  const SHOW_MARKET_KEY='admin_show_market';
   const [showMarket,setShowMarket]=useState(false);
+  const [hideClosedAdmin,setHideClosedAdmin]=useState(true);
+  const ADMIN_CLOSED_STATUSES=['ปิดเคส'];
   const filtered=safeArray(cases).filter(c=>{
     if(!showMarket&&(marketIds.has(String(c.caseid))||c.market===true))return false; // ซ่อนเคสในตลาด
+    if(hideClosedAdmin&&ADMIN_CLOSED_STATUSES.includes(c.status))return false; // ซ่อนปิดเคส
     if(filter.sales!=='all'&&c.sales!==filter.sales)return false;
     if(filter.status&&c.status!==filter.status)return false;
     if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom))return false;}
@@ -1494,7 +1502,7 @@ function AdminCurrentCases({currentUser,users}){
         </div>
       </div>
     </div>}>
-    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส{marketCount>0&&!showMarket&&<span style={{marginLeft:6,color:'var(--purple)',cursor:'pointer',textDecoration:'underline'}} onClick={()=>setShowMarket(true)}>· ซ่อน {marketCount} เคสในตลาด</span>}</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{marketCount>0&&<button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showMarket?'var(--purple)':'var(--border)'}`,color:showMarket?'var(--purple)':'var(--text2)'}} onClick={()=>setShowMarket(v=>!v)}>{showMarket?'🏪 ซ่อนเคสตลาด':`🏪 แสดงเคสตลาด (${marketCount})`}</button>}<button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส{marketCount>0&&!showMarket&&<span style={{marginLeft:6,color:'var(--purple)',cursor:'pointer',textDecoration:'underline'}} onClick={()=>setShowMarket(true)}>· ซ่อน {marketCount} เคสในตลาด</span>}</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${hideClosedAdmin?'var(--red)':'var(--border)'}`,color:hideClosedAdmin?'var(--red)':'var(--text2)'}} onClick={()=>setHideClosedAdmin(v=>!v)}>{hideClosedAdmin?'🔴 ซ่อนปิดเคส':'⚫ แสดงปิดเคส'}</button>{marketCount>0&&<button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showMarket?'var(--purple)':'var(--border)'}`,color:showMarket?'var(--purple)':'var(--text2)'}} onClick={()=>setShowMarket(v=>!v)}>{showMarket?'🏪 ซ่อนเคสตลาด':`🏪 แสดงเคสตลาด (${marketCount})`}</button>}<button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
@@ -2215,7 +2223,7 @@ function GlobalSearch({currentUser,onClose,onNavigate}){
 function SalesMarket({currentUser}){
   const [cases,setCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [loading,setLoading]=useState(true);const [claimedIds,setClaimedIds]=useState(new Set());const [skippedIds,setSkippedIds]=useState(new Set());const [toast,setToast]=useState(null);const [leaderboard,setLeaderboard]=useState([]);
   const showToast=(msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);};
-  const load=useCallback((silent=false)=>{if(!silent)setLoading(true);Promise.all([api('getMarket',{sales:currentUser.name}),api('getClaimedCases',{sales:currentUser.name}),api('getDashboard',{role:'Admin'})]).then(([mr,cr,dr])=>{if(mr.success)setCases(safeArray(mr.data).filter(c=>c.old_sales!==currentUser.name));if(cr.success)setClaimedCases(cr.data||[]);if(dr.success)setLeaderboard(dr.data?.sales||[]);setLoading(false);setClaimedIds(new Set());setSkippedIds(new Set());});},[currentUser.name]);
+  const load=useCallback((silent=false)=>{if(!silent)setLoading(true);Promise.all([api('getMarket',{sales:currentUser.name}),api('getClaimedCases',{sales:currentUser.name}),api('getDashboard',{role:'Admin'})]).then(([mr,cr,dr])=>{if(mr.success)setCases(safeArray(mr.data).filter(c=>c.old_sales!==currentUser.name&&c.status!=='ปิดเคส'));if(cr.success)setClaimedCases(cr.data||[]);if(dr.success)setLeaderboard(dr.data?.sales||[]);setLoading(false);setClaimedIds(new Set());setSkippedIds(new Set());});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   async function claim(caseId){setClaimedIds(prev=>new Set([...prev,caseId]));setClaimedCases(prev=>[...prev,{caseID:caseId,sale:currentUser.name}]);showToast('✅ รับเคส '+caseId+' สำเร็จ!','ok');const r=await api('claimCase',{caseId,sales:currentUser.name});if(!r.success){setClaimedIds(prev=>{const s=new Set(prev);s.delete(caseId);return s;});setClaimedCases(prev=>prev.filter(c=>c.caseID!==caseId));showToast('❌ '+(r.error||'รับเคสไม่สำเร็จ'),'err');}else{setTimeout(()=>load(true),2000);}}
   async function notInterested(caseId){setSkippedIds(prev=>new Set([...prev,caseId]));await api('returnCase',{caseId,sales:'_skip_'+currentUser.name});setTimeout(()=>load(true),1000);}
@@ -2309,7 +2317,18 @@ function SalesCurrentCases({currentUser,users}){
 
 function SalesClaimedCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [confirm,setConfirm]=useState(null);const [now,setNow]=useState(Date.now());
-  const load=useCallback(()=>{setLoading(true);api('getClaimedCases',{sales:currentUser.name}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[currentUser.name]);
+  const load=useCallback(()=>{setLoading(true);api('getClaimedCases',{sales:currentUser.name}).then(r=>{
+    if(r.success){
+      // เรียงใหม่สุดอยู่บนสุด
+      const sorted=safeArray(r.data).sort((a,b)=>{
+        const ta=String(a.AssignedAt||a['วันที่รับเคส']||'');
+        const tb=String(b.AssignedAt||b['วันที่รับเคส']||'');
+        return tb.localeCompare(ta);
+      });
+      setCases(sorted);
+    }
+    setLoading(false);
+  });},[currentUser.name]);
   useEffect(()=>{load();},[load]);useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(t);},[]);
   function parseAssignedAt(s){if(!s)return null;const m=String(s).match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
   function canReturn(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return true;return(now-dt.getTime())>=24*3600*1000;}
