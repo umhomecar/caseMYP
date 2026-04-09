@@ -210,6 +210,7 @@ tr.clickable{cursor:pointer;}
 .loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text2);}
 .spin{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes newCasePop{0%{transform:scale(1.02);box-shadow:0 0 0 3px rgba(88,166,255,.6);}60%{transform:scale(1.01);box-shadow:0 0 0 5px rgba(88,166,255,.3);}100%{transform:scale(1);box-shadow:none;}}
 @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
 .skeleton{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:800px 100%;animation:shimmer 1.4s infinite;border-radius:6px;}
 .form-group{margin-bottom:14px;}
@@ -855,7 +856,22 @@ async function sbApi(action,data){
     case 'getNotifications':{const q={order:'id.desc'};if(data.sales)q.sales=`eq.${data.sales}`;const rows=await sbQ('GET','notifications',q);return{success:true,data:(rows||[]).map(mapNotif)};}
     case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');await sbQ('PATCH','notifications',{id:`eq.${id}`},{status:'read'});return{success:true};}
     case 'deleteCase':{const cid=data.caseId||data.caseid;await Promise.all([sbQ('DELETE','cases',{caseid:`eq.${cid}`}),sbQ('DELETE','market',{id:`eq.${cid}`}),sbQ('DELETE','claimedcases',{caseid:`eq.${cid}`})]);sbHist(cid,data.deletedBy||'แอดมิน','ลบเคส','ลบเคสออกจากระบบ');return{success:true};}
-    case 'adminPullCase':case 'adminChangeSales':{const ts=nowTH();await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{sales:data.newSales,updatedat:ts});const existClaimed=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`});if(existClaimed?.length){await sbQ('PATCH','claimedcases',{caseid:`eq.${data.caseId}`},{sale:data.newSales,assignedat:ts});}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(cr?.length){const c=cr[0];await sbQ('POST','claimedcases',{},{caseid:data.caseId,customername:c.customername,contact:c.contact,report:c.report,status:c.status,fromsales:data.changedBy||'แอดมิน',sale:data.newSales,newstatus:c.status,assignedat:ts,notes:''});}}cacheClear(['getClaimedCases']);sbHist(data.caseId,data.changedBy||'แอดมิน',action==='adminPullCase'?'ดึงเคส':'โอนเคส','โอนเคสไปให้ '+data.newSales);return{success:true};}
+    case 'adminPullCase':case 'adminChangeSales':{
+      const ts=nowTH();
+      // 1) อัปเดต cases table
+      await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{sales:data.newSales,updatedat:ts});
+      // 2) upsert claimedcases + 🔥 assignedat ใหม่ → เคสขึ้นบนสุด
+      const existing=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`});
+      if(existing?.length){
+        await sbQ('PATCH','claimedcases',{caseid:`eq.${data.caseId}`},{sale:data.newSales,assignedat:ts});
+      }else{
+        const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
+        if(cr?.length){const c=cr[0];await sbQ('POST','claimedcases',{},{caseid:data.caseId,customername:c.customername,contact:c.contact,report:c.report,status:c.status,fromsales:data.changedBy||'แอดมิน',sale:data.newSales,newstatus:c.status,assignedat:ts,notes:''});}
+      }
+      cacheClear(['getClaimedCases']);
+      sbHist(data.caseId,data.changedBy||'แอดมิน',action==='adminPullCase'?'ดึงเคส':'โอนเคส','โอนเคสไปให้ '+data.newSales);
+      return{success:true};
+    }
     case 'getSmartAssign':{const sales=await getSmartAssignSales();return{success:true,sales};}
 
     case 'broadcast':{
@@ -2307,18 +2323,69 @@ function SalesCurrentCases({currentUser,users}){
   </div>;
 }
 
+
+// ============================================================
+// 🔴 SUPABASE REALTIME — claimedcases live sync
+// ============================================================
+function useRealtimeClaimed(salesName, onUpdate){
+  useEffect(()=>{
+    if(!salesName) return;
+    const wsUrl=SUPA_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SUPA_KEY+'&vsn=1.0.0';
+    let ws=null; let hb=null; let ref=1;
+    function send(obj){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}catch(e){}}
+    try{
+      ws=new WebSocket(wsUrl);
+      ws.onopen=()=>{
+        // subscribe ต่อแถว sale=eq.<ชื่อเซลส์> เท่านั้น
+        send({topic:'realtime:public:claimedcases',event:'phx_join',payload:{config:{broadcast:{self:false},presence:{key:''},postgres_changes:[{event:'*',schema:'public',table:'claimedcases',filter:'sale=eq.'+salesName}]}},ref:String(ref++)});
+        hb=setInterval(()=>send({topic:'phoenix',event:'heartbeat',payload:{},ref:String(ref++)}),25000);
+      };
+      ws.onmessage=(e)=>{
+        try{
+          const msg=JSON.parse(e.data);
+          const d=msg?.payload?.data;
+          if(d&&['INSERT','UPDATE','DELETE'].includes(d.type)) onUpdate(d);
+        }catch(err){}
+      };
+      ws.onerror=()=>{};
+    }catch(e){}
+    return()=>{clearInterval(hb);try{ws&&ws.close();}catch(e){}};
+  },[salesName]);
+}
+
 function SalesClaimedCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [confirm,setConfirm]=useState(null);const [now,setNow]=useState(Date.now());
-  const load=useCallback(()=>{setLoading(true);api('getClaimedCases',{sales:currentUser.name}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[currentUser.name]);
-  useEffect(()=>{load();},[load]);useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(t);},[]);
+  const [newCaseId,setNewCaseId]=useState(null); // 🔥 highlight เคสที่เพิ่งได้รับ
+  const load=useCallback(()=>{
+    setLoading(true);
+    cacheClear(['getClaimedCases']);
+    api('getClaimedCases',{sales:currentUser.name}).then(r=>{
+      if(r.success){
+        // เรียงใหม่สุดขึ้นบนสุด
+        const sorted=safeArray(r.data).sort((a,b)=>String(b.AssignedAt||'').localeCompare(String(a.AssignedAt||'')));
+        setCases(sorted);
+      }
+      setLoading(false);
+    });
+  },[currentUser.name]);
+  // 🔴 Realtime — รับ event ทันทีที่มีเคสโยนมา
+  useRealtimeClaimed(currentUser.name,(payload)=>{
+    const cid=payload?.new?.caseid||payload?.record?.caseid||'';
+    if(cid) setNewCaseId(cid);
+    load();
+    showToast('📩 ได้รับเคสใหม่'+(cid?' — '+cid:''),'info',4000);
+  });
+  useEffect(()=>{load();},[load]);
+  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(t);},[]);
+  useEffect(()=>{if(newCaseId){const t=setTimeout(()=>setNewCaseId(null),5000);return()=>clearTimeout(t);}},[newCaseId]);
   function parseAssignedAt(s){if(!s)return null;const m=String(s).match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
   function canReturn(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return true;return(now-dt.getTime())>=24*3600*1000;}
   function timeLeft(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return '';const ms=24*3600*1000-(now-dt.getTime());if(ms<=0)return '';const h=Math.floor(ms/3600000);const min=Math.floor((ms%3600000)/60000);return h>0?`${h} ชม. ${min} น.`:`${min} น.`;}
   async function doReturn(caseId){const r=await api('returnCase',{caseId,sales:currentUser.name});if(!r.success){alert(r.error||'ไม่สามารถคืนเคสได้');return;}load();}
   return <div className="page">
     <div className="page-hd"><div className="page-title">📥 เคสที่รับจากตลาด</div><button className="btn btn-ghost" onClick={load}>🔄</button></div>
-    {loading?<SkeletonCards n={3}/>:cases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:cases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer'}}>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseID}</span><StatusBadge status={c.newstatus||c.status}/></div>
+    {loading?<SkeletonCards n={3}/>:cases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:cases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);const isNew=newCaseId&&String(c.caseID)===String(newCaseId);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer',animation:isNew?'newCasePop .6s ease':'',border:isNew?'1px solid rgba(88,166,255,.7)':'',background:isNew?'rgba(88,166,255,.06)':''}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><div style={{display:'flex',alignItems:'center',gap:6}}><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseID}</span>{isNew&&<span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20,background:'rgba(88,166,255,.2)',color:'var(--blue)',border:'1px solid rgba(88,166,255,.5)',animation:'pulse .8s infinite'}}>✨ ใหม่!</span>}</div><StatusBadge status={c.newstatus||c.status}/></div>
       <div style={{fontWeight:500,marginBottom:4}}>{c.customername}</div>
       <div style={{fontSize:12,color:'var(--text2)',marginBottom:6}}>รับมาจาก: <span style={{color:'var(--orange)'}}>{c.fromsales||'-'}</span>{' · '}รับเมื่อ: {String(c.AssignedAt||'').split(' ')[0]}</div>
       {!ok&&<div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(210,153,34,.10)',border:'1px solid rgba(210,153,34,.35)',borderRadius:6,padding:'5px 10px',marginBottom:8,fontSize:12,color:'var(--yellow)'}}>🔒 คืนเคสได้หลังจากอีก <strong style={{marginLeft:4}}>{left}</strong></div>}
