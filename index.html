@@ -30,6 +30,7 @@ window.addEventListener('load',function(){
   },4000);
 });
 </script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Sarabun',sans-serif;}
@@ -210,6 +211,8 @@ tr.clickable{cursor:pointer;}
 .loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text2);}
 .spin{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes fadeZoom{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
 .skeleton{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:800px 100%;animation:shimmer 1.4s infinite;border-radius:6px;}
 .form-group{margin-bottom:14px;}
@@ -853,8 +856,7 @@ async function sbApi(action,data){
     case 'getDashboard':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const[cs,cl,users]=await Promise.all([sbQ('GET','cases',{caseid:`like.${pre}*`}),sbQ('GET','claimedcases',{}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'userid,name,avatar,startdate'})]);const cases=cs||[],claimed=cl||[],salesList=users||[];if(data.role==='Admin'){return{success:true,data:{sales:salesList.map(u=>{const my=cases.filter(c=>c.sales===u.name);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});return{name:u.name,avatar:u.avatar||'',currentCases:my.length,claimedCases:claimed.filter(c=>c.sale===u.name).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st};}),total:{cases:cases.length}}};}const my=cases.filter(c=>c.sales===data.sales);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});const me=salesList.find(u=>u.name===data.sales);return{success:true,data:{currentCases:my.length,claimedCases:claimed.filter(c=>c.sale===data.sales).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st,startdate:me?.startdate||''}};}
     case 'getHistory':{const q={order:'createdat.desc'};if(data.caseId)q.caseid=`eq.${data.caseId}`;const rows=await sbQ('GET','history',q);return{success:true,data:(rows||[]).map(mapHistory)};}
     case 'getNotifications':{const q={order:'id.desc'};if(data.sales)q.sales=`eq.${data.sales}`;const rows=await sbQ('GET','notifications',q);return{success:true,data:(rows||[]).map(mapNotif)};}
-    case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');await sbQ('PATCH','notifications',{id:`eq.${id}`},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
-    case 'markAllNotifRead':{if(data.sales)await sbQ('PATCH','notifications',{sales:`eq.${data.sales}`,status:'eq.unread'},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
+    case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');await sbQ('PATCH','notifications',{id:`eq.${id}`},{status:'read'});return{success:true};}
     case 'deleteCase':{const cid=data.caseId||data.caseid;await Promise.all([sbQ('DELETE','cases',{caseid:`eq.${cid}`}),sbQ('DELETE','market',{id:`eq.${cid}`}),sbQ('DELETE','claimedcases',{caseid:`eq.${cid}`})]);sbHist(cid,data.deletedBy||'แอดมิน','ลบเคส','ลบเคสออกจากระบบ');return{success:true};}
     case 'adminPullCase':case 'adminChangeSales':{await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{sales:data.newSales,updatedat:nowTH()});sbHist(data.caseId,'แอดมิน',action==='adminPullCase'?'ดึงเคส':'เปลี่ยนเซลส์','เปลี่ยนเป็น '+data.newSales);return{success:true};}
     case 'getSmartAssign':{const sales=await getSmartAssignSales();return{success:true,sales};}
@@ -1368,61 +1370,11 @@ function AddBookingModal({currentUser,users,onClose,onAdded}){
 function NotifPanel({user,onClose,onCountChange}){
   const [notifs,setNotifs]=useState([]);const [loading,setLoading]=useState(true);
   useEffect(()=>{api('getNotifications',{sales:user.name}).then(r=>{if(r.success)setNotifs(r.data||[]);setLoading(false);});},[]);
-
-  // 🔥 อัปเดต state + badge ทันที ไม่รอ API
-  function syncCount(updated){
-    const unread=updated.filter(n=>n['สถานะ']==='unread').length;
-    if(onCountChange)onCountChange(unread);
-  }
-  async function markRead(id){
-    // อัปเดต UI ก่อนเลย
-    const updated=notifs.map(x=>x.notifId===id?{...x,'สถานะ':'read'}:x);
-    setNotifs(updated);syncCount(updated);
-    // แล้วค่อย call API ใน background
-    api('markNotifRead',{notifId:id});
-  }
-  async function markAllRead(){
-    // อัปเดต UI ก่อนทันที → badge = 0
-    const updated=notifs.map(x=>({...x,'สถานะ':'read'}));
-    setNotifs(updated);syncCount(updated);
-    // call API bulk ใน background (1 call แทนที่จะวน loop)
-    api('markAllNotifRead',{sales:user.name});
-  }
-
-  const unreadCount=notifs.filter(n=>n['สถานะ']==='unread').length;
-  return <div style={{position:'fixed',top:56,right:16,width:320,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,boxShadow:'var(--shadow)',zIndex:200,maxHeight:440,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-    <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
-      <div style={{display:'flex',alignItems:'center',gap:8}}>
-        <span style={{fontWeight:700,fontSize:14}}>การแจ้งเตือน</span>
-        {unreadCount>0&&<span style={{background:'var(--blue2)',color:'#fff',borderRadius:20,fontSize:11,fontWeight:700,padding:'1px 8px'}}>{unreadCount}</span>}
-      </div>
-      <div style={{display:'flex',gap:6}}>
-        {unreadCount>0&&<button className="btn btn-ghost" style={{padding:'3px 10px',fontSize:11,color:'var(--blue)'}} onClick={markAllRead}>✓ อ่านทั้งหมด</button>}
-        <button className="btn btn-ghost" style={{padding:'3px 8px'}} onClick={onClose}><Ico.x/></button>
-      </div>
-    </div>
-    <div style={{overflowY:'auto',flex:1}}>
-      {loading?<Loading/>:notifs.length===0?
-        <div style={{padding:'32px 20px',textAlign:'center',color:'var(--text2)'}}>
-          <div style={{fontSize:32,marginBottom:8}}>🔔</div>
-          <div style={{fontSize:13}}>ไม่มีการแจ้งเตือน</div>
-        </div>:
-        notifs.slice(0,50).map(n=>{
-          const isUnread=n['สถานะ']==='unread';
-          return <div key={n.notifId} style={{padding:'10px 16px',borderBottom:'1px solid var(--border)',background:isUnread?'rgba(88,166,255,.05)':'transparent',cursor:'pointer',transition:'background .15s'}}
-            onMouseOver={e=>e.currentTarget.style.background='var(--bg3)'}
-            onMouseOut={e=>e.currentTarget.style.background=isUnread?'rgba(88,166,255,.05)':'transparent'}
-            onClick={()=>isUnread&&markRead(n.notifId)}>
-            <div style={{fontSize:13,display:'flex',gap:8,alignItems:'flex-start'}}>
-              {isUnread&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--blue)',flexShrink:0,marginTop:4}}/>}
-              {!isUnread&&<span style={{width:7,height:7,flexShrink:0}}/>}
-              <span style={{color:isUnread?'var(--text)':'var(--text2)',lineHeight:1.5}}>{n.message}</span>
-            </div>
-            <div style={{fontSize:11,color:'var(--text3)',marginTop:3,paddingLeft:15}}>{String(n['วันที่']||'')}</div>
-          </div>;
-        })
-      }
-    </div>
+  async function markRead(id){await api('markNotifRead',{notifId:id});const updated=notifs.map(x=>x.notifId===id?{...x,'สถานะ':'read'}:x);setNotifs(updated);if(onCountChange)onCountChange(updated.filter(n=>n['สถานะ']==='unread').length);}
+  async function markAllRead(){const unread=notifs.filter(n=>n['สถานะ']==='unread');for(const n of unread)await api('markNotifRead',{notifId:n.notifId});setNotifs(prev=>prev.map(x=>({...x,'สถานะ':'read'})));if(onCountChange)onCountChange(0);}
+  return <div style={{position:'fixed',top:56,right:16,width:320,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,boxShadow:'var(--shadow)',zIndex:200,maxHeight:420,overflowY:'auto'}}>
+    <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:700}}>การแจ้งเตือน</span><div style={{display:'flex',gap:6}}><button className="btn btn-ghost" style={{padding:'2px 8px',fontSize:11}} onClick={markAllRead}>อ่านทั้งหมด</button><button className="btn btn-ghost" style={{padding:'2px 8px'}} onClick={onClose}><Ico.x/></button></div></div>
+    {loading?<Loading/>:notifs.length===0?<p style={{padding:20,textAlign:'center',color:'var(--text2)',fontSize:13}}>ไม่มีการแจ้งเตือน</p>:notifs.slice(0,30).map(n=><div key={n.notifId} style={{padding:'10px 16px',borderBottom:'1px solid var(--border)',background:n['สถานะ']==='unread'?'rgba(88,166,255,.06)':'transparent',cursor:'pointer'}} onClick={()=>markRead(n.notifId)}><div style={{fontSize:13,display:'flex',gap:8,alignItems:'flex-start'}}>{n['สถานะ']==='unread'&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--blue)',flexShrink:0,marginTop:4}}/>}<span style={{color:n['สถานะ']==='unread'?'var(--text)':'var(--text2)'}}>{n.message}</span></div><div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>{String(n['วันที่']||'')}</div></div>)}
   </div>;
 }
 
@@ -2358,8 +2310,129 @@ function SalesCurrentCases({currentUser,users}){
   </div>;
 }
 
+
+// ============================================================
+// 📷 QR VIEWER + SCANNER + DETECTOR
+// ============================================================
+
+// ตรวจสอบว่า QR เป็น LINE / เบอร์ / URL / text
+function detectQRType(text){
+  const t=String(text||'').trim();
+  if(t.includes('line.me')||t.includes('lin.ee')||t.includes('line://'))return{type:'line',label:'LINE',color:'#06c755',icon:'💬',value:t};
+  if(/^0\d{8,9}$/.test(t.replace(/[-\s]/g,'')))return{type:'phone',label:'เบอร์โทร',color:'var(--green)',icon:'📞',value:t.replace(/[-\s]/g,'')};
+  if(t.startsWith('http'))return{type:'url',label:'เว็บลิงก์',color:'var(--blue)',icon:'🌐',value:t};
+  return{type:'text',label:'ข้อความ',color:'var(--text2)',icon:'📝',value:t};
+}
+
+// ── QR Viewer: preview thumbnail → click → iPhone popup ──────────
+function QRContactViewer({src,onScan}){
+  const [open,setOpen]=useState(false);
+  const isQR=src&&(String(src).startsWith('data:image')||String(src).startsWith('https://drive.google.com'));
+  if(!isQR)return null;
+  function download(){
+    const a=document.createElement('a');a.href=src;a.download='qr-code.jpg';a.click();
+  }
+  return <>
+    {/* thumbnail กด → popup */}
+    <div style={{marginTop:6,display:'inline-block',position:'relative'}}
+      onClick={e=>{e.stopPropagation();setOpen(true);}}>
+      <img src={src} alt="QR" style={{width:80,height:80,objectFit:'cover',borderRadius:10,border:'1px solid var(--border)',cursor:'zoom-in',transition:'transform .15s,box-shadow .15s'}}
+        onMouseOver={e=>{e.target.style.transform='scale(1.06)';e.target.style.boxShadow='0 4px 16px rgba(0,0,0,.4)';}}
+        onMouseOut={e=>{e.target.style.transform='scale(1)';e.target.style.boxShadow='none';}}/>
+      <div style={{position:'absolute',bottom:4,right:4,background:'rgba(0,0,0,.55)',borderRadius:4,padding:'1px 5px',fontSize:10,color:'#fff',pointerEvents:'none'}}>🔍</div>
+    </div>
+
+    {/* iPhone-style popup */}
+    {open&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',zIndex:9999,display:'flex',flexDirection:'column',justifyContent:'flex-end',alignItems:'center'}}
+      onClick={()=>setOpen(false)}>
+      <div style={{width:'100%',maxWidth:480,background:'var(--bg2)',borderRadius:'20px 20px 0 0',padding:'8px 20px 32px',animation:'slideUp .25s cubic-bezier(.16,1,.3,1)'}}
+        onClick={e=>e.stopPropagation()}>
+        {/* handle bar */}
+        <div style={{width:40,height:5,background:'var(--bg4)',borderRadius:10,margin:'0 auto 16px'}}/>
+        <div style={{textAlign:'center',marginBottom:16,fontSize:15,fontWeight:700}}>📷 QR Code</div>
+        {/* รูปใหญ่ */}
+        <div style={{textAlign:'center',marginBottom:20}}>
+          <img src={src} alt="QR" style={{maxWidth:'100%',maxHeight:'50vh',objectFit:'contain',borderRadius:14,border:'1px solid var(--border)',animation:'fadeZoom .2s ease'}}/>
+        </div>
+        {/* ปุ่ม action */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+          <button style={{background:'rgba(88,166,255,.12)',border:'1px solid rgba(88,166,255,.3)',borderRadius:12,padding:'12px',cursor:'pointer',color:'var(--blue)',fontWeight:700,fontSize:13}} onClick={download}>💾 บันทึกรูป</button>
+          <button style={{background:'rgba(88,166,255,.12)',border:'1px solid rgba(88,166,255,.3)',borderRadius:12,padding:'12px',cursor:'pointer',color:'var(--blue)',fontWeight:700,fontSize:13}} onClick={()=>window.open(src,'_blank')}>🔍 เปิดเต็มจอ</button>
+        </div>
+        {onScan&&<button style={{width:'100%',background:'linear-gradient(135deg,#1f6feb,#388bfd)',border:'none',borderRadius:12,padding:'13px',cursor:'pointer',color:'#fff',fontWeight:700,fontSize:14}} onClick={()=>{setOpen(false);onScan();}}>📷 สแกน QR ด้วยกล้อง</button>}
+        <button style={{width:'100%',background:'transparent',border:'none',borderRadius:12,padding:'12px',cursor:'pointer',color:'var(--text2)',fontWeight:600,fontSize:14,marginTop:4}} onClick={()=>setOpen(false)}>ปิด</button>
+      </div>
+    </div>}
+  </>;
+}
+
+// ── QR Scanner: เปิดกล้อง ─────────────────────────────────────────
+function QRScanner({onResult,onClose}){
+  const scannerRef=useRef(null);
+  useEffect(()=>{
+    let scanner=null;
+    const containerId='cp-qr-reader-'+Math.random().toString(36).slice(2);
+    const el=document.getElementById('cp-qr-reader');
+    if(el)el.id=containerId;
+    setTimeout(()=>{
+      try{
+        scanner=new Html5Qrcode(containerId||'cp-qr-reader');
+        scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:220,height:220}},
+          (text)=>{scanner.stop().catch(()=>{});onResult(text);},
+          ()=>{}
+        ).catch(()=>{});
+      }catch(e){}
+    },300);
+    return()=>{try{scanner&&scanner.stop().catch(()=>{});}catch(e){}};
+  },[]);
+  return <div className="overlay" style={{zIndex:9999,alignItems:'flex-end',padding:0}} onClick={onClose}>
+    <div style={{width:'100%',maxWidth:480,background:'var(--bg2)',borderRadius:'20px 20px 0 0',padding:'8px 20px 32px'}} onClick={e=>e.stopPropagation()}>
+      <div style={{width:40,height:5,background:'var(--bg4)',borderRadius:10,margin:'0 auto 14px'}}/>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:15}}>📷 สแกน QR Code</div>
+        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onClose}><Ico.x/></button>
+      </div>
+      <div id="cp-qr-reader" style={{width:'100%',borderRadius:14,overflow:'hidden',background:'#000'}}/>
+      <div style={{fontSize:12,color:'var(--text2)',textAlign:'center',marginTop:10}}>วาง QR ให้อยู่ในกรอบสีเขียว</div>
+      <button className="btn btn-ghost" style={{width:'100%',marginTop:12,fontSize:14}} onClick={onClose}>ยกเลิก</button>
+    </div>
+  </div>;
+}
+
+// ── QR Result Popup: iPhone action sheet ─────────────────────────
+function QRResultPopup({result,onClose}){
+  if(!result)return null;
+  const d=detectQRType(result);
+  return <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',zIndex:9999,display:'flex',flexDirection:'column',justifyContent:'flex-end',alignItems:'center'}}
+    onClick={onClose}>
+    <div style={{width:'100%',maxWidth:480,background:'var(--bg2)',borderRadius:'20px 20px 0 0',padding:'8px 20px 32px',animation:'slideUp .25s cubic-bezier(.16,1,.3,1)'}} onClick={e=>e.stopPropagation()}>
+      <div style={{width:40,height:5,background:'var(--bg4)',borderRadius:10,margin:'0 auto 16px'}}/>
+      {/* type badge */}
+      <div style={{textAlign:'center',marginBottom:16}}>
+        <span style={{fontSize:28}}>{d.icon}</span>
+        <div style={{fontSize:11,fontWeight:700,color:d.color,background:d.color+'18',border:`1px solid ${d.color}40`,borderRadius:20,padding:'3px 12px',display:'inline-block',marginTop:6}}>{d.label}</div>
+      </div>
+      {/* ค่าที่สแกนได้ */}
+      <div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:12,padding:'12px 16px',marginBottom:16,wordBreak:'break-all',fontSize:14,textAlign:'center',fontWeight:600}}>{d.value}</div>
+      {/* action buttons */}
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {d.type==='phone'&&<>
+          <a href={`tel:${d.value}`} style={{display:'block',textAlign:'center',background:'rgba(63,185,80,.15)',border:'1px solid rgba(63,185,80,.4)',borderRadius:12,padding:'13px',color:'var(--green)',fontWeight:700,fontSize:15,textDecoration:'none'}}>📞 โทรหา {d.value}</a>
+          <a href={`https://line.me/ti/p/~${d.value}`} target="_blank" rel="noopener" style={{display:'block',textAlign:'center',background:'rgba(6,199,85,.12)',border:'1px solid rgba(6,199,85,.35)',borderRadius:12,padding:'13px',color:'#06c755',fontWeight:700,fontSize:15,textDecoration:'none'}}>💬 เพิ่มใน LINE</a>
+          <button style={{background:'rgba(88,166,255,.12)',border:'1px solid rgba(88,166,255,.3)',borderRadius:12,padding:'12px',cursor:'pointer',color:'var(--blue)',fontWeight:600,fontSize:14}} onClick={()=>{copyText(d.value);onClose();}}>📋 คัดลอกเบอร์</button>
+        </>}
+        {d.type==='line'&&<a href={d.value} target="_blank" rel="noopener" style={{display:'block',textAlign:'center',background:'rgba(6,199,85,.12)',border:'1px solid rgba(6,199,85,.35)',borderRadius:12,padding:'13px',color:'#06c755',fontWeight:700,fontSize:15,textDecoration:'none'}}>💬 เปิด LINE</a>}
+        {d.type==='url'&&<a href={d.value} target="_blank" rel="noopener" style={{display:'block',textAlign:'center',background:'rgba(88,166,255,.12)',border:'1px solid rgba(88,166,255,.3)',borderRadius:12,padding:'13px',color:'var(--blue)',fontWeight:700,fontSize:15,textDecoration:'none'}}>🌐 เปิดลิงก์</a>}
+        {(d.type==='text'||d.type==='url')&&<button style={{background:'rgba(88,166,255,.12)',border:'1px solid rgba(88,166,255,.3)',borderRadius:12,padding:'12px',cursor:'pointer',color:'var(--blue)',fontWeight:600,fontSize:14}} onClick={()=>{copyText(d.value);onClose();}}>📋 คัดลอกข้อความ</button>}
+      </div>
+      <button style={{width:'100%',background:'transparent',border:'none',borderRadius:12,padding:'13px',cursor:'pointer',color:'var(--text2)',fontWeight:600,fontSize:15,marginTop:8}} onClick={onClose}>ปิด</button>
+    </div>
+  </div>;
+}
+
 function SalesClaimedCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [confirm,setConfirm]=useState(null);const [now,setNow]=useState(Date.now());
+  const [showScanner,setShowScanner]=useState(false);const [scanResult,setScanResult]=useState(null);
   const load=useCallback(()=>{setLoading(true);api('getClaimedCases',{sales:currentUser.name}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);});},[currentUser.name]);
   useEffect(()=>{load();},[load]);useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(t);},[]);
   function parseAssignedAt(s){if(!s)return null;const m=String(s).match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
@@ -2373,14 +2446,24 @@ function SalesClaimedCases({currentUser,users}){
       <div style={{fontWeight:500,marginBottom:4}}>{c.customername}</div>
       <div style={{fontSize:12,color:'var(--text2)',marginBottom:6}}>รับมาจาก: <span style={{color:'var(--orange)'}}>{c.fromsales||'-'}</span>{' · '}รับเมื่อ: {String(c.AssignedAt||'').split(' ')[0]}</div>
       {!ok&&<div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(210,153,34,.10)',border:'1px solid rgba(210,153,34,.35)',borderRadius:6,padding:'5px 10px',marginBottom:8,fontSize:12,color:'var(--yellow)'}}>🔒 คืนเคสได้หลังจากอีก <strong style={{marginLeft:4}}>{left}</strong></div>}
-      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px',color:'var(--green)'}} onClick={e=>{e.stopPropagation();copyText(formatContact(c.contact)||'');}}><Ico.copy/> {formatContact(c.contact)||'ไม่มีเบอร์'}</button>
-        {formatContact(c.contact)&&/^\d{9,10}$/.test(String(formatContact(c.contact)).replace(/\D/g,''))&&<a href={`tel:${formatContact(c.contact)}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}
+      {/* แสดง QR thumbnail ถ้าเป็น QR / เบอร์ถ้าเป็นเบอร์ */}
+      {String(c.contact||'').startsWith('data:image')||String(c.contact||'').startsWith('https://drive.google.com')?
+        <div onClick={e=>e.stopPropagation()}>
+          <QRContactViewer src={c.contact} onScan={()=>setShowScanner(true)}/>
+        </div>:
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
+          <button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px',color:'var(--green)'}} onClick={e=>{e.stopPropagation();copyText(formatContact(c.contact)||'');}}><Ico.copy/> {formatContact(c.contact)||'ไม่มีเบอร์'}</button>
+          {formatContact(c.contact)&&/^\d{9,10}$/.test(String(formatContact(c.contact)).replace(/\D/g,''))&&<a href={`tel:${formatContact(c.contact)}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}
+        </div>
+      }
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:6}}>
         <button className={ok?'btn btn-danger':'btn btn-ghost'} style={{fontSize:12,padding:'4px 10px',marginLeft:'auto',opacity:ok?1:0.45,cursor:ok?'pointer':'not-allowed'}} disabled={!ok} onClick={e=>{e.stopPropagation();if(ok)setConfirm(c.caseID);}}>{ok?'↩ คืนเคส':'🔒 ยังคืนไม่ได้'}</button>
       </div>
     </div>;})}
     {sel&&<CaseModal caseData={{...sel,caseid:sel.caseID}} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
     {confirm&&<Confirm msg={`คืนเคส ${confirm} กลับตลาด?`} onOk={()=>{doReturn(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>}
+    {showScanner&&<QRScanner onClose={()=>setShowScanner(false)} onResult={text=>{setShowScanner(false);setScanResult(text);}}/>}
+    {scanResult&&<QRResultPopup result={scanResult} onClose={()=>setScanResult(null)}/>}
   </div>;
 }
 
@@ -2482,108 +2565,45 @@ function LoginPage({onLogin}){
   const [showPass,setShowPass]=useState(false);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
-  const [focused,setFocused]=useState('');
-
   async function submit(){
     if(!username||!password)return setError('กรุณากรอกข้อมูลให้ครบ');
     setLoading(true);setError('');
     const r=await api('login',{username,password});
     setLoading(false);
     if(r.success)onLogin(r.user);
-    else setError(r.error||'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+    else setError(r.error||'เข้าสู่ระบบไม่สำเร็จ');
   }
-
-  return <div style={{minHeight:'100vh',display:'flex',background:'var(--bg)',overflow:'hidden'}}>
-    {/* ── Left panel (desktop only) ── */}
-    <div style={{display:'none',flex:1,background:'linear-gradient(145deg,#0d1b2e 0%,#112240 60%,#0a1628 100%)',alignItems:'center',justifyContent:'center',padding:48,position:'relative',overflow:'hidden'}}
-      className="login-left-panel">
-      {/* decorative circles */}
-      <div style={{position:'absolute',top:-80,right:-80,width:320,height:320,borderRadius:'50%',background:'rgba(88,166,255,.05)',border:'1px solid rgba(88,166,255,.08)'}}/>
-      <div style={{position:'absolute',bottom:-60,left:-60,width:240,height:240,borderRadius:'50%',background:'rgba(63,185,80,.04)',border:'1px solid rgba(63,185,80,.07)'}}/>
-      <div style={{position:'relative',zIndex:1,maxWidth:380}}>
-        <div style={{fontSize:56,marginBottom:20}}>🚗</div>
-        <div style={{fontSize:32,fontWeight:800,color:'#e6edf3',lineHeight:1.2,marginBottom:16}}>ระบบจัดการเคส<br/><span style={{color:'#58a6ff'}}>รถยนต์</span>ครบวงจร</div>
-        <div style={{fontSize:15,color:'rgba(139,148,158,.8)',lineHeight:1.8,marginBottom:32}}>ติดตามเคส อัปเดตสถานะ และปิดการขายได้อย่างมีประสิทธิภาพ</div>
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          {[['🎯','ติดตามเคสแบบ Real-time'],['📊','Dashboard วิเคราะห์ยอดขาย'],['🔔','แจ้งเตือนทันทีเมื่อมีเคสใหม่']].map(([icon,text])=>
-            <div key={text} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:'rgba(88,166,255,.06)',border:'1px solid rgba(88,166,255,.12)',borderRadius:10}}>
-              <span style={{fontSize:18}}>{icon}</span>
-              <span style={{fontSize:14,color:'rgba(230,237,243,.8)',fontWeight:500}}>{text}</span>
-            </div>
-          )}
+  return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg,#0d1117 0%,#161b22 50%,#0d1117 100%)',padding:16}}>
+    <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:18,padding:'36px 28px',width:'100%',maxWidth:360,boxShadow:'0 20px 60px rgba(0,0,0,.6)',animation:'fadeInUp .5s cubic-bezier(.16,1,.3,1)'}}>
+      <div style={{textAlign:'center',marginBottom:28}}>
+        <div style={{fontSize:48,marginBottom:10,display:'inline-block',animation:'floatY 3s ease-in-out infinite'}}>🚗</div>
+        <div style={{fontSize:26,fontWeight:800,color:'var(--blue)',letterSpacing:.5}}>CasePool</div>
+        <div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ระบบจัดการเคสรถยนต์</div>
+        <div style={{height:1,background:'linear-gradient(90deg,transparent,var(--border),transparent)',marginTop:20}}/>
+      </div>
+      {error&&<div style={{background:'rgba(218,54,51,.1)',border:'1px solid rgba(218,54,51,.4)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'var(--red)',display:'flex',alignItems:'center',gap:8}}>⚠️ {error}</div>}
+      <div style={{marginBottom:14}}>
+        <label style={{fontSize:12,color:'var(--text2)',fontWeight:600,display:'block',marginBottom:6}}>Username</label>
+        <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="กรอก Username" autoComplete="username"/>
+      </div>
+      <div style={{marginBottom:20}}>
+        <label style={{fontSize:12,color:'var(--text2)',fontWeight:600,display:'block',marginBottom:6}}>รหัสผ่าน</label>
+        <div style={{position:'relative'}}>
+          <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="current-password"/>
+          <button onClick={()=>setShowPass(!showPass)} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--text2)',cursor:'pointer',fontSize:16,padding:4}}>{showPass?'🙈':'👁'}</button>
         </div>
       </div>
+      <button onClick={submit} disabled={loading} style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,borderRadius:10,border:'none',cursor:loading?'wait':'pointer',background:loading?'var(--bg3)':'linear-gradient(135deg,#1f6feb,#388bfd)',color:loading?'var(--text2)':'#fff',boxShadow:loading?'none':'0 6px 20px rgba(31,111,235,.4)',transition:'all .2s'}}>
+        {loading?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}><span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/> กำลังเข้าสู่ระบบ...</span>:'เข้าสู่ระบบ →'}
+      </button>
+      <div style={{textAlign:'center',marginTop:16,fontSize:11,color:'var(--text3)'}}>CasePool v2.0</div>
     </div>
-
-    {/* ── Right panel / Login form ── */}
-    <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px',minHeight:'100vh'}}>
-      <div style={{width:'100%',maxWidth:400}}>
-
-        {/* Logo */}
-        <div style={{textAlign:'center',marginBottom:32}}>
-          <div style={{width:64,height:64,borderRadius:18,background:'linear-gradient(135deg,#1f6feb,#388bfd)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,margin:'0 auto 16px',boxShadow:'0 8px 24px rgba(31,111,235,.35)'}}>🚗</div>
-          <div style={{fontSize:26,fontWeight:800,color:'var(--text)',letterSpacing:.3}}>CasePool</div>
-          <div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>เข้าสู่ระบบเพื่อจัดการเคส</div>
-        </div>
-
-        {/* Card */}
-        <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:16,padding:'28px 28px 24px',boxShadow:'0 4px 24px rgba(0,0,0,.2)'}}>
-
-          {error&&<div style={{background:'rgba(248,81,73,.08)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13,color:'var(--red)',display:'flex',alignItems:'center',gap:8,animation:'fadeInUp .2s ease'}}>
-            <span style={{fontSize:16,flexShrink:0}}>⚠️</span>{error}
-          </div>}
-
-          <div className="form-group" style={{marginBottom:16}}>
-            <label style={{fontSize:12,fontWeight:600,color:'var(--text2)',letterSpacing:.5,textTransform:'uppercase',display:'block',marginBottom:7}}>Username</label>
-            <input value={username} onChange={e=>{setUsername(e.target.value);setError('');}}
-              onKeyDown={e=>e.key==='Enter'&&document.getElementById('cp-pass-in')?.focus()}
-              onFocus={()=>setFocused('user')} onBlur={()=>setFocused('')}
-              placeholder="กรอก username" autoComplete="username"
-              style={{borderColor:focused==='user'?'var(--blue)':error?'rgba(248,81,73,.5)':'var(--border)',transition:'border-color .15s'}}/>
-          </div>
-
-          <div className="form-group" style={{marginBottom:22,position:'relative'}}>
-            <label style={{fontSize:12,fontWeight:600,color:'var(--text2)',letterSpacing:.5,textTransform:'uppercase',display:'block',marginBottom:7}}>รหัสผ่าน</label>
-            <input id="cp-pass-in" type={showPass?'text':'password'}
-              value={password} onChange={e=>{setPassword(e.target.value);setError('');}}
-              onKeyDown={e=>e.key==='Enter'&&submit()}
-              onFocus={()=>setFocused('pass')} onBlur={()=>setFocused('')}
-              placeholder="••••••••" autoComplete="current-password"
-              style={{paddingRight:44,borderColor:focused==='pass'?'var(--blue)':error?'rgba(248,81,73,.5)':'var(--border)',transition:'border-color .15s'}}/>
-            <button onClick={()=>setShowPass(!showPass)}
-              style={{position:'absolute',right:12,bottom:9,background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:18,padding:4,lineHeight:1}}>
-              {showPass?'🙈':'👁'}
-            </button>
-          </div>
-
-          <button onClick={submit} disabled={loading}
-            style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,border:'none',borderRadius:10,cursor:loading?'wait':'pointer',
-              background:loading?'var(--bg3)':'linear-gradient(135deg,#1f6feb,#388bfd)',
-              color:loading?'var(--text3)':'#fff',
-              boxShadow:loading?'none':'0 4px 16px rgba(31,111,235,.4)',
-              transition:'all .2s',letterSpacing:.2}}>
-            {loading
-              ?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-                 <span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/>
-                 กำลังเข้าสู่ระบบ...
-               </span>
-              :'เข้าสู่ระบบ →'}
-          </button>
-        </div>
-
-        <div style={{textAlign:'center',marginTop:16,fontSize:11,color:'var(--text3)'}}>CasePool v2.0 · Powered by Supabase</div>
-      </div>
-    </div>
-
-    <style>{`
-      @media(min-width:860px){
-        .login-left-panel{display:flex !important;}
-      }
-    `}</style>
   </div>;
 }
 
-
+// ============================================================
+// 🎯 ADMIN TEAM HQ
+// ============================================================
 function AdminFollowupsContent({users,neon='#00f5ff'}){
   const [history,setHistory]=useState([]);
   const [loading,setLoading]=useState(true);
