@@ -2548,49 +2548,6 @@ function SalesClaimedCases({currentUser,users}){
   </div>;
 }
 
-function SalesDashboard({currentUser}){
-  const [data,setData]=useState(null);const [allCases,setAllCases]=useState([]);const [loading,setLoading]=useState(true);
-  const [myTarget,setMyTarget]=useState(0);
-  const d=new Date();const monthKey=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
-  const load=useCallback(()=>{
-    cacheClear(['getDashboard']);
-    Promise.all([
-      api('getDashboard',{role:'Sales',sales:currentUser.name}),
-      api('getCases',{sales:currentUser.name,all:'true'}),
-      sbQ('GET','targets',{sales_name:'eq.'+currentUser.name,month_key:'eq.'+monthKey})
-    ]).then(([dr,cr,tRows])=>{
-      if(dr.success)setData(dr.data);
-      if(cr.success)setAllCases(safeArray(cr.data));
-      if(tRows&&tRows.length)setMyTarget(tRows[0].target_value||0);
-      setLoading(false);
-    });
-  },[currentUser.name]);
-  useEffect(()=>{load();},[load]);
-  if(loading)return <div className="page"><Loading/></div>;if(!data)return <div className="page"><p>ไม่พบข้อมูล</p></div>;
-  function parseStartDate(startdate){if(!startdate&&startdate!==0)return null;const s=String(startdate).trim();if(!s)return null;if(/^\d{4,6}$/.test(s)){const d=new Date((parseInt(s)-25569)*86400000);if(!isNaN(d))return d;}if(s.includes('/')){const p=s.split('/');if(p.length>=3){const p0=parseInt(p[0]),p1=parseInt(p[1]),p2=parseInt(p[2]);if(p[2].length===4){const d=new Date(p2,p1-1,p0);if(!isNaN(d))return d;}const d2=new Date(p2,p0-1,p1);if(!isNaN(d2))return d2;}}const d=new Date(s);return isNaN(d)?null:d;}
-  function calcDays(sd){const d=parseStartDate(sd);if(!d)return null;const diff=Math.floor((Date.now()-d.getTime())/86400000);return diff>=0?diff:null;}
-  function fmtStart(sd){const d=parseStartDate(sd);if(!d)return null;return`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;}
-  const startdate=data?.startdate||currentUser.startdate;const daysWorked=calcDays(startdate);const yearsMonths=daysWorked!=null?(()=>{const y=Math.floor(daysWorked/365),m=Math.floor((daysWorked%365)/30),d=daysWorked%30;if(y>0&&m>0)return`${y} ปี ${m} เดือน`;if(y>0)return`${y} ปี`;if(m>0&&d>0)return`${m} เดือน ${d} วัน`;if(m>0)return`${m} เดือน`;return`${daysWorked} วัน`;})():null;
-  const WIN_ST=['ปล่อยแล้ว'];const months=Array.from({length:6},(_,i)=>{const d=new Date();d.setMonth(d.getMonth()-(5-i));const yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,'0');const pre=yy+mm;const label=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][d.getMonth()];const mc=allCases.filter(c=>String(c.caseid||'').startsWith(pre));const total=mc.length,won=mc.filter(c=>WIN_ST.includes(c.status)).length;return{pre,label,total,won,winRate:total>0?Math.round(won/total*100):0};});
-  const curMonth=months[5];const target=myTarget;const soldNow=curMonth.won;const pct=target>0?Math.min(Math.round(soldNow/target*100),100):0;
-  const BADGES=[{id:'b1',icon:'🌱',label:'ก้าวแรก',req:1},{id:'b3',icon:'⭐',label:'ดาวขึ้น',req:3},{id:'b5',icon:'🔥',label:'กำลังมา',req:5},{id:'b10',icon:'💪',label:'เซลส์ร็อก',req:10},{id:'b20',icon:'💎',label:'ระดับเพชร',req:20}];
-  const earned=BADGES.filter(b=>soldNow>=b.req);const latest=earned[earned.length-1]||null;const nextB=BADGES.find(b=>soldNow<b.req)||null;
-  return <div className="page">
-    <div className="page-hd"><div className="page-title">📊 แดชบอร์ดของฉัน</div><button className="btn btn-ghost" style={{fontSize:13}} onClick={load}>🔄</button></div>
-    <div style={{display:'flex',gap:12,marginBottom:18,alignItems:'center'}}><div style={{width:64,height:64,borderRadius:'50%',background:'var(--bg3)',border:'2px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>{currentUser.avatar?<img src={currentUser.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:18,display:'flex',alignItems:'center',gap:8}}>{currentUser.name}{latest&&<span title={latest.label} style={{fontSize:22}}>{latest.icon}</span>}</div><div style={{fontSize:13,color:'var(--text2)'}}>Sales · ประจำเดือนนี้</div>{startdate&&<div style={{marginTop:5,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}><span style={{fontSize:12,color:'var(--text3)'}}>📅 เริ่ม {fmtStart(startdate)}</span>{yearsMonths&&<span style={{fontSize:12,fontWeight:700,background:'rgba(88,166,255,.12)',color:'var(--blue)',border:'1px solid rgba(88,166,255,.25)',borderRadius:20,padding:'2px 10px'}}>⏱ {yearsMonths}</span>}</div>}</div></div>
-    <div className="stat-grid" style={{marginBottom:14}}>{[['เคสของฉัน',data.currentCases||0,'var(--blue)'],['รับตลาด',data.claimedCases||0,'var(--purple)'],['ปล่อยแล้ว',data.sold||0,'var(--green)']].map(([l,v,c])=><div key={l} className="stat-card"><div className="stat-num" style={{color:c}}>{v}</div><div className="stat-lbl">{l}</div></div>)}</div>
-    <div className="card" style={{marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontWeight:700,fontSize:14}}>🎯 เป้าหมายเดือนนี้</div><span style={{fontSize:12,color:'var(--text3)'}}>ตั้งโดย Admin</span></div>{target>0?<><div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span style={{fontSize:13,color:'var(--text2)'}}>ปล่อยแล้ว {soldNow} / {target} เคส</span><span style={{fontSize:14,fontWeight:700,color:pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--yellow)'}}>{pct}%</span></div><div style={{height:10,background:'var(--bg3)',borderRadius:6,overflow:'hidden',marginBottom:8}}><div style={{height:'100%',borderRadius:6,transition:'width .5s',background:pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--yellow)',width:`${pct}%`}}/></div>{pct>=100?<div style={{fontSize:12,color:'var(--green)',fontWeight:700}}>🎉 บรรลุเป้าหมาย!</div>:<div style={{fontSize:12,color:'var(--text2)'}}>เหลืออีก <strong style={{color:'var(--blue)'}}>{target-soldNow}</strong> เคส</div>}</>:<div style={{fontSize:13,color:'var(--text3)',textAlign:'center',padding:'6px 0'}}>กดตั้งเป้าหมายเพื่อติดตาม</div>}</div>
-    <div className="card" style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>🏆 Achievement เดือนนี้</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{BADGES.map(b=>{const ok=soldNow>=b.req;return<div key={b.id} className="ach-badge" title={`${b.label}: ${b.req} เคส`} style={{background:ok?'rgba(88,166,255,.08)':'var(--bg3)',border:`1px solid ${ok?'rgba(88,166,255,.3)':'var(--border)'}`,opacity:ok?1:.38,filter:ok?'none':'grayscale(1)'}}><span style={{fontSize:24}}>{b.icon}</span><span style={{fontSize:11,fontWeight:700,color:ok?'var(--text)':'var(--text3)'}}>{b.label}</span><span style={{fontSize:10,color:'var(--text3)'}}>{b.req} เคส</span></div>;})}</div>{nextB&&<div style={{fontSize:12,color:'var(--text2)',marginTop:10,background:'var(--bg3)',padding:'8px 12px',borderRadius:8}}>🎯 ปิดอีก <strong style={{color:'var(--blue)'}}>{nextB.req-soldNow}</strong> เคส รับ {nextB.icon} <strong>{nextB.label}</strong></div>}</div>
-    <div className="card" style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:14,marginBottom:14}}>📈 ผลงาน 6 เดือนล่าสุด</div><div style={{height:180}}><BarChart id="perfBar6" labels={months.map(m=>m.label)} datasets={[{label:'เคสทั้งหมด',data:months.map(m=>m.total),backgroundColor:'rgba(88,166,255,.5)'},{label:'ปล่อยแล้ว',data:months.map(m=>m.won),backgroundColor:'rgba(63,185,80,.8)'}]}/></div></div>
-    {/* Smart Summary */}
-    {(()=>{const active=allCases.filter(c=>!['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'].includes(c.status));const hot=active.filter(c=>calculateCaseScore(c)>=80);const stale=active.filter(c=>{const m=String(c.updatedat||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return false;const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return(Date.now()-d.getTime())>86400000;});if(!hot.length&&!stale.length)return null;
-    return<div className="card" style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:14,marginBottom:10}}>🧠 สรุปวันนี้</div>
-      {hot.length>0&&<div style={{background:'rgba(248,81,73,.08)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'10px 12px',marginBottom:8}}><div style={{fontWeight:600,fontSize:13,color:'var(--red)',marginBottom:6}}>🔥 เคสร้อน ต้องโทรวันนี้ ({hot.length})</div>{hot.slice(0,3).map((c,i)=><div key={i} style={{fontSize:12,display:'flex',justifyContent:'space-between',marginBottom:i<Math.min(hot.length,3)-1?4:0}}><span style={{color:'var(--blue)',fontWeight:600}}>{c.caseid}</span><span>{c.customername}</span><StatusBadge status={c.status}/></div>)}</div>}
-      {stale.length>0&&<div style={{background:'rgba(210,153,34,.08)',border:'1px solid rgba(210,153,34,.3)',borderRadius:8,padding:'10px 12px'}}><div style={{fontWeight:600,fontSize:13,color:'var(--yellow)',marginBottom:6}}>⏰ ค้างนาน > 24 ชม. ({stale.length} เคส)</div><div style={{fontSize:12,color:'var(--text2)'}}>อัปเดตสถานะก่อนเคสถูกส่งตลาด</div></div>}
-    </div>;})()}
-  </div>;
-}
-
 function OnboardingTour({currentUser,onDone}){
   const [step,setStep]=useState(0);
   const [animDir,setAnimDir]=useState('in'); // in | out-left | out-right
