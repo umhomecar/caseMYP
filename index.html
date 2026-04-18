@@ -2248,23 +2248,237 @@ function GlobalSearch({currentUser,onClose,onNavigate}){
 }
 
 function SalesMarket({currentUser}){
-  const [cases,setCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [loading,setLoading]=useState(true);const [claimedIds,setClaimedIds]=useState(new Set());const [skippedIds,setSkippedIds]=useState(new Set());const [toast,setToast]=useState(null);const [leaderboard,setLeaderboard]=useState([]);
-  const showToast=(msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);};
-  const load=useCallback((silent=false)=>{if(!silent)setLoading(true);Promise.all([api('getMarket',{sales:currentUser.name}),api('getClaimedCases',{sales:currentUser.name}),api('getDashboard',{role:'Admin'})]).then(([mr,cr,dr])=>{if(mr.success)setCases(safeArray(mr.data).filter(c=>c.old_sales!==currentUser.name));if(cr.success)setClaimedCases(cr.data||[]);if(dr.success)setLeaderboard(dr.data?.sales||[]);setLoading(false);setClaimedIds(new Set());setSkippedIds(new Set());});},[currentUser.name]);
+  const [cases,setCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [loading,setLoading]=useState(true);const [claimedIds,setClaimedIds]=useState(new Set());const [skippedIds,setSkippedIds]=useState(new Set());const [toast,setToast]=useState(null);const [leaderboard,setLeaderboard]=useState([]);const [showLb,setShowLb]=useState(false);const [justClaimed,setJustClaimed]=useState(null);const [now,setNow]=useState(Date.now());
+  const showT=(msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),3000);};
+  const load=useCallback((silent=false)=>{if(!silent)setLoading(true);Promise.all([api('getMarket',{sales:currentUser.name}),api('getClaimedCases',{sales:currentUser.name}),api('getDashboard',{role:'Admin'})]).then(([mr,cr,dr])=>{if(mr.success)setCases(safeArray(mr.data).filter(c=>c.old_sales!==currentUser.name&&c.status!=='ปิดเคส'));if(cr.success)setClaimedCases(cr.data||[]);if(dr.success)setLeaderboard(dr.data?.sales||[]);setLoading(false);setClaimedIds(new Set());setSkippedIds(new Set());});},[currentUser.name]);
   useEffect(()=>{load();},[load]);
-  async function claim(caseId){setClaimedIds(prev=>new Set([...prev,caseId]));setClaimedCases(prev=>[...prev,{caseID:caseId,sale:currentUser.name}]);showToast('✅ รับเคส '+caseId+' สำเร็จ!','ok');const r=await api('claimCase',{caseId,sales:currentUser.name});if(!r.success){setClaimedIds(prev=>{const s=new Set(prev);s.delete(caseId);return s;});setClaimedCases(prev=>prev.filter(c=>c.caseID!==caseId));showToast('❌ '+(r.error||'รับเคสไม่สำเร็จ'),'err');}else{setTimeout(()=>load(true),2000);}}
-  async function notInterested(caseId){setSkippedIds(prev=>new Set([...prev,caseId]));await api('returnCase',{caseId,sales:'_skip_'+currentUser.name});setTimeout(()=>load(true),1000);}
-  const visibleCases=cases.filter(c=>!claimedIds.has(c.ID)&&!skippedIds.has(c.ID));const myStats=leaderboard.find(s=>s.name===currentUser.name)||{};const totalInMarket=visibleCases.length;const myClaimed=claimedCases.length+(claimedIds.size);const lbSorted=[...leaderboard].sort((a,b)=>(b.claimedCases||0)-(a.claimedCases||0));
-  return <div className="mk-page">
-    <div className="mk-hero"><div className="mk-hero-top"><div><div style={{fontSize:20,fontWeight:800,display:'flex',alignItems:'center',gap:8,color:'#e6edf3'}}>🎯 ตลาดเคส</div><div style={{fontSize:13,color:'rgba(230,237,243,.7)',marginTop:4}}>ใครไวได้ก่อน</div></div><button className="btn btn-ghost" onClick={()=>load(false)} style={{fontSize:13}}>🔄</button></div><div className="mk-stats">{[['ว่างอยู่',totalInMarket,'var(--blue)'],['ของฉัน',myClaimed,'var(--green)']].map(([l,v,c])=><div key={l} className="mk-stat"><div className="mk-stat-num" style={{color:c}}>{v}</div><div className="mk-stat-lbl">{l}</div></div>)}</div></div>
-    <div className="mk-body"><div className="mk-cards-area">
-      {toast&&<div style={{background:toast.type==='ok'?'rgba(63,185,80,.12)':'rgba(248,81,73,.12)',border:`1px solid ${toast.type==='ok'?'var(--green)':'var(--red)'}`,padding:'10px 16px',borderRadius:8,marginBottom:14,fontSize:13,display:'flex',alignItems:'center',gap:8}}>{toast.msg}</div>}
-      {loading?<SkeletonCards n={6}/>:visibleCases.length===0?<div style={{textAlign:'center',padding:60,color:'var(--text2)'}}><div style={{fontSize:48,marginBottom:12}}>📭</div><div style={{fontSize:16,fontWeight:600}}>ไม่มีเคสในตลาด</div></div>:<><div style={{fontSize:13,color:'var(--text2)',marginBottom:12}}>พบ {visibleCases.length} เคส</div><div className="mk-cards-grid">{visibleCases.map((c,i)=><div key={i} className="mkc" style={{"--i":i}}><div className="mkc-top"><span className="mkc-id">{c.ID}</span><span className="mkc-date">📅 {getDateBadge(c)}</span></div><div className="mkc-name">{c.name}</div><div className="mkc-badges"><StatusBadge status={c.status}/><span className="badge" style={{background:'rgba(255,166,87,.1)',color:'var(--orange)',border:'1px solid rgba(255,166,87,.3)',fontSize:11}}>จาก {c.old_sales||'-'}</span></div><div className="mkc-contact">📞 <span style={{filter:'blur(5px)',userSelect:'none',letterSpacing:1}}>••••••••••</span><span style={{fontSize:11,color:'var(--text3)'}}>(เห็นหลังรับเคส)</span></div>{c.report&&<div className="mkc-report">{String(c.report).slice(0,130)}{c.report.length>130?'...':''}</div>}<div className="mkc-actions"><button className="btn-claim" onClick={()=>claim(c.ID)}>รับเคสนี้ →</button><button onClick={()=>notInterested(c.ID)} style={{background:'rgba(248,81,73,.12)',color:'var(--red)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'10px 14px',fontSize:15,cursor:'pointer',transition:'all .15s',fontWeight:700,lineHeight:1}}>✕</button></div></div>)}</div></>}
-    </div>
-    <div className="mk-sidebar"><div className="mk-sb-section"><div className="mk-sb-title">🏆 Leaderboard</div>{lbSorted.map((s,i)=><div key={i} className="lb-row"><div className="lb-rank" style={{background:i===0?'#3d2a00':i===1?'#1c1c2e':i===2?'#1a2a00':'var(--bg3)',color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text2)'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div style={{flex:1}}><div style={{fontWeight:s.name===currentUser.name?700:500,fontSize:13,color:s.name===currentUser.name?'var(--blue)':'var(--text)'}}>{s.name}{s.name===currentUser.name?' (ฉัน)':''}</div></div><span style={{fontWeight:700,color:'var(--blue)',fontSize:14}}>{s.claimedCases||0}</span></div>)}</div></div></div>
-  </div>;
-}
+  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(t);},[]);
+  async function claim(caseId){
+    setClaimedIds(prev=>new Set([...prev,caseId]));
+    setJustClaimed(caseId);setTimeout(()=>setJustClaimed(null),1500);
+    showT('🎉 รับเคส '+caseId+' สำเร็จ!','ok');
+    try{navigator.vibrate&&navigator.vibrate([30,20,30]);}catch(e){}
+    const r=await api('claimCase',{caseId,sales:currentUser.name});
+    if(!r.success){setClaimedIds(prev=>{const s=new Set(prev);s.delete(caseId);return s;});showT('❌ '+(r.error||'รับเคสไม่สำเร็จ'),'err');}
+    else setTimeout(()=>load(true),2000);
+  }
+  async function skip(caseId){setSkippedIds(prev=>new Set([...prev,caseId]));await api('returnCase',{caseId,sales:'_skip_'+currentUser.name});setTimeout(()=>load(true),1000);}
+  
+  const allVisible=cases.filter(c=>!claimedIds.has(c.ID)&&!skippedIds.has(c.ID));
+  const totalInMarket=allVisible.length;
+  const myClaimed=claimedCases.length+claimedIds.size;
+  const lbSorted=[...leaderboard].sort((a,b)=>(b.claimedCases||0)-(a.claimedCases||0));
+  const myRank=lbSorted.findIndex(s=>s.name===currentUser.name)+1;
+  const topScore=lbSorted[0]?.claimedCases||0;
+  
+  // สถานะที่ "ร้อน" — ต้องรีบรับ
+  const HOT_STATUSES=['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'];
+  function isHot(c){return HOT_STATUSES.includes(c.status);}
+  function getUrgency(c){
+    // เคสที่ส่งตลาดมานานแล้ว = urgent
+    const id=String(c.ID||'');
+    if(id.length<6)return 0;
+    const yy=2000+parseInt(id.slice(0,2));
+    const mm=parseInt(id.slice(2,4))-1;
+    const date=new Date(yy,mm,1);
+    const days=(Date.now()-date.getTime())/86400000;
+    if(days<7)return 3; // ใหม่มาก
+    if(days<30)return 2;
+    return 1;
+  }
 
+  return <div style={{minHeight:'100vh',background:'var(--bg)',position:'relative',overflow:'hidden'}}>
+    {/* ── Animated background orbs ── */}
+    <div style={{position:'absolute',top:-100,left:-100,width:300,height:300,borderRadius:'50%',background:'radial-gradient(circle,rgba(88,166,255,.12),transparent 70%)',pointerEvents:'none',animation:'orb1 8s ease-in-out infinite'}}/>
+    <div style={{position:'absolute',top:200,right:-80,width:240,height:240,borderRadius:'50%',background:'radial-gradient(circle,rgba(248,81,73,.08),transparent 70%)',pointerEvents:'none',animation:'orb2 10s ease-in-out infinite'}}/>
+
+    {/* ── Hero Banner ── */}
+    <div style={{background:'linear-gradient(135deg,#0d1b2e 0%,#1a2744 50%,#112233 100%)',padding:'22px 20px 18px',borderBottom:'1px solid rgba(88,166,255,.2)',position:'relative',overflow:'hidden'}}>
+      {/* Grid pattern overlay */}
+      <div style={{position:'absolute',inset:0,backgroundImage:'radial-gradient(circle,rgba(88,166,255,.06) 1px,transparent 1px)',backgroundSize:'24px 24px',pointerEvents:'none',opacity:.5}}/>
+      
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:18,position:'relative'}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+            {totalInMarket>0&&<div style={{display:'flex',alignItems:'center',gap:5,background:'rgba(63,185,80,.15)',border:'1px solid rgba(63,185,80,.4)',borderRadius:20,padding:'3px 10px',fontSize:10,fontWeight:700,color:'#3fb950',letterSpacing:1,textTransform:'uppercase'}}>
+              <span style={{width:6,height:6,borderRadius:'50%',background:'#3fb950',boxShadow:'0 0 10px #3fb950',animation:'pulse 1.5s ease-in-out infinite'}}/>
+              LIVE
+            </div>}
+            <div style={{fontSize:10,color:'rgba(255,255,255,.4)',letterSpacing:1.5,textTransform:'uppercase'}}>Case Market</div>
+          </div>
+          <div style={{fontSize:26,fontWeight:900,color:'#e6edf3',lineHeight:1.1,letterSpacing:'-.5px',marginBottom:3,display:'flex',alignItems:'center',gap:10}}>
+            🏪 ตลาดเคส
+          </div>
+          <div style={{fontSize:13,color:'rgba(230,237,243,.55)',fontWeight:500}}>⚡ ใครไวได้ก่อน — รีบรับก่อนโดนคนอื่นแย่ง!</div>
+        </div>
+        <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0}}>
+          {myRank>0&&<div style={{textAlign:'center',background:myRank<=3?'linear-gradient(135deg,rgba(255,215,0,.2),rgba(255,215,0,.05))':'rgba(255,255,255,.06)',border:'1px solid '+(myRank<=3?'rgba(255,215,0,.35)':'rgba(255,255,255,.1)'),borderRadius:12,padding:'8px 12px',backdropFilter:'blur(10px)'}}>
+            <div style={{fontSize:10,color:myRank<=3?'#ffd700':'rgba(230,237,243,.5)',marginBottom:-2,letterSpacing:.5}}>RANK</div>
+            <div style={{fontSize:20,fontWeight:900,color:myRank<=3?'#ffd700':'#e6edf3',lineHeight:1.1}}>#{myRank}</div>
+          </div>}
+          <button onClick={()=>setShowLb(v=>!v)} style={{background:showLb?'rgba(255,215,0,.15)':'rgba(255,255,255,.06)',border:'1px solid '+(showLb?'rgba(255,215,0,.35)':'rgba(255,255,255,.1)'),borderRadius:12,padding:'10px 12px',cursor:'pointer',color:showLb?'#ffd700':'rgba(230,237,243,.7)',fontSize:16,fontWeight:700,transition:'all .2s'}}>🏆</button>
+          <button onClick={()=>load(false)} style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,padding:'10px 12px',cursor:'pointer',color:'rgba(230,237,243,.6)',fontSize:16,transition:'transform .2s'}}
+            onMouseOver={e=>e.currentTarget.style.transform='rotate(180deg)'}
+            onMouseOut={e=>e.currentTarget.style.transform='rotate(0)'}>🔄</button>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{display:'flex',gap:10,marginBottom:showLb?16:0,position:'relative'}}>
+        {[
+          ['📦','เคสว่าง',totalInMarket,'#58a6ff','rgba(88,166,255,.15)','rgba(88,166,255,.25)'],
+          ['✅','ของฉัน',myClaimed,'#3fb950','rgba(63,185,80,.15)','rgba(63,185,80,.25)'],
+          ['⚡','ทีม',lbSorted.reduce((s,x)=>s+(x.claimedCases||0),0),'#bc8cff','rgba(188,140,255,.15)','rgba(188,140,255,.25)']
+        ].map(([ico,lbl,val,clr,bg,bd])=>
+          <div key={lbl} style={{flex:1,background:bg,border:'1px solid '+bd,borderRadius:14,padding:'12px 8px',textAlign:'center',backdropFilter:'blur(10px)',transition:'transform .2s'}}
+            onMouseOver={e=>e.currentTarget.style.transform='translateY(-2px)'}
+            onMouseOut={e=>e.currentTarget.style.transform='translateY(0)'}>
+            <div style={{fontSize:11,color:'rgba(230,237,243,.5)',marginBottom:2,fontWeight:600}}>{ico} {lbl}</div>
+            <div style={{fontSize:24,fontWeight:900,color:clr,lineHeight:1,textShadow:'0 0 20px '+clr+'40'}}>{val}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Leaderboard dropdown */}
+      {showLb&&<div style={{borderTop:'1px solid rgba(255,215,0,.15)',paddingTop:14,animation:'slideDown .3s ease'}}>
+        <div style={{fontSize:10,color:'#ffd700',letterSpacing:1.5,textTransform:'uppercase',marginBottom:10,fontWeight:700,display:'flex',alignItems:'center',gap:8}}>🏆 Top Performers</div>
+        {lbSorted.slice(0,8).map((s,i)=>{
+          const isMe=s.name===currentUser.name;
+          const medals=['🥇','🥈','🥉'];
+          const pct=topScore>0?Math.round((s.claimedCases||0)/topScore*100):0;
+          return<div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 10px',borderRadius:10,background:isMe?'linear-gradient(90deg,rgba(88,166,255,.18),rgba(88,166,255,.05))':'transparent',marginBottom:4,border:isMe?'1px solid rgba(88,166,255,.35)':'1px solid transparent',transition:'all .2s'}}>
+            <span style={{width:26,textAlign:'center',flexShrink:0,fontSize:16}}>{medals[i]||<span style={{fontSize:11,color:'rgba(255,255,255,.4)',fontWeight:700}}>#{i+1}</span>}</span>
+            <div style={{flex:1,fontSize:13,fontWeight:isMe?700:500,color:isMe?'#79c0ff':'rgba(230,237,243,.85)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}{isMe&&' 👈'}</div>
+            <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+              <div style={{height:5,borderRadius:3,background:'rgba(255,255,255,.08)',width:54,overflow:'hidden'}}>
+                <div style={{height:'100%',background:i===0?'linear-gradient(90deg,#ffd700,#ffa500)':i===1?'linear-gradient(90deg,#c0c0c0,#a0a0a0)':i===2?'linear-gradient(90deg,#cd7f32,#a0622a)':'linear-gradient(90deg,#58a6ff,#79c0ff)',width:pct+'%',transition:'width .6s'}}/>
+              </div>
+              <span style={{fontWeight:900,color:i===0?'#ffd700':'#58a6ff',fontSize:14,minWidth:22,textAlign:'right'}}>{s.claimedCases||0}</span>
+            </div>
+          </div>;
+        })}
+      </div>}
+    </div>
+
+    {/* ── Toast ── */}
+    {toast&&<div style={{margin:'12px 16px 0',background:toast.type==='ok'?'linear-gradient(135deg,rgba(63,185,80,.15),rgba(63,185,80,.05))':'linear-gradient(135deg,rgba(248,81,73,.15),rgba(248,81,73,.05))',border:'1px solid '+(toast.type==='ok'?'rgba(63,185,80,.4)':'rgba(248,81,73,.4)'),borderRadius:12,padding:'12px 16px',fontSize:14,fontWeight:600,color:toast.type==='ok'?'var(--green)':'var(--red)',display:'flex',alignItems:'center',gap:10,boxShadow:'0 4px 20px '+(toast.type==='ok'?'rgba(63,185,80,.15)':'rgba(248,81,73,.15)'),animation:'slideDown .3s cubic-bezier(.16,1,.3,1)'}}>{toast.msg}</div>}
+
+    {/* ── Cards ── */}
+    <div style={{padding:'16px 16px 80px',position:'relative'}}>
+      {loading?<SkeletonCards n={4}/>:visibleCases_render(allVisible)}
+    </div>
+
+    <style>{`
+      @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.6;transform:scale(1.15);}}
+      @keyframes orb1{0%,100%{transform:translate(0,0);}50%{transform:translate(30px,30px);}}
+      @keyframes orb2{0%,100%{transform:translate(0,0);}50%{transform:translate(-20px,40px);}}
+      @keyframes slideDown{from{transform:translateY(-10px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+      @keyframes cardIn{from{transform:translateY(20px) scale(.96);opacity:0;}to{transform:translateY(0) scale(1);opacity:1;}}
+      @keyframes claimPulse{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(88,166,255,.6);}50%{transform:scale(1.02);box-shadow:0 0 0 12px rgba(88,166,255,0);}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(88,166,255,0);}}
+      @keyframes glow{0%,100%{box-shadow:0 0 20px rgba(248,81,73,.15);}50%{box-shadow:0 0 30px rgba(248,81,73,.35);}}
+      @keyframes shine{0%{background-position:-200% center;}100%{background-position:200% center;}}
+    `}</style>
+  </div>;
+
+  function visibleCases_render(allVisible){
+    if(allVisible.length===0)return <div style={{textAlign:'center',padding:'72px 20px',color:'var(--text2)'}}>
+      <div style={{fontSize:64,marginBottom:16,opacity:.4}}>📭</div>
+      <div style={{fontWeight:700,fontSize:18,marginBottom:6,color:'var(--text)'}}>ไม่มีเคสในตลาดตอนนี้</div>
+      <div style={{fontSize:13,color:'var(--text3)',marginBottom:20,lineHeight:1.6}}>เคสใหม่จะปรากฏที่นี่ทันที<br/>เมื่อเซลส์ส่งขึ้นตลาด</div>
+      <button onClick={()=>load(false)} style={{background:'linear-gradient(135deg,#1f6feb,#388bfd)',border:'none',borderRadius:12,color:'#fff',padding:'12px 28px',cursor:'pointer',fontSize:14,fontWeight:700,boxShadow:'0 4px 18px rgba(31,111,235,.35)'}}>🔄 รีเฟรช</button>
+    </div>;
+
+    return <>
+      <div style={{fontSize:12,color:'var(--text2)',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
+        <span style={{width:4,height:4,borderRadius:'50%',background:'#3fb950'}}/>
+        <span>พบ <strong style={{color:'var(--text)',fontSize:14}}>{allVisible.length}</strong> เคส — เลื่อนดูและรับเลย</span>
+      </div>
+      {allVisible.map((c,i)=>{
+        const urgency=getUrgency(c);
+        const hot=isHot(c);
+        const justC=justClaimed===c.ID;
+        return <div key={c.ID||i} style={{
+          background:hot?'linear-gradient(135deg,rgba(248,81,73,.06),var(--bg2) 40%)':'var(--bg2)',
+          border:'1px solid '+(hot?'rgba(248,81,73,.35)':'var(--border)'),
+          borderRadius:16,padding:0,marginBottom:14,
+          transition:'all .25s cubic-bezier(.16,1,.3,1)',
+          animation:`cardIn .4s ease ${Math.min(i*0.04,0.4)}s backwards${justC?', claimPulse .8s ease':''}${hot?', glow 3s ease-in-out infinite':''}`,
+          overflow:'hidden',position:'relative',
+        }}
+        onMouseOver={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.borderColor=hot?'rgba(248,81,73,.55)':'rgba(88,166,255,.4)';e.currentTarget.style.boxShadow='0 8px 24px '+(hot?'rgba(248,81,73,.15)':'rgba(88,166,255,.12)');}}
+        onMouseOut={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.borderColor=hot?'rgba(248,81,73,.35)':'var(--border)';e.currentTarget.style.boxShadow='none';}}>
+          
+          {/* HOT ribbon */}
+          {hot&&<div style={{position:'absolute',top:12,right:-32,background:'linear-gradient(135deg,#f85149,#da3633)',color:'#fff',fontSize:10,fontWeight:900,padding:'3px 40px',transform:'rotate(35deg)',letterSpacing:1.5,boxShadow:'0 2px 8px rgba(248,81,73,.4)',zIndex:1}}>HOT 🔥</div>}
+
+          <div style={{padding:'16px'}}>
+            {/* Top row */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12,gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                  <div style={{fontSize:16,fontWeight:900,color:'var(--blue)',fontFamily:'monospace',letterSpacing:.5}}>#{c.ID}</div>
+                  {urgency===3&&<span style={{fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:20,background:'rgba(63,185,80,.15)',color:'#3fb950',border:'1px solid rgba(63,185,80,.35)',letterSpacing:.5}}>✨ ใหม่</span>}
+                  {urgency===2&&<span style={{fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:20,background:'rgba(210,153,34,.15)',color:'var(--yellow)',border:'1px solid rgba(210,153,34,.35)',letterSpacing:.5}}>⏱ เดือนนี้</span>}
+                </div>
+                <div style={{fontSize:16,fontWeight:700,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:5,flexShrink:0}}>
+                <StatusBadge status={c.status}/>
+              </div>
+            </div>
+
+            {/* From sales chip */}
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10,fontSize:11,color:'var(--text3)'}}>
+              <span style={{background:'rgba(255,166,87,.1)',color:'var(--orange)',border:'1px solid rgba(255,166,87,.25)',borderRadius:20,padding:'2px 10px',fontWeight:600}}>👤 จาก {c.old_sales||'-'}</span>
+              <span>·</span>
+              <span>📅 {getDateBadge(c)}</span>
+            </div>
+
+            {/* Contact (blurred) */}
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,background:'var(--bg3)',borderRadius:10,padding:'8px 12px',border:'1px dashed var(--border)'}}>
+              <span style={{fontSize:14}}>🔒</span>
+              <span style={{filter:'blur(5px)',userSelect:'none',letterSpacing:2,fontSize:14,color:'var(--text2)',flex:1,fontFamily:'monospace'}}>0XX-XXX-XXXX</span>
+              <span style={{fontSize:10,color:'var(--text3)',fontStyle:'italic'}}>รับเคสเพื่อดู</span>
+            </div>
+
+            {/* Report */}
+            {c.report&&<div style={{fontSize:13,color:'var(--text2)',lineHeight:1.7,marginBottom:12,background:'rgba(88,166,255,.04)',borderLeft:'3px solid rgba(88,166,255,.4)',padding:'8px 12px',borderRadius:'0 8px 8px 0'}}>
+              <span style={{fontSize:11,color:'var(--text3)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>📝 รายละเอียด</span>
+              <div style={{marginTop:4}}>{String(c.report).slice(0,140)}{c.report.length>140?'...':''}</div>
+            </div>}
+
+            {/* Actions */}
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>claim(c.ID)} style={{
+                flex:1,
+                background:'linear-gradient(135deg,#1f6feb,#388bfd,#1f6feb)',
+                backgroundSize:'200% auto',
+                border:'none',borderRadius:12,color:'#fff',padding:'13px',
+                fontSize:15,fontWeight:800,cursor:'pointer',
+                boxShadow:'0 4px 16px rgba(31,111,235,.4)',
+                transition:'all .2s',
+                animation:'shine 3s linear infinite',
+                letterSpacing:.3,
+              }}
+                onMouseOver={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 8px 24px rgba(31,111,235,.55)';}}
+                onMouseOut={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow='0 4px 16px rgba(31,111,235,.4)';}}>
+                ⚡ รับเคสนี้
+              </button>
+              <button onClick={()=>skip(c.ID)} title="ไม่สนใจ" style={{
+                background:'rgba(248,81,73,.06)',color:'var(--red)',
+                border:'1px solid rgba(248,81,73,.2)',borderRadius:12,padding:'0 16px',
+                fontSize:16,cursor:'pointer',fontWeight:700,
+                transition:'all .15s',
+              }}
+                onMouseOver={e=>{e.currentTarget.style.background='rgba(248,81,73,.18)';e.currentTarget.style.transform='scale(1.05)';}}
+                onMouseOut={e=>{e.currentTarget.style.background='rgba(248,81,73,.06)';e.currentTarget.style.transform='scale(1)';}}>✕</button>
+            </div>
+          </div>
+        </div>;
+      })}
+    </>;
+  }
+}
 
 // ── Today's Follow-up Mini Banner ──
 
