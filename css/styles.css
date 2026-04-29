@@ -122,6 +122,7 @@ tr.clickable{cursor:pointer;}
 .stat-lbl{font-size:12px;color:var(--text2);margin-top:4px;}
 .s-wait{background:#3a3d42;color:#ffffff;border:1px solid #6e7681;}
 .s-go{background:#1a4731;color:#3fb950;}
+.s-calling{background:#0d3149;color:#79c0ff;}
 .s-nurse{background:#3d2b00;color:#ffa657;}
 .s-half{background:#2d1b00;color:#d29922;}
 .s-cant{background:#3d1515;color:#f85149;}
