@@ -200,7 +200,7 @@ function mapMarket(r){return{ID:r.id,name:r.name,contact:r.contact,report:r.repo
 function mapClaimed(r){return{caseID:r.caseid,customername:r.customername,contact:r.contact,report:r.report,status:r.status,fromsales:r.fromsales,sale:r.sale,newstatus:r.newstatus,AssignedAt:r.assignedat,Notes:r.notes||'',date:r.assignedat};}
 function mapBooking(r){return{'วันที่':r.createdat,CaseID:r.caseid,'เซลส์':r.sales,'ลูกค้า':r.customer,Facebook:r.facebook||'',Ads:r.ads||'','รถ':r.brand||'','รุ่น':r.model||'','ทะเบียน':r.plate||'','สถานะ':r.status,'หมายเหตุ':r.note||''};}
 function mapHistory(r){return{historyId:'H'+r.id,'รหัสเคส':r.caseid,'เซลส์':r.sales,action:r.action,detail:r.detail||'','วันที่':r.createdat};}
-function mapNotif(r){return{notifId:'N'+r.id,'เซลส์':r.sales,'รหัสเคส':r.caseid,message:r.message,'วันที่':r.createdat,'สถานะ':r.status};}
+function mapNotif(r){return{notifId:'N'+r.id,id:r.id,sales:r.sales,caseid:r.caseid,'เซลส์':r.sales,'รหัสเคส':r.caseid,message:r.message,'วันที่':r.createdat,status:r.status,'สถานะ':r.status};}
 
 function sbHist(caseid,sales,action,detail){sbQ('POST','history',{},{caseid,sales:sales||'ระบบ',action,detail:detail||'',createdat:nowTH()});}
 function sbNotif(sales,caseid,message){sbQ('POST','notifications',{},{sales,caseid,message,createdat:nowTH(),status:'unread'});}
@@ -561,6 +561,39 @@ function getCaseSuggestion(c){
   return'📝 อัปเดตรีพอร์ต + หาข้อมูลเพิ่ม';
 }
 
+// ============================================================
+// ⏱️ AUTO MARKET GUARD — ส่งเคสค้างเกิน 60 ชม.เข้าตลาดอัตโนมัติ
+// หมายเหตุ: ทำงานเมื่อมีผู้ใช้เปิด/รีเฟรชระบบ ไม่ใช่ server cron
+// ============================================================
+const AUTO_MARKET_HOURS = 60;
+const AUTO_MARKET_CLOSED = ['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
+function parseTHDateTime(s){
+  const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);
+  if(!m)return null;
+  return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));
+}
+function caseAgeHoursFromNow(c){
+  const d=parseTHDateTime(c?.updatedat||c?.createdat);
+  if(!d)return 0;
+  return (Date.now()-d.getTime())/3600000;
+}
+async function autoSendStaleCasesToMarket(caseRows,marketIds,salesName){
+  const ids=marketIds instanceof Set?marketIds:new Set(safeArray(marketIds).map(String));
+  const rows=safeArray(caseRows).filter(c=>{
+    const id=String(c.caseid||'');
+    if(!id||ids.has(id)||c.market===true||c.market==='true')return false;
+    if(AUTO_MARKET_CLOSED.includes(c.status))return false;
+    return caseAgeHoursFromNow(c)>=AUTO_MARKET_HOURS;
+  }).slice(0,10); // กันยิง API หนักเกินไปในครั้งเดียว
+  let sent=0;
+  for(const c of rows){
+    const r=await api('sendToMarket',{caseId:c.caseid,sales:salesName||c.sales||'ระบบ'});
+    if(r&&r.success){sent++;ids.add(String(c.caseid));}
+  }
+  return sent;
+}
+
+
 function ScoreBadge({score}){
   const cfg=score>=80?{bg:'rgba(248,81,73,.15)',color:'var(--red)',label:'🔥 ร้อน'}:
             score>=50?{bg:'rgba(210,153,34,.15)',color:'var(--yellow)',label:'⚠️ ตาม'}:
@@ -881,12 +914,12 @@ function AddBookingModal({currentUser,users,onClose,onAdded}){
 function NotifPanel({user,onClose,onCountChange}){
   const [notifs,setNotifs]=useState([]);const [loading,setLoading]=useState(true);
   useEffect(()=>{api('getNotifications',{sales:user.name}).then(r=>{if(r.success)setNotifs(r.data||[]);setLoading(false);});},[]);
-  function syncCount(u){if(onCountChange)onCountChange(u.filter(n=>n['สถานะ']==='unread').length);}
+  function syncCount(u){if(onCountChange)onCountChange(u.filter(n=>(n.status||n['สถานะ'])==='unread').length);}
   function markRead(id){const u=notifs.map(x=>x.notifId===id?{...x,'สถานะ':'read'}:x);setNotifs(u);syncCount(u);api('markNotifRead',{notifId:id});}
   function markAllRead(){const u=notifs.map(x=>({...x,'สถานะ':'read'}));setNotifs(u);syncCount(u);api('markAllNotifRead',{sales:user.name});}
   return <div style={{position:'fixed',top:56,right:16,width:320,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,boxShadow:'var(--shadow)',zIndex:200,maxHeight:420,overflowY:'auto'}}>
     <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:700}}>การแจ้งเตือน</span><div style={{display:'flex',gap:6}}><button className="btn btn-ghost" style={{padding:'2px 8px',fontSize:11}} onClick={markAllRead}>อ่านทั้งหมด</button><button className="btn btn-ghost" style={{padding:'2px 8px'}} onClick={onClose}><Ico.x/></button></div></div>
-    {loading?<Loading/>:notifs.length===0?<p style={{padding:20,textAlign:'center',color:'var(--text2)',fontSize:13}}>ไม่มีการแจ้งเตือน</p>:notifs.slice(0,30).map(n=><div key={n.notifId} style={{padding:'10px 16px',borderBottom:'1px solid var(--border)',background:n['สถานะ']==='unread'?'rgba(88,166,255,.06)':'transparent',cursor:'pointer'}} onClick={()=>markRead(n.notifId)}><div style={{fontSize:13,display:'flex',gap:8,alignItems:'flex-start'}}>{n['สถานะ']==='unread'&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--blue)',flexShrink:0,marginTop:4}}/>}<span style={{color:n['สถานะ']==='unread'?'var(--text)':'var(--text2)'}}>{n.message}</span></div><div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>{String(n['วันที่']||'')}</div></div>)}
+    {loading?<Loading/>:notifs.length===0?<p style={{padding:20,textAlign:'center',color:'var(--text2)',fontSize:13}}>ไม่มีการแจ้งเตือน</p>:notifs.slice(0,30).map(n=><div key={n.notifId} style={{padding:'10px 16px',borderBottom:'1px solid var(--border)',background:(n.status||n['สถานะ'])==='unread'?'rgba(88,166,255,.06)':'transparent',cursor:'pointer'}} onClick={()=>markRead(n.notifId)}><div style={{fontSize:13,display:'flex',gap:8,alignItems:'flex-start'}}>{(n.status||n['สถานะ'])==='unread'&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--blue)',flexShrink:0,marginTop:4}}/>}<span style={{color:(n.status||n['สถานะ'])==='unread'?'var(--text)':'var(--text2)'}}>{n.message}</span></div><div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>{String(n['วันที่']||'')}</div></div>)}
   </div>;
 }
 
@@ -1598,13 +1631,23 @@ function DailyFocusPage({currentUser,onNavigate}){
     api('getClaimedCases',{sales:currentUser.name}),
     api('getMarket',{sales:currentUser.name}),
     sbQ('GET','targets',{sales_name:'eq.'+currentUser.name,month_key:'eq.'+focusMonthKey})
-  ]).then(([cr,ccr,mr,tRows])=>{
-    if(cr.success)setMyCases(safeArray(cr.data));
-    if(ccr.success)setClaimedCases(ccr.data||[]);
-    if(mr.success){const mArr=safeArray(mr.data);setMarketCount(mArr.filter(c=>c.old_sales!==currentUser.name).length);setMarketCaseIds(new Set(mArr.map(c=>String(c.ID||''))));}
+  ]).then(async([cr,ccr,mr,tRows])=>{
+    const caseArr=cr.success?safeArray(cr.data):[];
+    const claimedArr=ccr.success?(ccr.data||[]):[];
+    const mArr=mr.success?safeArray(mr.data):[];
+    const mIds=new Set(mArr.map(c=>String(c.ID||'')));
+    const autoSent=await autoSendStaleCasesToMarket(caseArr,mIds,currentUser.name);
+    if(autoSent>0){
+      showToast('ส่งเคสค้างเกิน '+AUTO_MARKET_HOURS+' ชม. เข้าตลาดแล้ว '+autoSent+' เคส','info',3500);
+      cacheClear(['getCases','getMarket','getDashboard','getMarketIds']);
+      return load();
+    }
+    if(cr.success)setMyCases(caseArr);
+    if(ccr.success)setClaimedCases(claimedArr);
+    if(mr.success){setMarketCount(mArr.filter(c=>c.old_sales!==currentUser.name).length);setMarketCaseIds(mIds);}
     if(tRows&&tRows.length)setMyTarget(tRows[0].target_value||0);
     setLoading(false);
-  });},[currentUser.name]);
+  });},[currentUser.name,focusMonthKey]);
   useEffect(()=>{load();},[load]);
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   function parseDate(d){const s=String(d||'');const m=s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
@@ -1690,10 +1733,13 @@ function usePushNotif(apiUrl,salesName){
       var perm='';try{perm=(typeof Notification!=='undefined')?Notification.permission:'';}catch(e){return;}
       if(perm!=='granted')return;
       try{
-        const rows=await sbQ('GET','notifications',{'sales':'eq.'+salesName,'สถานะ':'eq.unread',limit:'50'});
-        const fresh=safeArray(rows).filter(n=>!seenRef.current.has(n.notifId));
+        const rows=await sbQ('GET','notifications',{sales:'eq.'+salesName,status:'eq.unread',limit:'50'});
+        const fresh=safeArray(rows).filter(n=>{
+          const key=String(n.id||n.notifId||n.createdat||n.message||'');
+          return key&&!seenRef.current.has(key);
+        });
         if(fresh.length>0){
-          fresh.forEach(n=>seenRef.current.add(n.notifId));
+          fresh.forEach(n=>seenRef.current.add(String(n.id||n.notifId||n.createdat||n.message||'')));
           try{localStorage.setItem('cp_seen_notifs',JSON.stringify([...seenRef.current]));}catch(e){}
           const body=fresh.length===1?fresh[0].message:fresh.length+' การแจ้งเตือนใหม่';
           try{new Notification('🚗 CasePool',{body,icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png',tag:'casepool',renotify:true});}catch(e){}
@@ -2324,7 +2370,7 @@ function AdminApp({currentUser,onLogout}){
 
   useEffect(()=>{
     api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});
-    api('getNotifications',{sales:'admin'}).then(r=>{if(r.success){const u=r.data.filter(n=>n['สถานะ']==='unread');setNotifCount(u.length);}});
+    api('getNotifications',{sales:'admin'}).then(r=>{if(r.success){const u=r.data.filter(n=>(n.status||n['สถานะ'])==='unread');setNotifCount(u.length);}});
   },[]);
 
   const pages={
@@ -2346,6 +2392,8 @@ function AdminApp({currentUser,onLogout}){
     {key:'bookings',icon:<Ico.book/>,label:'การจอง'},
     {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
     {key:'team',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/> <circle cx="9" cy="7" r="4"/> <path d="M23 21v-2a4 4 0 0 0-3-3.87"/> <path d="M16 3.13a4 4 0 0 1 0 7.75"/> </svg>,label:'ทีม'},
+    {key:'ai',icon:<Ico.ai/>,label:'AI Admin'},
+    {key:'analytics',icon:<Ico.report/>,label:'Analytics'},
   ];
 
   const bottomNavItems=[
@@ -2353,6 +2401,8 @@ function AdminApp({currentUser,onLogout}){
     {key:'market',icon:<Ico.market/>,label:'ตลาด'},
     {key:'dashboard',icon:<Ico.dash/>,label:'Dash'},
     {key:'team',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/> <circle cx="9" cy="7" r="4"/> <path d="M23 21v-2a4 4 0 0 0-3-3.87"/> <path d="M16 3.13a4 4 0 0 1 0 7.75"/> </svg>,label:'ทีม'},
+    {key:'ai',icon:<Ico.ai/>,label:'AI'},
+    {key:'analytics',icon:<Ico.report/>,label:'Graph'},
     {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
   ];
 
@@ -2432,9 +2482,9 @@ function SalesFollowups({currentUser}){
 function SalesApp({currentUser,onLogout}){
   const [page,setPage]=useState('focus');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);const [showSearch,setShowSearch]=useState(false);const [showOnboarding,setShowOnboarding]=useState(false);
   usePushNotif(API_URL,currentUser.name);
-  useEffect(()=>{api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});function refreshNotif(){api('getNotifications',{sales:currentUser.name}).then(r=>{if(r.success){const u=r.data.filter(n=>n['สถานะ']==='unread');setNotifCount(u.length);}});}refreshNotif();const t=setInterval(refreshNotif,30000);try{if(!localStorage.getItem('cp_onboarded_'+currentUser.userId))setShowOnboarding(true);}catch(e){}return()=>clearInterval(t);},[currentUser.name,currentUser.userId]);
+  useEffect(()=>{api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});function refreshNotif(){api('getNotifications',{sales:currentUser.name}).then(r=>{if(r.success){const u=r.data.filter(n=>(n.status||n['สถานะ'])==='unread');setNotifCount(u.length);}});}refreshNotif();const t=setInterval(refreshNotif,30000);try{if(!localStorage.getItem('cp_onboarded_'+currentUser.userId))setShowOnboarding(true);}catch(e){}return()=>clearInterval(t);},[currentUser.name,currentUser.userId]);
   const pages={focus:<><PushNotifBanner currentUser={currentUser}/><DailyFocusPage currentUser={currentUser} onNavigate={k=>setPage(k)}/></>,market:<SalesMarket currentUser={currentUser}/>,cases:<SalesCurrentCases currentUser={currentUser} users={users}/>,claimed:<SalesClaimedCases currentUser={currentUser} users={users}/>,ai:<AIAdvisorPage currentUser={currentUser}/>,dashboard:<SalesDashboard currentUser={currentUser}/>,followup:<SalesFollowups currentUser={currentUser}/>};
-  const navItems=[{key:'focus',icon:<Ico.focus/>,label:'วันนี้'},{key:'market',icon:<Ico.market/>,label:'ตลาด'},{key:'cases',icon:<Ico.home/>,label:'เคสของฉัน'},{key:'claimed',icon:<Ico.inbox/>,label:'รับตลาด'},{key:'dashboard',icon:<Ico.trophy/>,label:'แดชบอร์ด'},{key:'followup',icon:<Ico.bell/>,label:'Follow-up'}];
+  const navItems=[{key:'focus',icon:<Ico.focus/>,label:'วันนี้'},{key:'market',icon:<Ico.market/>,label:'ตลาด'},{key:'cases',icon:<Ico.home/>,label:'เคสของฉัน'},{key:'claimed',icon:<Ico.inbox/>,label:'รับตลาด'},{key:'ai',icon:<Ico.ai/>,label:'AI แนะนำ'},{key:'dashboard',icon:<Ico.trophy/>,label:'แดชบอร์ด'},{key:'followup',icon:<Ico.bell/>,label:'Follow-up'}];
   return <div>
     {showOnboarding&&<OnboardingTour currentUser={currentUser} onDone={()=>setShowOnboarding(false)}/>}
     {showSearch&&<GlobalSearch currentUser={currentUser} onClose={()=>setShowSearch(false)} onNavigate={k=>{setPage(k);setShowSearch(false);}}/>}
@@ -2456,7 +2506,7 @@ function SalesApp({currentUser,onLogout}){
       </div>
     </div>
     <div className="sales-content sales-desktop-content" style={{paddingTop:56}}><ErrorBoundary>{pages[page]||pages.focus}</ErrorBoundary></div>
-    <div className="bottom-nav">{navItems.slice(0,5).map(n=><div key={n.key} className={`bottom-nav-item ${page===n.key?'active':''}`} onClick={()=>{if(page!==n.key)setPage(n.key);}}>{n.icon}<span>{n.label}</span></div>)}</div>
+    <div className="bottom-nav">{navItems.map(n=><div key={n.key} className={`bottom-nav-item ${page===n.key?'active':''}`} onClick={()=>{if(page!==n.key)setPage(n.key);}}>{n.icon}<span>{n.label}</span></div>)}</div>
     {showNotif&&<NotifPanel user={currentUser} onClose={()=>setShowNotif(false)} onCountChange={setNotifCount}/>}
   </div>;
 }
