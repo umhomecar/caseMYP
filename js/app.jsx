@@ -106,6 +106,21 @@ function cacheGet(action,data){const k=cacheKey(action,data);const c=_cache[k];i
 function cacheSet(action,data,result){_cache[cacheKey(action,data)]={data:result,ts:Date.now()};}
 function cacheClear(patterns){(patterns||[]).forEach(p=>{Object.keys(_cache).forEach(k=>{if(k.startsWith(p))delete _cache[k];});});}
 
+// ── Safe Supabase helpers ──
+function isSbError(x){return x&&!Array.isArray(x)&&(x.code||x.message||x.error||x.details);}
+function formatSbError(x){return String(x?.message||x?.error||x?.details||'ทำรายการไม่สำเร็จ');}
+function isDuplicateError(x){const m=String((x?.code||'')+' '+(x?.message||'')+' '+(x?.details||'')).toLowerCase();return x?.code==='23505'||m.includes('duplicate')||m.includes('unique');}
+function isPostgrestSearchSafe(q){return /^[0-9A-Za-zก-๙\s@._\-+#/]*$/u.test(String(q||''));}
+function localCaseSearch(rows,q){
+  const lq=String(q||'').toLowerCase();
+  return safeArray(rows).filter(c=>
+    String(c.caseid||'').toLowerCase().includes(lq)||
+    String(c.customername||'').toLowerCase().includes(lq)||
+    String(c.contact||'').toLowerCase().includes(lq)||
+    String(c.report||'').toLowerCase().includes(lq)
+  );
+}
+
 const CACHEABLE=['getCases','getMarket','getMarketIds','getUsers','getBookings','getDashboard','getNotifications','getClaimedCases'];
 const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard'],sendToMarket:['getCases','getMarket','getDashboard','getMarketIds'],claimCase:['getMarket','getMarketIds','getClaimedCases','getDashboard'],returnCase:['getMarket','getMarketIds','getClaimedCases','getCases'],updateClaimed:['getClaimedCases'],closeMarketCase:['getMarket','getCases'],adminChangeSales:['getCases','getClaimedCases'],adminPullCase:['getCases','getClaimedCases'],deleteCase:['getCases','getMarket','getDashboard'],addBooking:['getBookings'],updateBooking:['getBookings']};
 
@@ -232,7 +247,28 @@ async function sbApi(action,data){
     case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbQ('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
     case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
-    case 'addCase':{const id=data.caseid||await genCaseId(),ts=nowTH();let assignedSales=data.sales,autoAssigned=false;if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}await sbQ('POST','cases',{},{caseid:id,customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ',attachment:data.attachment||''});sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');return{success:true,caseId:id,sales:assignedSales,autoAssigned};}
+    case 'addCase':{
+      const ts=nowTH();
+      let assignedSales=data.sales,autoAssigned=false;
+      if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}
+      const baseRow={customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ',attachment:data.attachment||''};
+      const maxAttempts=data.caseid?1:8;
+      let lastError=null;
+      for(let attempt=0;attempt<maxAttempts;attempt++){
+        const id=data.caseid||await genCaseId(attempt);
+        const inserted=await sbQ('POST','cases',{},{...baseRow,caseid:id});
+        if(!isSbError(inserted)){
+          sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);
+          if(autoAssigned&&assignedSales)sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+') อัตโนมัติ');
+          return{success:true,caseId:id,sales:assignedSales,autoAssigned};
+        }
+        lastError=inserted;
+        if(data.caseid||!isDuplicateError(inserted)){
+          return{success:false,error:formatSbError(inserted)};
+        }
+      }
+      return{success:false,error:'รหัสเคสซ้ำหลายครั้ง กรุณากดเพิ่มเคสใหม่อีกครั้ง'};
+    }
     case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);
       // Push notification ถ้าเปลี่ยน sales (assign)
       if(data.sales&&data.sales!==data.changedBy){
@@ -242,23 +278,22 @@ async function sbApi(action,data){
     case 'searchCases':{
       const q=String(data.q||'').trim();
       if(!q)return{success:true,data:[]};
-      // ใช้ Supabase OR filter (ilike = case-insensitive LIKE) — เร็วกว่าโหลดทั้ง table
-      const orFilter=`caseid.ilike.*${q}*,customername.ilike.*${q}*,contact.ilike.*${q}*,report.ilike.*${q}*`;
-      try{
-        const rows=await sbQ('GET','cases',{or:`(${orFilter})`,order:'caseid.desc',limit:'100'});
-        return{success:true,data:safeArray(rows)};
-      }catch(e){
-        // Fallback: ถ้า OR filter ล้มเหลว (เช่น special chars) → filter ใน JS
+
+      // ถ้าคำค้นมีอักขระพิเศษที่ PostgREST parser อาจตีความผิด เช่น comma, วงเล็บ, quote
+      // ให้โหลดรายการล่าสุดแล้วค้นในฝั่ง JS แทน เพื่อไม่ให้ค้นหาแล้วหายเงียบ
+      if(!isPostgrestSearchSafe(q)){
         const allRows=await sbQ('GET','cases',{order:'caseid.desc',limit:'2000'});
-        const lq=q.toLowerCase();
-        const results=safeArray(allRows).filter(c=>
-          String(c.caseid||'').toLowerCase().includes(lq)||
-          String(c.customername||'').toLowerCase().includes(lq)||
-          String(c.contact||'').toLowerCase().includes(lq)||
-          String(c.report||'').toLowerCase().includes(lq)
-        );
-        return{success:true,data:results};
+        return{success:true,data:localCaseSearch(allRows,q)};
       }
+
+      const cleanQ=q.replace(/\*/g,'');
+      const orFilter=`caseid.ilike.*${cleanQ}*,customername.ilike.*${cleanQ}*,contact.ilike.*${cleanQ}*,report.ilike.*${cleanQ}*`;
+      const rows=await sbQ('GET','cases',{or:`(${orFilter})`,order:'caseid.desc',limit:'100'});
+      if(Array.isArray(rows))return{success:true,data:rows};
+
+      // Fallback: sbQ จะคืน error object ถ้า Supabase ตอบ error จึงต้องเช็ก Array เอง
+      const allRows=await sbQ('GET','cases',{order:'caseid.desc',limit:'2000'});
+      return{success:true,data:localCaseSearch(allRows,q)};
     }
     case 'getMarket':{
       // ✅ ดึงข้อมูลทั้งหมดโดยไม่จำกัด (ใช้ pagination อัตโนมัติ)
@@ -301,7 +336,27 @@ async function sbApi(action,data){
       return{success:true,data:safeArray(rows).map(r=>String(r.id))};
     }
     case 'closeMarketCase':{await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'ปิด'});await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,data.closedBy||'แอดมิน','ปิดเคส','ปิดเคสออกจากตลาด');return{success:true};}
-    case 'claimCase':{const mk=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});if(!mk?.length)return{success:false,error:'เคสนี้ถูกรับไปแล้ว'};const m=mk[0],ts=nowTH();await sbQ('POST','claimedcases',{},{caseid:data.caseId,customername:m.name,contact:m.contact,report:m.report,status:m.status,fromsales:m.old_sales,sale:data.sales,newstatus:m.status,assignedat:ts,notes:''});const exp=m.expiredsales?m.expiredsales+','+data.sales:data.sales;await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'ปิด',expiredsales:exp});sbHist(data.caseId,data.sales,'รับเคส','รับเคสจากตลาด');sbNotif(data.sales,data.caseId,'✅ รับเคส '+data.caseId+' เรียบร้อย');return{success:true};}
+    case 'claimCase':{
+      const mk=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});
+      if(!mk?.length)return{success:false,error:'เคสนี้ถูกรับไปแล้ว'};
+      const m=mk[0],ts=nowTH();
+      const expList=m.expiredsales?String(m.expiredsales).split(',').filter(Boolean):[];
+      if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);
+      const exp=expList.join(',');
+
+      // ล็อกเคสแบบมีเงื่อนไขก่อนบันทึก เพื่อกัน 2 คนกดรับเคสเดียวกันพร้อมกัน
+      const locked=await sbQ('PATCH','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'},{poolstatus:'ปิด',expiredsales:exp});
+      if(!Array.isArray(locked)||!locked.length)return{success:false,error:'เคสนี้ถูกรับไปแล้ว'};
+
+      const inserted=await sbQ('POST','claimedcases',{},{caseid:data.caseId,customername:m.name,contact:m.contact,report:m.report,status:m.status,fromsales:m.old_sales,sale:data.sales,newstatus:m.status,assignedat:ts,notes:''});
+      if(isSbError(inserted)){
+        await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:m.expiredsales||''});
+        return{success:false,error:formatSbError(inserted)};
+      }
+      sbHist(data.caseId,data.sales,'รับเคส','รับเคสจากตลาด');
+      sbNotif(data.sales,data.caseId,'✅ รับเคส '+data.caseId+' เรียบร้อย');
+      return{success:true};
+    }
     case 'getClaimedCases':{const q={order:'assignedat.desc'};if(data.sales)q.sale=`eq.${data.sales}`;const rows=await sbQ('GET','claimedcases',q);return{success:true,data:(rows||[]).map(mapClaimed)};}
     case 'updateClaimed':{const upd={};if(data.newstatus!==undefined)upd.newstatus=data.newstatus;if(data.Notes!==undefined)upd.notes=data.Notes;const q={caseid:`eq.${data.caseId}`};if(data.sales)q.sale=`eq.${data.sales}`;await sbQ('PATCH','claimedcases',q,upd);sbHist(data.caseId,data.sales||'ระบบ','แก้ไข','เปลี่ยนสถานะเป็น '+data.newstatus);return{success:true};}
     case 'returnCase':{const isSkip=String(data.sales||'').startsWith('_skip_');const realSales=isSkip?data.sales.replace('_skip_',''):data.sales;if(!isSkip){const cl=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});if(cl?.length&&cl[0].assignedat){const m=String(cl[0].assignedat).match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m){const t=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));const hrs=(Date.now()-t.getTime())/3600000;if(hrs<24){const rem=Math.ceil(24-hrs);return{success:false,error:'ต้องรออย่างน้อย 24 ชั่วโมงหลังรับเคส ก่อนคืนตลาด (เหลือ '+rem+' ชม.)'};}}}}await sbQ('DELETE','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});const[mk,uRows]=await Promise.all([sbQ('GET','market',{id:`eq.${data.caseId}`}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'name'})]);const allSales=(uRows||[]).map(u=>u.name);if(mk?.length){const exp=mk[0].expiredsales?String(mk[0].expiredsales).split(',').filter(Boolean):[];if(!exp.includes(realSales))exp.push(realSales);const done=allSales.every(n=>exp.includes(n));await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:done?'ปิด':'เปิด',expiredsales:exp.join(',')});if(done)await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');return{success:true,allClosed:done};}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(cr?.length){const c=cr[0];await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:realSales,expiredsales:realSales,poolstatus:'เปิด'});}sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');return{success:true,allClosed:false};}}
@@ -953,7 +1008,7 @@ function AdminCurrentCases({currentUser,users}){
           <button className="btn btn-danger" style={{flex:1,padding:'10px',fontWeight:700}} onClick={()=>doSendToMarket(confirmMarket.caseId,confirmMarket.salesName)}>📤 ยืนยันส่ง</button>
         </div>
       </div>
-    </div>}>
+    </div>}
     <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส{marketCount>0&&!showMarket&&<span style={{marginLeft:6,color:'var(--purple)',cursor:'pointer',textDecoration:'underline'}} onClick={()=>setShowMarket(true)}>· ซ่อน {marketCount} เคสในตลาด</span>}</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{marketCount>0&&<button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showMarket?'var(--purple)':'var(--border)'}`,color:showMarket?'var(--purple)':'var(--text2)'}} onClick={()=>setShowMarket(v=>!v)}>{showMarket?'🏪 ซ่อนเคสตลาด':`🏪 แสดงเคสตลาด (${marketCount})`}</button>}<button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
@@ -989,7 +1044,7 @@ function AdminCurrentCases({currentUser,users}){
                 📤 ส่งตลาด
               </button>
             }
-          </td></tr>;})}}</tbody></table></div></div>
+          </td></tr>;})}</tbody></table></div></div>
     {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load} isInMarket={marketIds.has(String(sel.caseid))}/>}
     {showExport&&<div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setShowExport(false);}}>
       <div className="modal" style={{maxWidth:460,borderRadius:14}}>
@@ -1981,7 +2036,7 @@ function SalesDashboard({currentUser}){
     {(()=>{const active=allCases.filter(c=>!['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'].includes(c.status));const hot=active.filter(c=>calculateCaseScore(c)>=80);const stale=active.filter(c=>{const m=String(c.updatedat||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return false;const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return(Date.now()-d.getTime())>86400000;});if(!hot.length&&!stale.length)return null;
     return<div className="card" style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:14,marginBottom:10}}>🧠 สรุปวันนี้</div>
       {hot.length>0&&<div style={{background:'rgba(248,81,73,.08)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'10px 12px',marginBottom:8}}><div style={{fontWeight:600,fontSize:13,color:'var(--red)',marginBottom:6}}>🔥 เคสร้อน ต้องโทรวันนี้ ({hot.length})</div>{hot.slice(0,3).map((c,i)=><div key={i} style={{fontSize:12,display:'flex',justifyContent:'space-between',marginBottom:i<Math.min(hot.length,3)-1?4:0}}><span style={{color:'var(--blue)',fontWeight:600}}>{c.caseid}</span><span>{c.customername}</span><StatusBadge status={c.status}/></div>)}</div>}
-      {stale.length>0&&<div style={{background:'rgba(210,153,34,.08)',border:'1px solid rgba(210,153,34,.3)',borderRadius:8,padding:'10px 12px'}}><div style={{fontWeight:600,fontSize:13,color:'var(--yellow)',marginBottom:6}}>⏰ ค้างนาน > 24 ชม. ({stale.length} เคส)</div><div style={{fontSize:12,color:'var(--text2)'}}>อัปเดตสถานะก่อนเคสถูกส่งตลาด</div></div>}
+      {stale.length>0&&<div style={{background:'rgba(210,153,34,.08)',border:'1px solid rgba(210,153,34,.3)',borderRadius:8,padding:'10px 12px'}}><div style={{fontWeight:600,fontSize:13,color:'var(--yellow)',marginBottom:6}}>⏰ ค้างนาน &gt; 24 ชม. ({stale.length} เคส)</div><div style={{fontSize:12,color:'var(--text2)'}}>อัปเดตสถานะก่อนเคสถูกส่งตลาด</div></div>}
     </div>;})()}
   </div>;
 }
