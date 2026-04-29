@@ -575,3 +575,21 @@ html{scroll-behavior:smooth;}
   animation:spin .7s linear infinite;
   margin-top:8px;
 }
+
+
+/* ═══════════════════════════════════════
+   Bottom Nav scroll fix — รองรับเมนูมากกว่า 5 รายการ
+═══════════════════════════════════════ */
+.bottom-nav,.admin-bottom-nav{
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.bottom-nav::-webkit-scrollbar,.admin-bottom-nav::-webkit-scrollbar{display:none;}
+.bottom-nav-item{min-width:76px;flex:0 0 auto;}
+@media(max-width:768px){
+  .bottom-nav,.admin-bottom-nav{display:flex;justify-content:flex-start;}
+  .sales-content{padding-bottom:88px !important;}
+  .admin-mobile-content,.main-content.admin-mobile-content{padding-bottom:88px !important;}
+}
