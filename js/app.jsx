@@ -566,6 +566,9 @@ function getCaseSuggestion(c){
 // หมายเหตุ: ทำงานเมื่อมีผู้ใช้เปิด/รีเฟรชระบบ ไม่ใช่ server cron
 // ============================================================
 const AUTO_MARKET_HOURS = 60;
+// ปิดการ auto-send ฝั่งหน้าเว็บ เพราะมี Supabase Cron/Edge Function ทำงานหลังบ้านแล้ว
+// ถ้าต้องการให้หน้าเว็บช่วย fallback ค่อยเปลี่ยนเป็น true
+const AUTO_MARKET_CLIENT_ENABLED = false;
 const AUTO_MARKET_CLOSED = ['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
 function parseTHDateTime(s){
   const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);
@@ -1636,11 +1639,13 @@ function DailyFocusPage({currentUser,onNavigate}){
     const claimedArr=ccr.success?(ccr.data||[]):[];
     const mArr=mr.success?safeArray(mr.data):[];
     const mIds=new Set(mArr.map(c=>String(c.ID||'')));
-    const autoSent=await autoSendStaleCasesToMarket(caseArr,mIds,currentUser.name);
-    if(autoSent>0){
-      showToast('ส่งเคสค้างเกิน '+AUTO_MARKET_HOURS+' ชม. เข้าตลาดแล้ว '+autoSent+' เคส','info',3500);
-      cacheClear(['getCases','getMarket','getDashboard','getMarketIds']);
-      return load();
+    if(AUTO_MARKET_CLIENT_ENABLED){
+      const autoSent=await autoSendStaleCasesToMarket(caseArr,mIds,currentUser.name);
+      if(autoSent>0){
+        showToast('ส่งเคสค้างเกิน '+AUTO_MARKET_HOURS+' ชม. เข้าตลาดแล้ว '+autoSent+' เคส','info',3500);
+        cacheClear(['getCases','getMarket','getDashboard','getMarketIds']);
+        return load();
+      }
     }
     if(cr.success)setMyCases(caseArr);
     if(ccr.success)setClaimedCases(claimedArr);
@@ -2480,11 +2485,32 @@ function SalesFollowups({currentUser}){
 }
 
 function SalesApp({currentUser,onLogout}){
-  const [page,setPage]=useState('focus');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);const [showSearch,setShowSearch]=useState(false);const [showOnboarding,setShowOnboarding]=useState(false);
+  const [page,setPage]=useState('focus');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);const [showSearch,setShowSearch]=useState(false);const [showOnboarding,setShowOnboarding]=useState(false);const [showMobileMore,setShowMobileMore]=useState(false);
   usePushNotif(API_URL,currentUser.name);
   useEffect(()=>{api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});function refreshNotif(){api('getNotifications',{sales:currentUser.name}).then(r=>{if(r.success){const u=r.data.filter(n=>(n.status||n['สถานะ'])==='unread');setNotifCount(u.length);}});}refreshNotif();const t=setInterval(refreshNotif,30000);try{if(!localStorage.getItem('cp_onboarded_'+currentUser.userId))setShowOnboarding(true);}catch(e){}return()=>clearInterval(t);},[currentUser.name,currentUser.userId]);
   const pages={focus:<><PushNotifBanner currentUser={currentUser}/><DailyFocusPage currentUser={currentUser} onNavigate={k=>setPage(k)}/></>,market:<SalesMarket currentUser={currentUser}/>,cases:<SalesCurrentCases currentUser={currentUser} users={users}/>,claimed:<SalesClaimedCases currentUser={currentUser} users={users}/>,ai:<AIAdvisorPage currentUser={currentUser}/>,dashboard:<SalesDashboard currentUser={currentUser}/>,followup:<SalesFollowups currentUser={currentUser}/>};
-  const navItems=[{key:'focus',icon:<Ico.focus/>,label:'วันนี้'},{key:'market',icon:<Ico.market/>,label:'ตลาด'},{key:'cases',icon:<Ico.home/>,label:'เคสของฉัน'},{key:'claimed',icon:<Ico.inbox/>,label:'รับตลาด'},{key:'ai',icon:<Ico.ai/>,label:'AI แนะนำ'},{key:'dashboard',icon:<Ico.trophy/>,label:'แดชบอร์ด'},{key:'followup',icon:<Ico.bell/>,label:'Follow-up'}];
+  // ซ่อนเมนู AI ไว้ก่อน เพราะยังไม่พร้อมใช้งานจริง
+  const navItems=[
+    {key:'focus',icon:<Ico.focus/>,label:'วันนี้'},
+    {key:'market',icon:<Ico.market/>,label:'ตลาด'},
+    {key:'cases',icon:<Ico.home/>,label:'เคสของฉัน'},
+    {key:'claimed',icon:<Ico.inbox/>,label:'รับตลาด'},
+    {key:'dashboard',icon:<Ico.trophy/>,label:'แดชบอร์ด'},
+    {key:'followup',icon:<Ico.bell/>,label:'Follow-up'}
+  ];
+  const mobileMainNav=[
+    {key:'focus',icon:<Ico.focus/>,label:'วันนี้'},
+    {key:'cases',icon:<Ico.home/>,label:'เคส'},
+    {key:'market',icon:<Ico.market/>,label:'ตลาด'},
+    {key:'claimed',icon:<Ico.inbox/>,label:'รับแล้ว'},
+    {key:'more',icon:<Ico.plus/>,label:'เพิ่มเติม'}
+  ];
+  const mobileMoreNav=[
+    {key:'dashboard',icon:<Ico.trophy/>,label:'แดชบอร์ด',desc:'สรุปยอดและผลงาน'},
+    {key:'followup',icon:<Ico.bell/>,label:'Follow-up',desc:'นัดหมายและ Notes'}
+  ];
+  const moreActive=['dashboard','followup'].includes(page);
+  function goSalesPage(k){setPage(k);setShowMobileMore(false);}
   return <div>
     {showOnboarding&&<OnboardingTour currentUser={currentUser} onDone={()=>setShowOnboarding(false)}/>}
     {showSearch&&<GlobalSearch currentUser={currentUser} onClose={()=>setShowSearch(false)} onNavigate={k=>{setPage(k);setShowSearch(false);}}/>}
@@ -2506,7 +2532,21 @@ function SalesApp({currentUser,onLogout}){
       </div>
     </div>
     <div className="sales-content sales-desktop-content" style={{paddingTop:56}}><ErrorBoundary>{pages[page]||pages.focus}</ErrorBoundary></div>
-    <div className="bottom-nav">{navItems.map(n=><div key={n.key} className={`bottom-nav-item ${page===n.key?'active':''}`} onClick={()=>{if(page!==n.key)setPage(n.key);}}>{n.icon}<span>{n.label}</span></div>)}</div>
+    <div className="bottom-nav">
+      {mobileMainNav.map(n=>{const active=n.key==='more'?moreActive:page===n.key;return <div key={n.key} className={`bottom-nav-item ${active?'active':''}`} onClick={()=>{if(n.key==='more')setShowMobileMore(v=>!v);else if(page!==n.key)goSalesPage(n.key);}}>{n.icon}<span>{n.label}</span>{n.key==='claimed'&&notifCount>0&&<em className="mobile-nav-badge">{notifCount}</em>}</div>;})}
+    </div>
+    {showMobileMore&&<div className="mobile-more-overlay" onClick={()=>setShowMobileMore(false)}>
+      <div className="mobile-more-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="mobile-more-handle"/>
+        <div className="mobile-more-title">เมนูเพิ่มเติม</div>
+        <div className="mobile-more-grid">
+          {mobileMoreNav.map(n=><button key={n.key} className={`mobile-more-item ${page===n.key?'active':''}`} onClick={()=>goSalesPage(n.key)}>
+            <span className="mobile-more-icon">{n.icon}</span>
+            <span><strong>{n.label}</strong><small>{n.desc}</small></span>
+          </button>)}
+        </div>
+      </div>
+    </div>}
     {showNotif&&<NotifPanel user={currentUser} onClose={()=>setShowNotif(false)} onCountChange={setNotifCount}/>}
   </div>;
 }
