@@ -944,7 +944,7 @@ function AdminCurrentCases({currentUser,users}){
   const [showAddBook,setShowAddBook]=useState(false);
   const [showExportModal,setShowExportModal]=useState(false);
   const [showExport,setShowExport]=useState(false);
-  const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
+  const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:'',includeMarket:false});
   const [marketIds,setMarketIds]=useState(()=>{
     try {
       const saved = localStorage.getItem('marketIds');
@@ -1000,30 +1000,61 @@ function AdminCurrentCases({currentUser,users}){
   const salesList=users.filter(u=>u.role==='Sales');
 
   function doExport(rows,filename='cases'){
-    // Format ตรงกับ Google Sheet — caseid, customername, contact, report, status, sales, createdat, updatedat, sent
-    const cols=['caseid','customername','contact','report','status','sales','createdat','updatedat','sent','attachment'];
     const thCols=['รหัสเคส','ชื่อลูกค้า','ช่องทางติดต่อ','รีพอร์ต','สถานะ','เซลส์','วันที่สร้าง','อัปเดตล่าสุด','ประเภทส่ง','ไฟล์แนบ'];
+    const cleanText=v=>String(v??'').replace(/\r?\n/g,' ').trim();
+    const safeCell=v=>{
+      const t=cleanText(v);
+      // กัน Google Sheet/Excel ตีความ cell เป็นสูตรโดยไม่ได้ตั้งใจ
+      return /^[=+\-@]/.test(t)?"'"+t:t;
+    };
     const data=rows.map(c=>[
-      c.caseid||'', c.customername||'', c.contact||'', (c.report||'').replace(/\n/g,' '),
+      c.caseid||'', c.customername||'', c.contact||'', c.report||'',
       c.status||'', c.sales||'', c.createdat||'', c.updatedat||'', c.sent||'ปกติ', c.attachment||''
     ]);
-    const csv=[thCols,...data].map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+    const csv=[thCols,...data]
+      .map(r=>r.map(v=>'"'+safeCell(v).replace(/"/g,'""')+'"').join(','))
+      .join('\r\n');
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+    a.href=url;
     a.download=filename+'_'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a);
     a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),800);
+    showToast('Export สำเร็จ '+rows.length+' แถว','ok',2500);
   }
 
-  function exportCSV(){setShowExport(true);}
+  function exportCSV(){
+    setExportFilter({
+      dateFrom:filter.dateFrom||'',
+      dateTo:filter.dateTo||'',
+      salesFilter:filter.sales||'all',
+      statusFilter:filter.status||'',
+      includeMarket:!!showMarket
+    });
+    setShowExport(true);
+  }
 
   function getExportRows(){
     let rows=[...cases];
+    // ค่าเริ่มต้นจะ Export เฉพาะเคสที่กำลังแสดงอยู่ ไม่ดึงเคสในตลาดที่ถูกซ่อนเข้ามาปน
+    if(!exportFilter.includeMarket){
+      rows=rows.filter(c=>!(marketIds.has(String(c.caseid))||c.market===true));
+    }
     // filter เซลส์
     if(exportFilter.salesFilter!=='all')rows=rows.filter(c=>c.sales===exportFilter.salesFilter);
     // filter สถานะ
     if(exportFilter.statusFilter)rows=rows.filter(c=>c.status===exportFilter.statusFilter);
-    // filter วันที่
-    function parseD(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+    // filter วันที่ รองรับทั้ง 29/05/2026, 29/05/2026 11:40 และ ISO date
+    function parseD(s){
+      const raw=String(s||'').trim();
+      const m=raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if(m)return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));
+      const d=new Date(raw);
+      return isNaN(d)?null:d;
+    }
     if(exportFilter.dateFrom){const from=new Date(exportFilter.dateFrom);rows=rows.filter(c=>{const d=parseD(c.createdat);return d&&d>=from;});}
     if(exportFilter.dateTo){const to=new Date(exportFilter.dateTo);to.setHours(23,59,59);rows=rows.filter(c=>{const d=parseD(c.createdat);return d&&d<=to;});}
     return rows;
@@ -1091,8 +1122,8 @@ function AdminCurrentCases({currentUser,users}){
         </div>
         <div style={{padding:'20px'}}>
           <div style={{fontSize:12,color:'var(--text2)',marginBottom:16,background:'var(--bg3)',borderRadius:8,padding:'10px 12px',lineHeight:1.7}}>
-            📊 Export ออกมาในรูปแบบ Google Sheet เลย<br/>
-            มีคอลัมน์: รหัสเคส, ชื่อลูกค้า, ติดต่อ, รีพอร์ต, สถานะ, เซลส์, วันสร้าง, อัปเดต, ประเภท
+            📊 ดาวน์โหลดเป็นไฟล์ CSV ที่เปิดใน Google Sheets/Excel ได้ทันที<br/>
+            ค่าเริ่มต้นจะอิงตัวกรองบนหน้าปัจจุบัน และไม่รวมเคสในตลาดที่ถูกซ่อน
           </div>
           <div className="form-group">
             <label>เซลส์</label>
@@ -1112,12 +1143,16 @@ function AdminCurrentCases({currentUser,users}){
             <div className="form-group"><label>วันที่สร้าง (จาก)</label><input type="date" value={exportFilter.dateFrom} onChange={e=>setExportFilter(f=>({...f,dateFrom:e.target.value}))}/></div>
             <div className="form-group" style={{marginBottom:0}}><label>วันที่สร้าง (ถึง)</label><input type="date" value={exportFilter.dateTo} onChange={e=>setExportFilter(f=>({...f,dateTo:e.target.value}))}/></div>
           </div>
+          <label style={{display:'flex',alignItems:'center',gap:10,background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 12px',margin:'4px 0 12px',cursor:'pointer',fontSize:13,color:'var(--text2)'}}>
+            <input type="checkbox" checked={!!exportFilter.includeMarket} onChange={e=>setExportFilter(f=>({...f,includeMarket:e.target.checked}))} style={{width:16,height:16,accentColor:'var(--blue)'}}/>
+            รวมเคสในตลาดที่ถูกซ่อนด้วย
+          </label>
           <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 14px',fontSize:13,color:'var(--text2)',marginBottom:16}}>
             จะ Export <strong style={{color:'var(--blue)'}}>{getExportRows().length}</strong> แถว
           </div>
           <div style={{display:'flex',gap:8}}>
             <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowExport(false)}>ยกเลิก</button>
-            <button className="btn btn-green" style={{flex:2,fontWeight:700}} onClick={()=>{doExport(getExportRows());setShowExport(false);}}>
+            <button className="btn btn-green" style={{flex:2,fontWeight:700}} disabled={getExportRows().length===0} onClick={()=>{const rows=getExportRows();if(rows.length===0){showToast('ไม่มีข้อมูลสำหรับ Export','warn');return;}doExport(rows);setShowExport(false);}}>
               📥 Download CSV ({getExportRows().length} แถว)
             </button>
           </div>
@@ -2394,6 +2429,7 @@ function AdminApp({currentUser,onLogout}){
     {key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},
     {key:'market',icon:<Ico.market/>,label:'ตลาดเคส'},
     {key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},
+    {key:'summary',icon:<span style={{fontSize:18,lineHeight:1}}>📈</span>,label:'สรุปยอด',href:'https://umhome-summary-web.vercel.app/'},
     {key:'bookings',icon:<Ico.book/>,label:'การจอง'},
     {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
     {key:'team',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/> <circle cx="9" cy="7" r="4"/> <path d="M23 21v-2a4 4 0 0 0-3-3.87"/> <path d="M16 3.13a4 4 0 0 1 0 7.75"/> </svg>,label:'ทีม'},
@@ -2414,7 +2450,10 @@ function AdminApp({currentUser,onLogout}){
   return <div>
     <div className="sidebar">
       <div className="sidebar-logo"><div style={{fontWeight:800,fontSize:18,color:'var(--blue)'}}>🚗 CasePool</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Admin Panel</div></div>
-      <nav className="sidebar-nav">{allNavItems.map(n=><div key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)}>{n.icon}<span>{n.label}</span></div>)}</nav>
+      <nav className="sidebar-nav">{allNavItems.map(n=>n.href?
+        <a key={n.key} className="nav-item nav-link-external" href={n.href} target="_blank" rel="noopener noreferrer" title="เปิดหน้าสรุปยอด UM Home Car">{n.icon}<span>{n.label}</span><span style={{marginLeft:'auto',fontSize:11,opacity:.65}}>↗</span></a>:
+        <div key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)}>{n.icon}<span>{n.label}</span></div>
+      )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
           <div style={{width:36,height:36,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{currentUser.avatar?<img src={currentUser.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
