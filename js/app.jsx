@@ -205,8 +205,8 @@ function mapNotif(r){return{notifId:'N'+r.id,id:r.id,sales:r.sales,caseid:r.case
 function sbHist(caseid,sales,action,detail){sbQ('POST','history',{},{caseid,sales:sales||'ระบบ',action,detail:detail||'',createdat:nowTH()});}
 function sbNotif(sales,caseid,message){sbQ('POST','notifications',{},{sales,caseid,message,createdat:nowTH(),status:'unread'});}
 
-async function genCaseId(attempt=0){
-  const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
+async function genCaseId(attempt=0,customPrefix=''){
+  const d=new Date(),pre=customPrefix||String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
   const rows=await sbQ('GET','cases',{select:'caseid',caseid:`like.${pre}*`,order:'caseid.desc',limit:'1'});
   let max=0;if(rows?.length){const id=String(rows[0].caseid||'');if(id.startsWith(pre))max=parseInt(id.slice(4))||0;}
   // กัน race condition — เพิ่มค่าตาม attempt ถ้าเจอชน
@@ -214,7 +214,7 @@ async function genCaseId(attempt=0){
   // ตรวจซ้ำ — ถ้ามีอยู่แล้ว ลอง attempt ถัดไป (สูงสุด 5 รอบ)
   if(attempt<5){
     const check=await sbQ('GET','cases',{select:'caseid',caseid:`eq.${candidate}`,limit:'1'});
-    if(check?.length)return genCaseId(attempt+1);
+    if(check?.length)return genCaseId(attempt+1,pre);
   }
   return candidate;
 }
@@ -248,14 +248,15 @@ async function sbApi(action,data){
     case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'addCase':{
-      const ts=nowTH();
+      const ts=data.createdat||nowTH();
+      const updatedTs=data.updatedat||ts;
       let assignedSales=data.sales,autoAssigned=false;
       if(!assignedSales||String(assignedSales).trim()===''){assignedSales=await getSmartAssignSales();autoAssigned=true;}
-      const baseRow={customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:ts,sent:data.sent||'ปกติ',attachment:data.attachment||''};
+      const baseRow={customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:updatedTs,sent:data.sent||'ปกติ',attachment:data.attachment||''};
       const maxAttempts=data.caseid?1:8;
       let lastError=null;
       for(let attempt=0;attempt<maxAttempts;attempt++){
-        const id=data.caseid||await genCaseId(attempt);
+        const id=data.caseid||await genCaseId(attempt,data.casePrefix||'');
         const inserted=await sbQ('POST','cases',{},{...baseRow,caseid:id});
         if(!isSbError(inserted)){
           sbHist(id,assignedSales,'เพิ่มเคส',(autoAssigned?'[Auto-Assign] ':'')+'เพิ่มเคสใหม่: '+data.customername);
@@ -860,25 +861,56 @@ function ImageUploader({value,onChange,caseId='',label='📷',accept='image/*',m
 }
 function QrUploader({value,onChange,caseId=''}){return <ImageUploader value={value} onChange={onChange} caseId={caseId} label="📷" maxMB={10}/>;}
 
-function AddCaseModal({users,currentUser,onClose,onAdded}){
-  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:'ปกติ',clipad:''});
+function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false}){
+  const pad=n=>String(n).padStart(2,'0');
+  const today=new Date();
+  const lastMonthDate=new Date(today.getFullYear(),today.getMonth()-1,Math.min(today.getDate(),28));
+  const defaultBackMonth=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}`;
+  const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
+  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:'ปกติ',clipad:''});
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
+  const [backMonth,setBackMonth]=useState(defaultBackMonth);
+  const [backDate,setBackDate]=useState(defaultBackDate);
+  const [backTime,setBackTime]=useState('09:00');
+  const [protectFromMarket,setProtectFromMarket]=useState(true);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  useEffect(()=>{const d=new Date();const pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');api('getCases',{all:'true'}).then(r=>{if(r.success){const max=(r.data||[]).filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[]);
+  function getCasePrefix(){const raw=backdated&&backMonth?backMonth:'';if(raw&&/^\d{4}-\d{2}$/.test(raw)){const [y,m]=raw.split('-');return y.slice(-2)+m;}const d=new Date();return String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');}
+  useEffect(()=>{const pre=getCasePrefix();api('getCases',{all:'true'}).then(r=>{if(r.success){const max=(r.data||[]).filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[backdated,backMonth]);
   async function submit(){
     if(!form.customername||!form.sales)return showToast('กรุณากรอกชื่อลูกค้าและเลือกเซลส์','warn');
+    if(backdated&&!backDate)return showToast('กรุณาเลือกวันที่ย้อนหลัง','warn');
     setLoading(true);
     const submitData={...form};
     // เก็บ clipad ใน attachment field โดย prefix [CLIP:...]
     if(submitData.clipad){submitData.attachment='[CLIP:'+submitData.clipad+']';}
     delete submitData.clipad;
+    if(backdated){
+      const [y,m,d]=String(backDate).split('-');
+      const [hh,mm]=String(backTime||'09:00').split(':');
+      const backTs=`${d}/${m}/${y} ${hh||'09'}:${mm||'00'}:00`;
+      submitData.casePrefix=getCasePrefix();
+      submitData.createdat=backTs;
+      // ค่าเริ่มต้นกันถูกส่งตลาดอัตโนมัติ: createdat ย้อนหลัง แต่ updatedat เป็นเวลาปัจจุบัน
+      submitData.updatedat=protectFromMarket?nowTH():backTs;
+    }
     const r=await api('addCase',submitData);
     setLoading(false);
-    if(r.success){onAdded();onClose();}else showToast(r.error||'เกิดข้อผิดพลาด','err');
+    if(r.success){showToast(backdated?'เพิ่มเคสย้อนหลังสำเร็จ':'เพิ่มเคสสำเร็จ','ok');onAdded();onClose();}else showToast(r.error||'เกิดข้อผิดพลาด','err');
   }
-  return <Modal title="➕ เพิ่มข้อมูลลูกค้า" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
+  return <Modal title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
+      {backdated&&<div style={{gridColumn:'1/-1',background:'linear-gradient(135deg,rgba(88,166,255,.10),rgba(188,140,255,.08))',border:'1px solid rgba(88,166,255,.25)',borderRadius:12,padding:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{gridColumn:'1/-1',fontSize:13,fontWeight:800,color:'var(--blue)'}}>🕒 โหมดเพิ่มเคสย้อนหลัง</div>
+        <div className="form-group" style={{marginBottom:0}}><label>เดือนของรหัสเคส</label><input type="month" value={backMonth} onChange={e=>{setBackMonth(e.target.value);if(e.target.value){const day=String(backDate||'').split('-')[2]||'01';setBackDate(e.target.value+'-'+day);}}}/></div>
+        <div className="form-group" style={{marginBottom:0}}><label>วันที่สร้างเคส</label><input type="date" value={backDate} onChange={e=>setBackDate(e.target.value)}/></div>
+        <div className="form-group" style={{marginBottom:0}}><label>เวลาที่สร้าง</label><input type="time" value={backTime} onChange={e=>setBackTime(e.target.value)}/></div>
+        <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'var(--text2)',background:'rgba(0,0,0,.10)',border:'1px solid var(--border)',borderRadius:10,padding:'10px',cursor:'pointer'}}>
+          <input type="checkbox" checked={protectFromMarket} onChange={e=>setProtectFromMarket(e.target.checked)} style={{width:16,height:16,accentColor:'var(--blue)'}}/>
+          กันส่งตลาดอัตโนมัติ
+        </label>
+        <div style={{gridColumn:'1/-1',fontSize:11,color:'var(--text3)',lineHeight:1.6}}>ถ้าเปิด “กันส่งตลาดอัตโนมัติ” ระบบจะสร้างวันที่ย้อนหลัง แต่ตั้งอัปเดตล่าสุดเป็นเวลาปัจจุบัน เพื่อไม่ให้ถูกมองว่าเคสค้างเกิน 72 ชม.</div>
+      </div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อเฟส *</label><input value={form.customername} onChange={e=>set('customername',e.target.value)} placeholder="ชื่อ-นามสกุล"/></div>
       <div className="form-group"><label>ติดต่อโดย</label><select value={form.contact_by} onChange={e=>set('contact_by',e.target.value)}>{CONTACT_BY.map(c=><option key={c}>{c}</option>)}</select></div>
       <div className="form-group"><label>ข้อมูลติดต่อ</label>{form.contact_by==='QR Code'?<QrUploader value={form.contact} onChange={v=>set('contact',v)}/>:<div><input value={form.contact} onChange={e=>set('contact',e.target.value)} placeholder="เบอร์ / ไลน์ / ID"/>{form.contact_by==='เบอร์'&&form.contact&&!/^0\d{8,9}$/.test(form.contact.replace(/\D/g,''))&&<div style={{fontSize:11,color:'var(--yellow)',marginTop:3}}>⚠️ เบอร์ไม่ครบ 10 หลัก</div>}</div>}</div>
@@ -941,6 +973,7 @@ function AdminCurrentCases({currentUser,users}){
   const [sortDir,setSortDir]=useState('desc');
   const [sel,setSel]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
+  const [showBackdate,setShowBackdate]=useState(false);
   const [showAddBook,setShowAddBook]=useState(false);
   const [showExportModal,setShowExportModal]=useState(false);
   const [showExport,setShowExport]=useState(false);
@@ -1076,7 +1109,7 @@ function AdminCurrentCases({currentUser,users}){
         </div>
       </div>
     </div>}
-    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส{marketCount>0&&!showMarket&&<span style={{marginLeft:6,color:'var(--purple)',cursor:'pointer',textDecoration:'underline'}} onClick={()=>setShowMarket(true)}>· ซ่อน {marketCount} เคสในตลาด</span>}</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{marketCount>0&&<button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showMarket?'var(--purple)':'var(--border)'}`,color:showMarket?'var(--purple)':'var(--text2)'}} onClick={()=>setShowMarket(v=>!v)}>{showMarket?'🏪 ซ่อนเคสตลาด':`🏪 แสดงเคสตลาด (${marketCount})`}</button>}<button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    <div className="page-hd"><div><div className="page-title">📋 เคสปัจจุบัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส{marketCount>0&&!showMarket&&<span style={{marginLeft:6,color:'var(--purple)',cursor:'pointer',textDecoration:'underline'}} onClick={()=>setShowMarket(true)}>· ซ่อน {marketCount} เคสในตลาด</span>}</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{marketCount>0&&<button className="btn btn-ghost" style={{fontSize:12,border:`1px solid ${showMarket?'var(--purple)':'var(--border)'}`,color:showMarket?'var(--purple)':'var(--text2)'}} onClick={()=>setShowMarket(v=>!v)}>{showMarket?'🏪 ซ่อนเคสตลาด':`🏪 แสดงเคสตลาด (${marketCount})`}</button>}<button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
@@ -1160,6 +1193,7 @@ function AdminCurrentCases({currentUser,users}){
       </div>
     </div>}
     {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={load}/>}
+    {showBackdate&&<AddCaseModal backdated users={users} currentUser={currentUser} onClose={()=>setShowBackdate(false)} onAdded={load}/>}
     {showAddBook&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAddBook(false)} onAdded={()=>{}}/>}
     {/* FAB มือถือ */}
     <button className="fab" onClick={()=>setShowAdd(true)} title="เพิ่มลูกค้า">＋</button>
