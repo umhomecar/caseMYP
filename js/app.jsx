@@ -111,14 +111,70 @@ function isSbError(x){return x&&!Array.isArray(x)&&(x.code||x.message||x.error||
 function formatSbError(x){return String(x?.message||x?.error||x?.details||'ทำรายการไม่สำเร็จ');}
 function isDuplicateError(x){const m=String((x?.code||'')+' '+(x?.message||'')+' '+(x?.details||'')).toLowerCase();return x?.code==='23505'||m.includes('duplicate')||m.includes('unique');}
 function isPostgrestSearchSafe(q){return /^[0-9A-Za-zก-๙\s@._\-+#/]*$/u.test(String(q||''));}
-function localCaseSearch(rows,q){
-  const lq=String(q||'').toLowerCase();
-  return safeArray(rows).filter(c=>
-    String(c.caseid||'').toLowerCase().includes(lq)||
-    String(c.customername||'').toLowerCase().includes(lq)||
-    String(c.contact||'').toLowerCase().includes(lq)||
-    String(c.report||'').toLowerCase().includes(lq)
-  );
+
+// ── Robust Search helpers ──
+// แก้ปัญหาค้นหาไม่เจอจากเบอร์ที่มีขีด/เว้นวรรค, เลขไทย, ตัวพิมพ์เล็ก/ใหญ่ และข้อมูลที่สะกดไม่เป๊ะ
+const _thaiDigitMap={'๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9'};
+function thaiDigitsToArabic(v){return String(v??'').replace(/[๐-๙]/g,ch=>_thaiDigitMap[ch]||ch);}
+function normalizeSearchText(v){return thaiDigitsToArabic(v).normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();}
+function normalizeLoose(v){return normalizeSearchText(v).replace(/[\s\-_.()\/\\:;,'"`~!@#$%^&*+=\[\]{}|<>?]+/g,'');}
+function normalizeDigits(v){return thaiDigitsToArabic(v).replace(/\D/g,'');}
+function getCaseSearchScore(c,q){
+  const term=normalizeSearchText(q);
+  if(!term)return 0;
+  const loose=normalizeLoose(q);
+  const digits=normalizeDigits(q);
+  const caseid=normalizeSearchText(c.caseid||c.caseID||c.ID||'');
+  const caseidLoose=normalizeLoose(c.caseid||c.caseID||c.ID||'');
+  const name=normalizeSearchText(c.customername||c.name||c.customer||'');
+  const nameLoose=normalizeLoose(c.customername||c.name||c.customer||'');
+  const contact=normalizeSearchText(c.contact||'');
+  const contactDigits=normalizeDigits(c.contact||'');
+  const report=normalizeSearchText(c.report||c.Notes||c.notes||'');
+  const status=normalizeSearchText(c.status||c.newstatus||'');
+  const sales=normalizeSearchText(c.sales||c.sale||c.old_sales||c.fromsales||'');
+  const created=normalizeSearchText(c.createdat||c.date||c.AssignedAt||'');
+  const sent=normalizeSearchText(c.sent||'');
+  let score=0;
+
+  if(caseid===term)score+=1000;
+  else if(caseid.startsWith(term))score+=850;
+  else if(caseid.includes(term))score+=760;
+  if(loose&&caseidLoose.includes(loose))score+=720;
+
+  if(digits.length>=3){
+    if(caseidLoose.includes(digits))score+=680;
+    if(contactDigits===digits)score+=900;
+    else if(contactDigits.endsWith(digits))score+=820;
+    else if(contactDigits.includes(digits))score+=780;
+  }
+
+  if(name.includes(term))score+=700;
+  if(loose&&nameLoose.includes(loose))score+=650;
+  if(contact.includes(term))score+=560;
+  if(report.includes(term))score+=360;
+  if(status.includes(term))score+=260;
+  if(sales.includes(term))score+=220;
+  if(created.includes(term))score+=180;
+  if(sent.includes(term))score+=150;
+  return score;
+}
+function caseMatchesSearch(c,q){return getCaseSearchScore(c,q)>0;}
+function localCaseSearch(rows,q,limit=500){
+  return safeArray(rows)
+    .map(c=>({c,score:getCaseSearchScore(c,q)}))
+    .filter(x=>x.score>0)
+    .sort((a,b)=>b.score-a.score||String(b.c.caseid||b.c.caseID||b.c.ID||'').localeCompare(String(a.c.caseid||a.c.caseID||a.c.ID||'')))
+    .slice(0,limit)
+    .map(x=>x.c);
+}
+let _searchCasesCache={ts:0,rows:null};
+async function getSearchCaseRows(force=false){
+  const fresh=_searchCasesCache.rows&&(Date.now()-_searchCasesCache.ts)<30000;
+  if(!force&&fresh)return _searchCasesCache.rows;
+  const rows=await sbQ('GET','cases',{order:'caseid.desc',limit:'10000'});
+  if(Array.isArray(rows)){_searchCasesCache={ts:Date.now(),rows};return rows;}
+  return _searchCasesCache.rows||[];
 }
 
 const CACHEABLE=['getCases','getMarket','getMarketIds','getUsers','getBookings','getDashboard','getNotifications','getClaimedCases'];
@@ -280,21 +336,35 @@ async function sbApi(action,data){
       const q=String(data.q||'').trim();
       if(!q)return{success:true,data:[]};
 
-      // ถ้าคำค้นมีอักขระพิเศษที่ PostgREST parser อาจตีความผิด เช่น comma, วงเล็บ, quote
-      // ให้โหลดรายการล่าสุดแล้วค้นในฝั่ง JS แทน เพื่อไม่ให้ค้นหาแล้วหายเงียบ
-      if(!isPostgrestSearchSafe(q)){
-        const allRows=await sbQ('GET','cases',{order:'caseid.desc',limit:'2000'});
-        return{success:true,data:localCaseSearch(allRows,q)};
+      // ✅ Search v2: ค้นแบบผสม Server + Local normalized search
+      // เหตุผล: Supabase ilike ค้นเบอร์ที่มีขีด/เว้นวรรค, เลขไทย, หรืออักขระพิเศษบางตัวไม่ค่อยเจอ
+      const merged=[];
+      const seen=new Set();
+      const addRows=(rows)=>safeArray(rows).forEach(r=>{const id=String(r.caseid||'');if(id&&!seen.has(id)){seen.add(id);merged.push(r);}});
+
+      // 1) ยิง Supabase ilike ก่อน เพื่อให้ค้นคำปกติเร็ว
+      if(isPostgrestSearchSafe(q)){
+        try{
+          const cleanQ=q.replace(/\*/g,'').trim();
+          const orFilter=`caseid.ilike.*${cleanQ}*,customername.ilike.*${cleanQ}*,contact.ilike.*${cleanQ}*,report.ilike.*${cleanQ}*,sales.ilike.*${cleanQ}*,status.ilike.*${cleanQ}*`;
+          const rows=await sbQ('GET','cases',{or:`(${orFilter})`,order:'caseid.desc',limit:'300'});
+          if(Array.isArray(rows))addRows(rows);
+        }catch(e){}
       }
 
-      const cleanQ=q.replace(/\*/g,'');
-      const orFilter=`caseid.ilike.*${cleanQ}*,customername.ilike.*${cleanQ}*,contact.ilike.*${cleanQ}*,report.ilike.*${cleanQ}*`;
-      const rows=await sbQ('GET','cases',{or:`(${orFilter})`,order:'caseid.desc',limit:'100'});
-      if(Array.isArray(rows))return{success:true,data:rows};
+      // 2) โหลด cache แล้วค้นฝั่ง JS แบบ normalize เสมอ เพื่อแก้กรณีค้นเบอร์/ชื่อ/รหัสไม่ตรง format
+      try{
+        const allRows=await getSearchCaseRows();
+        addRows(localCaseSearch(allRows,q,500));
+      }catch(e){}
 
-      // Fallback: sbQ จะคืน error object ถ้า Supabase ตอบ error จึงต้องเช็ก Array เอง
-      const allRows=await sbQ('GET','cases',{order:'caseid.desc',limit:'2000'});
-      return{success:true,data:localCaseSearch(allRows,q)};
+      // 3) เรียงผลลัพธ์ให้ตัวที่ตรงกว่าอยู่บน
+      const dataOut=merged
+        .map(c=>({c,score:getCaseSearchScore(c,q)}))
+        .sort((a,b)=>b.score-a.score||String(b.c.caseid||'').localeCompare(String(a.c.caseid||'')))
+        .map(x=>x.c)
+        .slice(0,500);
+      return{success:true,data:dataOut};
     }
     case 'getMarket':{
       // ✅ ดึงข้อมูลทั้งหมดโดยไม่จำกัด (ใช้ pagination อัตโนมัติ)
@@ -1243,8 +1313,7 @@ function AdminMarket({currentUser,users}){
   async function closeCase(caseId){await api('closeMarketCase',{caseId,closedBy:currentUser.name});load();}
   const filtered=(filterSales==='all'?cases:cases.filter(c=>c.old_sales===filterSales)).filter(c=>{
     if(!searchQ)return true;
-    const q=searchQ.toLowerCase();
-    return String(c.ID||'').toLowerCase().includes(q)||String(c.name||'').toLowerCase().includes(q)||String(c.contact||'').toLowerCase().includes(q)||String(c.report||'').toLowerCase().includes(q);
+    return caseMatchesSearch({...c,caseid:c.ID,customername:c.name,sales:c.old_sales},searchQ);
   });
   const salesList=users.filter(u=>u.role==='Sales');
   const total=allCases.length;const owned=allCases.filter(c=>c.PoolStatus==='ปิด').length;
@@ -1838,7 +1907,7 @@ function PushNotifBanner({currentUser}){
 function GlobalSearch({currentUser,onClose,onNavigate}){
   const [q,setQ]=useState('');const [results,setResults]=useState([]);const [loading,setLoading]=useState(false);const inputRef=useRef();
   useEffect(()=>{setTimeout(()=>inputRef.current?.focus(),80);},[]);
-  useEffect(()=>{if(q.trim().length<2){setResults([]);return;}setLoading(true);const t=setTimeout(async()=>{const[cr,ccr]=await Promise.all([api('searchCases',{q:q.trim()}),api('getClaimedCases',{sales:currentUser.name})]);const myCases=(cr.success?(cr.data||[]):[]).filter(c=>c.sales===currentUser.name).map(c=>({...c,_type:'cases'}));const claimed=(ccr.success?(ccr.data||[]):[]).filter(c=>{const lq=q.toLowerCase();return String(c.caseID||'').toLowerCase().includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(formatContact(c.contact)||'').includes(lq);}).map(c=>({...c,caseid:c.caseID,status:c.newstatus||c.status,_type:'claimed'}));const seen=new Set();const merged=[...myCases,...claimed].filter(c=>{if(seen.has(c.caseid))return false;seen.add(c.caseid);return true;});setResults(merged);setLoading(false);},380);return()=>clearTimeout(t);},[q,currentUser.name]);
+  useEffect(()=>{if(q.trim().length<2){setResults([]);return;}setLoading(true);const t=setTimeout(async()=>{const[cr,ccr]=await Promise.all([api('searchCases',{q:q.trim()}),api('getClaimedCases',{sales:currentUser.name})]);const myCases=(cr.success?(cr.data||[]):[]).filter(c=>c.sales===currentUser.name).map(c=>({...c,_type:'cases'}));const claimed=(ccr.success?(ccr.data||[]):[]).filter(c=>caseMatchesSearch({...c,caseid:c.caseID,status:c.newstatus||c.status},q)).map(c=>({...c,caseid:c.caseID,status:c.newstatus||c.status,_type:'claimed'}));const seen=new Set();const merged=[...myCases,...claimed].filter(c=>{if(seen.has(c.caseid))return false;seen.add(c.caseid);return true;}).sort((a,b)=>getCaseSearchScore(b,q)-getCaseSearchScore(a,q));setResults(merged);setLoading(false);},380);return()=>clearTimeout(t);},[q,currentUser.name]);
   return <div className="overlay" style={{alignItems:'flex-start',paddingTop:56,zIndex:200}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,width:'100%',maxWidth:540,boxShadow:'0 20px 60px rgba(0,0,0,.55)',overflow:'hidden'}}>
       <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',borderBottom:'1px solid var(--border)'}}><Ico.gsearch/><input ref={inputRef} value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหาชื่อลูกค้า เบอร์ หรือรหัสเคส..." style={{flex:1,background:'none',border:'none',outline:'none',fontSize:15,color:'var(--text)'}}/><button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onClose}><Ico.x/></button></div>
@@ -2051,7 +2120,7 @@ function SalesCurrentCases({currentUser,users}){
   // ซ่อนเคสที่อยู่ในตลาดออกจากรายการหลัก (แต่ถ้ากด "แสดงเคสปิดแล้ว" จะเห็น)
   const filtered=cases.filter(c=>{
     if(!showClosed&&(marketIds.has(String(c.caseid))||c.market===true))return false;
-    if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){const lq=q.toLowerCase();return String(c.caseid).includes(lq)||String(c.customername||'').toLowerCase().includes(lq)||String(c.contact||'').toLowerCase().includes(lq)||String(c.report||'').toLowerCase().includes(lq);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
+    if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){return caseMatchesSearch(c,q);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   return <div className="page">
     <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส{closedCount>0&&<span style={{marginLeft:8,color:'var(--text3)'}}>· ปิดแล้ว {closedCount}</span>}</div></div><button className="btn btn-ghost" onClick={load} style={{padding:'6px 10px'}}>🔄</button></div>
