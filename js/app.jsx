@@ -199,6 +199,12 @@ function formatDate(dateStr){
   return s||'-';
 }
 function nowTH(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;}
+function todayYMD(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
+function toBEYear(y){y=parseInt(y,10)||0;return y&&y<2400?y+543:y;}
+function formatYMDToTHBE(ymd){const s=String(ymd||'').trim();const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return s||'-';return `${m[3]}/${m[2]}/${toBEYear(m[1])}`;}
+function formatTextDateToTHBE(v){const s=String(v||'').trim();if(!s)return '-';const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(iso)return formatYMDToTHBE(s)+(s.includes('T')?' '+s.slice(11,16):'');const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(.*)$/);if(m){const dd=String(m[1]).padStart(2,'0'),mm=String(m[2]).padStart(2,'0'),yy=toBEYear(m[3]);return `${dd}/${mm}/${yy}${m[4]||''}`;}const d=new Date(s);if(!isNaN(d)){const pad=n=>String(n).padStart(2,'0');return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${toBEYear(d.getFullYear())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;}return s;}
+function mapCaseNote(r){return{id:r.id,caseid:r.caseid,sales:r.sales,note:r.note||'',createdat:r.createdat||'',createdDisplay:formatTextDateToTHBE(r.createdat||''),deletedat:r.deletedat||''};}
+function mapCaseFollowup(r){return{id:r.id,caseid:r.caseid,sales:r.sales,customername:r.customername||'',due_date:r.due_date||'',date:r.due_date||'',note:r.note||'',status:r.status||'pending',createdat:r.createdat||'',createdDisplay:formatTextDateToTHBE(r.createdat||''),dueDisplay:formatYMDToTHBE(r.due_date||''),doneat:r.doneat||'',deletedat:r.deletedat||'',notified_on:r.notified_on||''};}
 
 async function sbQ(method,table,q={},body=null){
   // แยก raw params (ที่มี % อยู่แล้ว) ออกจาก normal params
@@ -436,6 +442,51 @@ async function sbApi(action,data){
     case 'updateBooking':{const upd={};if(data.status!==undefined)upd.status=data.status;if(data.note!==undefined)upd.note=data.note;await sbQ('PATCH','bookings',{caseid:`eq.${data.caseId}`},upd);return{success:true};}
     case 'getDashboard':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const[cs,cl,users]=await Promise.all([sbQ('GET','cases',{caseid:`like.${pre}*`}),sbQ('GET','claimedcases',{}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'userid,name,avatar,startdate'})]);const cases=cs||[],claimed=cl||[],salesList=users||[];if(data.role==='Admin'){return{success:true,data:{sales:salesList.map(u=>{const my=cases.filter(c=>c.sales===u.name);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});return{name:u.name,avatar:u.avatar||'',currentCases:my.length,claimedCases:claimed.filter(c=>c.sale===u.name).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st};}),total:{cases:cases.length}}};}const my=cases.filter(c=>c.sales===data.sales);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});const me=salesList.find(u=>u.name===data.sales);return{success:true,data:{currentCases:my.length,claimedCases:claimed.filter(c=>c.sale===data.sales).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st,startdate:me?.startdate||''}};}
     case 'getHistory':{const q={order:'createdat.desc'};if(data.caseId)q.caseid=`eq.${data.caseId}`;const rows=await sbQ('GET','history',q);return{success:true,data:(rows||[]).map(mapHistory)};}
+    case 'getCaseNotes':{
+      const rows=await sbQ('GET','case_notes',{caseid:`eq.${data.caseId||data.caseid}`,deletedat:'is.null',order:'id.desc',limit:'500'});
+      if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};
+      return{success:true,data:safeArray(rows).map(mapCaseNote)};
+    }
+    case 'addCaseNote':{
+      const row={caseid:data.caseId||data.caseid,sales:data.sales||'',note:data.note||'',createdat:nowTH(),deletedat:null};
+      const inserted=await sbQ('POST','case_notes',{},row);
+      if(isSbError(inserted))return{success:false,error:formatSbError(inserted)};
+      sbHist(row.caseid,row.sales,'📝 Note','📝 Note: '+row.note);
+      return{success:true,data:safeArray(inserted).map(mapCaseNote)[0]||mapCaseNote(row)};
+    }
+    case 'deleteCaseNote':{await sbQ('PATCH','case_notes',{id:`eq.${data.id}`},{deletedat:nowTH()});return{success:true};}
+    case 'getCaseFollowups':{
+      const rows=await sbQ('GET','case_followups',{caseid:`eq.${data.caseId||data.caseid}`,deletedat:'is.null',order:'due_date.asc,id.asc',limit:'500'});
+      if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};
+      return{success:true,data:safeArray(rows).map(mapCaseFollowup)};
+    }
+    case 'addCaseFollowup':{
+      const row={caseid:data.caseId||data.caseid,sales:data.sales||'',customername:data.customername||'',due_date:data.due_date||data.date,note:data.note||'',status:'pending',createdat:nowTH(),doneat:'',deletedat:null,notified_on:''};
+      const inserted=await sbQ('POST','case_followups',{},row);
+      if(isSbError(inserted))return{success:false,error:formatSbError(inserted)};
+      const f=safeArray(inserted).map(mapCaseFollowup)[0]||mapCaseFollowup(row);
+      sbHist(row.caseid,row.sales,'นัด Follow-up','ลงนัด '+formatTextDateToTHBE(row.createdat)+' → นัดวันที่ '+formatYMDToTHBE(row.due_date)+(row.note?' — '+row.note:''));
+      return{success:true,data:f};
+    }
+    case 'updateFollowupStatus':{const upd={status:data.status||'pending'};if(data.status==='done')upd.doneat=nowTH();if(data.status==='pending')upd.doneat='';await sbQ('PATCH','case_followups',{id:`eq.${data.id}`},upd);return{success:true};}
+    case 'deleteFollowup':{await sbQ('PATCH','case_followups',{id:`eq.${data.id}`},{status:'cancelled',deletedat:nowTH()});return{success:true};}
+    case 'getSalesFollowups':{const q={sales:`eq.${data.sales}`,deletedat:'is.null',order:'due_date.asc,id.asc',limit:data.limit||'500'};if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','case_followups',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows).map(mapCaseFollowup)};}
+    case 'getSalesNotes':{const q={sales:`eq.${data.sales}`,deletedat:'is.null',order:'id.desc',limit:data.limit||'500'};const rows=await sbQ('GET','case_notes',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows).map(mapCaseNote)};}
+    case 'checkDueFollowups':{
+      const sales=data.sales||'';if(!sales)return{success:true,count:0};
+      const today=todayYMD();
+      const rows=await sbQ('GET','case_followups',{sales:`eq.${sales}`,status:'eq.pending',deletedat:'is.null',due_date:`lte.${today}`,limit:'100'});
+      if(isSbError(rows))return{success:false,error:formatSbError(rows),count:0};
+      let count=0;
+      for(const f of safeArray(rows)){
+        if(String(f.notified_on||'')===today)continue;
+        const msg='📅 ถึงวันนัด Follow-up เคส '+f.caseid+(f.customername?' ('+f.customername+')':'')+' นัดวันที่ '+formatYMDToTHBE(f.due_date)+(f.note?' — '+f.note:'');
+        await sbQ('POST','notifications',{},{sales:f.sales||sales,caseid:f.caseid,message:msg,createdat:nowTH(),status:'unread'});
+        await sbQ('PATCH','case_followups',{id:`eq.${f.id}`},{notified_on:today});count++;
+      }
+      if(count>0){cacheClear(['getNotifications']);try{if(window.cpTriggerPushPoll)window.cpTriggerPushPoll(500);}catch(e){}}
+      return{success:true,count};
+    }
     case 'getNotifications':{const q={order:'id.desc'};if(data.sales)q.sales=`eq.${data.sales}`;const rows=await sbQ('GET','notifications',q);return{success:true,data:(rows||[]).map(mapNotif)};}
     case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');await sbQ('PATCH','notifications',{id:`eq.${id}`},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
     case 'markAllNotifRead':{if(data.sales)await sbQ('PATCH','notifications',{sales:`eq.${data.sales}`,status:'eq.unread'},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
@@ -795,6 +846,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const [showHistory,setShowHistory]=useState(false);
   const [newSales,setNewSales]=useState(caseData.sales||caseData.sale||'');
   const [notes,setNotes]=useState([]);
+  const [notesLoading,setNotesLoading]=useState(false);
   const [addingNote,setAddingNote]=useState(false);
   const [newNote,setNewNote]=useState('');
   const [confirmDel,setConfirmDel]=useState(false);
@@ -802,7 +854,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const isClaimed=!!caseData.fromsales;
   const isMarketLocked=isInMarket&&!isAdmin; // Sales ดูได้แต่แก้ไขไม่ได้
   const caseId=caseData.caseid||caseData.caseID;
-  const FU_KEY='cp_followup_'+caseId;
+  const FU_KEY='cp_followup_'+caseId; // legacy localStorage fallback
   const [showTransfer,setShowTransfer]=useState(false);
   const [transferTo,setTransferTo]=useState('');
   const [transferring,setTransferring]=useState(false);
@@ -819,25 +871,44 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
       onUpdated();onClose();
     }else{showToast('โอนเคสไม่สำเร็จ: '+(r.error||''),'err');setTransferring(false);}
   }
-  const [followups,setFollowups]=useState(()=>{try{return JSON.parse(localStorage.getItem(FU_KEY)||'[]');}catch(e){return[];}});
+  const [followups,setFollowups]=useState([]);
+  const [followupsLoading,setFollowupsLoading]=useState(false);
   const [followupDate,setFollowupDate]=useState('');
   const [followupNote,setFollowupNote]=useState('');
-  function saveFollowup(){if(!followupDate)return;const newFU={date:followupDate,note:followupNote,done:false,caseid:caseId,customername:caseData.customername||caseData.name||'',by:currentUser.name};const upd=[...followups,newFU];setFollowups(upd);try{localStorage.setItem(FU_KEY,JSON.stringify(upd));}catch(e){}
-    sbHist(caseId,currentUser.name,'นัด Follow-up','นัด Follow-up: '+followupDate+(followupNote?' — '+followupNote:''));
-    setFollowupDate('');setFollowupNote('');}
-  function doneFollowup(i){const upd=followups.map((f,idx)=>idx===i?{...f,done:true}:f);setFollowups(upd);try{localStorage.setItem(FU_KEY,JSON.stringify(upd));}catch(e){}}
-  function delFollowup(i){const upd=followups.filter((_,idx)=>idx!==i);setFollowups(upd);try{localStorage.setItem(FU_KEY,JSON.stringify(upd));}catch(e){}}
+  async function loadCaseNotesFollowups(){
+    setNotesLoading(true);setFollowupsLoading(true);
+    try{
+      const [nr,fr]=await Promise.all([api('getCaseNotes',{caseId}),api('getCaseFollowups',{caseId})]);
+      if(nr.success)setNotes(nr.data||[]);else{try{const d=JSON.parse(localStorage.getItem('cnotes_'+caseId)||'[]');setNotes(Array.isArray(d)?d:[]);}catch(e){setNotes([]);}}
+      if(fr.success)setFollowups(fr.data||[]);else{try{const d=JSON.parse(localStorage.getItem(FU_KEY)||'[]');setFollowups(Array.isArray(d)?d:[]);}catch(e){setFollowups([]);}}
+    }catch(e){
+      try{const d=JSON.parse(localStorage.getItem('cnotes_'+caseId)||'[]');setNotes(Array.isArray(d)?d:[]);}catch(_){setNotes([]);}
+      try{const d=JSON.parse(localStorage.getItem(FU_KEY)||'[]');setFollowups(Array.isArray(d)?d:[]);}catch(_){setFollowups([]);}
+    }
+    setNotesLoading(false);setFollowupsLoading(false);
+  }
+  useEffect(()=>{loadCaseNotesFollowups();},[caseId]);
+  async function saveFollowup(){
+    if(!followupDate)return;
+    const temp={id:'tmp_'+Date.now(),due_date:followupDate,date:followupDate,note:followupNote,status:'pending',caseid:caseId,customername:caseData.customername||caseData.name||'',sales:currentUser.name,createdat:nowTH(),createdDisplay:formatTextDateToTHBE(nowTH()),dueDisplay:formatYMDToTHBE(followupDate)};
+    setFollowups(f=>[...f,temp]);setFollowupDate('');setFollowupNote('');
+    const r=await api('addCaseFollowup',{caseId,sales:currentUser.name,customername:caseData.customername||caseData.name||'',due_date:followupDate,note:followupNote});
+    if(r.success){setFollowups(f=>f.map(x=>x.id===temp.id?r.data:x));showToast('บันทึกนัดแล้ว','ok');}
+    else{setFollowups(f=>f.filter(x=>x.id!==temp.id));showToast('บันทึกนัดไม่สำเร็จ: '+(r.error||''),'err');}
+  }
+  async function doneFollowup(i){const f=followups[i];const upd=followups.map((x,idx)=>idx===i?{...x,status:'done',doneat:nowTH()}:x);setFollowups(upd);if(f?.id&&!String(f.id).startsWith('tmp_'))await api('updateFollowupStatus',{id:f.id,status:'done'});}
+  async function delFollowup(i){const f=followups[i];const upd=followups.filter((_,idx)=>idx!==i);setFollowups(upd);if(f?.id&&!String(f.id).startsWith('tmp_'))await api('deleteFollowup',{id:f.id});}
+  async function saveNote(){if(!newNote.trim())return;
+    const text=newNote.trim();const temp={id:'tmp_'+Date.now(),note:text,text,createdat:nowTH(),createdDisplay:formatTextDateToTHBE(nowTH()),sales:currentUser.name,by:currentUser.name};
+    setNotes(n=>[temp,...n]);setNewNote('');setAddingNote(false);
+    const r=await api('addCaseNote',{caseId,sales:currentUser.name,note:text});
+    if(r.success){setNotes(n=>n.map(x=>x.id===temp.id?r.data:x));showToast('บันทึก Note แล้ว','ok');}
+    else{setNotes(n=>n.filter(x=>x.id!==temp.id));showToast('บันทึก Note ไม่สำเร็จ: '+(r.error||''),'err');}
+  }
+  async function deleteNote(i){const n=notes[i];setNotes(notes.filter((_,idx)=>idx!==i));if(n?.id&&!String(n.id).startsWith('tmp_'))await api('deleteCaseNote',{id:n.id});}
   const contactRaw=caseData.contact||'';
   const contactVal=formatContact(contactRaw);
   const isQR=contactRaw.startsWith('http')||contactRaw.startsWith('data:image');
-  useEffect(()=>{try{const d=JSON.parse(localStorage.getItem('cnotes_'+caseId)||'[]');setNotes(Array.isArray(d)?d:[]);}catch(e){setNotes([]);}},[caseId]);
-  function saveNote(){if(!newNote.trim())return;
-    const upd=[...notes,{text:newNote.trim(),date:new Date().toLocaleString('th-TH'),by:currentUser.name}];
-    setNotes(upd);setNewNote('');setAddingNote(false); // UI update ก่อนทันที
-    try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}
-    sbHist(caseId,currentUser.name,'📝 Note','📝 Note: '+newNote.trim()); // sync background
-  }
-  function deleteNote(i){const upd=notes.filter((_,idx)=>idx!==i);setNotes(upd);try{localStorage.setItem('cnotes_'+caseId,JSON.stringify(upd));}catch(e){}}
   async function save(){
     const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:editReport?report:caseData.report,sales:(isAdmin&&newSales)?newSales:caseData.sales};
     onUpdated(optimisticData);onClose();
@@ -889,16 +960,23 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
               <input value={followupNote} onChange={e=>setFollowupNote(e.target.value)} placeholder="หมายเหตุนัด" style={{flex:2,fontSize:13}}/>
               {followupDate&&<button className="btn btn-green" style={{fontSize:12,padding:'0 12px',whiteSpace:'nowrap'}} onClick={saveFollowup}>บันทึกนัด</button>}
             </div>
-            {followups.length>0&&<div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
-              {followups.map((f,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:8,background:f.done?'var(--bg3)':'rgba(88,166,255,.07)',border:'1px solid '+(f.done?'var(--border)':'rgba(88,166,255,.3)'),borderRadius:6,padding:'5px 10px',fontSize:12}}>
-                <span style={{color:f.done?'var(--text3)':'var(--blue)',fontWeight:600}}>{f.date}</span>
-                <span style={{flex:1,color:f.done?'var(--text3)':'var(--text)',textDecoration:f.done?'line-through':''}}>{f.note||'ไม่มีหมายเหตุ'}</span>
-                {!f.done&&<button onClick={()=>doneFollowup(i)} style={{background:'none',border:'none',color:'var(--green)',cursor:'pointer',fontSize:14}}>✓</button>}
-                <button onClick={()=>delFollowup(i)} style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:13}}>✕</button>
-              </div>)}
+            {followupsLoading&&<div style={{fontSize:12,color:'var(--text3)',marginTop:6}}>กำลังโหลดนัด...</div>}
+            {followups.length>0&&<div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
+              {followups.map((f,i)=>{const done=(f.status==='done'||f.done);return <div key={f.id||i} style={{display:'flex',alignItems:'flex-start',gap:8,background:done?'var(--bg3)':'rgba(88,166,255,.07)',border:'1px solid '+(done?'var(--border)':'rgba(88,166,255,.3)'),borderRadius:8,padding:'8px 10px',fontSize:12}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:3}}>
+                    <span style={{color:done?'var(--text3)':'var(--blue)',fontWeight:800}}>ลงนัด {f.createdDisplay||formatTextDateToTHBE(f.createdat)}</span>
+                    <span style={{color:done?'var(--text3)':'var(--yellow)',fontWeight:800}}>นัดวันที่ {f.dueDisplay||formatYMDToTHBE(f.due_date||f.date)}</span>
+                    {done&&<span style={{fontSize:10,color:'var(--green)',fontWeight:800}}>ทำแล้ว</span>}
+                  </div>
+                  <div style={{color:done?'var(--text3)':'var(--text)',textDecoration:done?'line-through':'',lineHeight:1.5}}>{f.note||'ไม่มีหมายเหตุ'}</div>
+                </div>
+                {!done&&<button onClick={()=>doneFollowup(i)} title="ทำแล้ว" style={{background:'none',border:'none',color:'var(--green)',cursor:'pointer',fontSize:15}}>✓</button>}
+                <button onClick={()=>delFollowup(i)} title="ลบนัด" style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:13}}>✕</button>
+              </div>;})}
             </div>}
           </div>
-          <div><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:14,fontWeight:600}}>📝 Notes</span><button className="btn btn-ghost" style={{fontSize:12,padding:'3px 12px',borderRadius:20,border:'1px dashed var(--border)'}} onClick={()=>setAddingNote(!addingNote)}>+ เพิ่ม Note</button></div>{addingNote&&<div style={{marginBottom:10}}><textarea rows={2} value={newNote} onChange={e=>setNewNote(e.target.value)} placeholder="เขียน note..." style={{marginBottom:6}}/><div style={{display:'flex',gap:6}}><button className="btn btn-primary" style={{fontSize:12,padding:'5px 14px'}} onClick={saveNote}>บันทึก</button><button className="btn btn-ghost" style={{fontSize:12,padding:'5px 14px'}} onClick={()=>{setAddingNote(false);setNewNote('');}}>ยกเลิก</button></div></div>}{notes.length===0&&!addingNote?<div style={{textAlign:'center',color:'var(--text3)',fontSize:12,padding:'8px 0'}}>ยังไม่มี notes</div>:<div style={{maxHeight:150,overflowY:'auto'}}>{notes.map((n,i)=><div key={i} style={{background:'var(--bg3)',borderRadius:6,padding:'8px 10px',marginBottom:6,fontSize:13,display:'flex',gap:8,alignItems:'flex-start'}}><div style={{flex:1}}><div style={{color:'var(--text)'}}>{n.text}</div><div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>โดย {n.by} · {n.date}</div></div><button onClick={()=>deleteNote(i)} style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:14,padding:'0 2px',flexShrink:0}}>✕</button></div>)}</div>}</div>
+          <div><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:14,fontWeight:600}}>📝 Notes</span><button className="btn btn-ghost" style={{fontSize:12,padding:'3px 12px',borderRadius:20,border:'1px dashed var(--border)'}} onClick={()=>setAddingNote(!addingNote)}>+ เพิ่ม Note</button></div>{addingNote&&<div style={{marginBottom:10}}><textarea rows={2} value={newNote} onChange={e=>setNewNote(e.target.value)} placeholder="เขียน note..." style={{marginBottom:6}}/><div style={{display:'flex',gap:6}}><button className="btn btn-primary" style={{fontSize:12,padding:'5px 14px'}} onClick={saveNote}>บันทึก</button><button className="btn btn-ghost" style={{fontSize:12,padding:'5px 14px'}} onClick={()=>{setAddingNote(false);setNewNote('');}}>ยกเลิก</button></div></div>}{notesLoading?<div style={{textAlign:'center',color:'var(--text3)',fontSize:12,padding:'8px 0'}}>กำลังโหลด notes...</div>:notes.length===0&&!addingNote?<div style={{textAlign:'center',color:'var(--text3)',fontSize:12,padding:'8px 0'}}>ยังไม่มี notes</div>:<div style={{maxHeight:150,overflowY:'auto'}}>{notes.map((n,i)=><div key={n.id||i} style={{background:'var(--bg3)',borderRadius:6,padding:'8px 10px',marginBottom:6,fontSize:13,display:'flex',gap:8,alignItems:'flex-start'}}><div style={{flex:1}}><div style={{color:'var(--text)'}}>{n.note||n.text}</div><div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>โดย {n.sales||n.by||currentUser.name} · {n.createdDisplay||formatTextDateToTHBE(n.createdat||n.date)}</div></div><button onClick={()=>deleteNote(i)} style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:14,padding:'0 2px',flexShrink:0}}>✕</button></div>)}</div>}</div>
         </div>
         <div style={{padding:'10px 16px', borderTop:'1px solid var(--border)', paddingBottom:'max(20px, env(safe-area-inset-bottom))'}}>
           {isMarketLocked?
@@ -2080,32 +2158,32 @@ function SalesMarket({currentUser}){
 
 // ── Today's Follow-up Mini Banner ──
 function TodayFollowupBanner({currentUser}){
-  const today=new Date().toISOString().slice(0,10);
-  const [items,setItems]=useState([]);
+  const today=todayYMD();
+  const [items,setItems]=useState([]);const [loading,setLoading]=useState(true);
   useEffect(()=>{
-    const all=[];
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(k&&k.startsWith('cp_followup_')){
-        try{const fus=JSON.parse(localStorage.getItem(k)||'[]');fus.forEach(f=>{if(!f.done&&f.by===currentUser.name&&f.date<=today)all.push(f);});}catch(e){}
-      }
-    }
-    setItems(all.sort((a,b)=>a.date.localeCompare(b.date)));
-  },[]);
+    let mounted=true;
+    api('getSalesFollowups',{sales:currentUser.name,status:'pending',limit:'100'}).then(r=>{
+      if(!mounted)return;
+      if(r.success){setItems(safeArray(r.data).filter(f=>(f.due_date||f.date)<=today).sort((a,b)=>String(a.due_date||a.date).localeCompare(String(b.due_date||b.date))));}
+      else setItems([]);
+      setLoading(false);
+    }).catch(()=>{if(mounted){setItems([]);setLoading(false);}});
+    return()=>{mounted=false;};
+  },[currentUser.name]);
+  if(loading)return null;
   if(!items.length)return<div style={{background:'rgba(88,166,255,.06)',border:'1px dashed rgba(88,166,255,.25)',borderRadius:10,padding:'10px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:8}}>
     <span style={{fontSize:16}}>📅</span>
     <div style={{fontSize:12,color:'var(--text3)'}}>ไม่มีนัดวันนี้ — กดเข้าเคสแล้วตั้งนัด Follow-up ได้เลย</div>
   </div>;
-  const overdue=items.filter(f=>f.date<today);
-  const todayItems=items.filter(f=>f.date===today);
+  const overdue=items.filter(f=>(f.due_date||f.date)<today);
   return<div style={{background:overdue.length?'rgba(248,81,73,.08)':'rgba(210,153,34,.08)',border:'1px solid '+(overdue.length?'rgba(248,81,73,.4)':'rgba(210,153,34,.4)'),borderRadius:10,padding:'12px 14px',marginBottom:14}}>
     <div style={{fontWeight:700,fontSize:13,color:overdue.length?'var(--red)':'var(--yellow)',marginBottom:8}}>
       {overdue.length?'⚠️ นัดที่เลยกำหนด':'📅 นัดวันนี้'} ({items.length})
     </div>
-    {items.slice(0,3).map((f,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:i<Math.min(items.length,3)-1?6:0}}>
-      <span style={{fontSize:11,color:f.date<today?'var(--red)':'var(--yellow)',fontWeight:700,flexShrink:0}}>{f.date}</span>
+    {items.slice(0,3).map((f,i)=><div key={f.id||i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:i<Math.min(items.length,3)-1?6:0}}>
+      <span style={{fontSize:11,color:(f.due_date||f.date)<today?'var(--red)':'var(--yellow)',fontWeight:700,flexShrink:0}}>{formatYMDToTHBE(f.due_date||f.date)}</span>
       <span style={{fontSize:13,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.customername||f.caseid}</span>
-      <span style={{fontSize:11,color:'var(--text3)',flexShrink:0}}>{f.note||''}</span>
+      <span style={{fontSize:11,color:'var(--text3)',flexShrink:0,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.note||''}</span>
     </div>)}
     {items.length>3&&<div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>+{items.length-3} รายการ</div>}
   </div>;
@@ -2589,38 +2667,44 @@ function AdminApp({currentUser,onLogout}){
 // 📅 SALES FOLLOWUPS
 // ============================================================
 function SalesFollowups({currentUser}){
-  const today=new Date().toISOString().slice(0,10);
-  const [rows,setRows]=useState([]);const [loading,setLoading]=useState(true);const [tab,setTab]=useState('followup');
-  function load(){setLoading(true);sbQ('GET','history',{sales:'eq.'+currentUser.name,order:'createdat.desc',limit:'300'}).then(r=>{setRows(safeArray(r).filter(h=>String(h.detail||'').includes('Follow-up')||String(h.detail||'').includes('Note:')));setLoading(false);}).catch(()=>setLoading(false));}
+  const today=todayYMD();
+  const [followups,setFollowups]=useState([]);const [notes,setNotes]=useState([]);const [loading,setLoading]=useState(true);const [tab,setTab]=useState('followup');
+  function load(){
+    setLoading(true);
+    Promise.all([api('getSalesFollowups',{sales:currentUser.name,limit:'500'}),api('getSalesNotes',{sales:currentUser.name,limit:'500'})])
+      .then(([fr,nr])=>{setFollowups(fr.success?safeArray(fr.data):[]);setNotes(nr.success?safeArray(nr.data):[]);setLoading(false);})
+      .catch(()=>setLoading(false));
+  }
   useEffect(()=>{load();},[currentUser.name]);
-  const fuRows=rows.filter(r=>String(r.detail||'').includes('Follow-up'));
-  const noteRows=rows.filter(r=>String(r.detail||'').includes('Note:')&&!String(r.detail||'').includes('Follow-up'));
-  function parseFUDate(d){const s=String(d||'');const m=s.match(/[0-9]{4}-[0-9]{2}-[0-9]{2}/);return m?m[0]:'';}
-  function parseFUNote(d){const s=String(d||'');const i=s.indexOf(' — ');return i>=0?s.slice(i+3).trim():'';}
-  function parseNoteText(d){const s=String(d||'');const i=s.indexOf('Note: ');return i>=0?s.slice(i+6).trim():s;}
-  const fuItems=fuRows.map(r=>({date:parseFUDate(r.detail),note:parseFUNote(r.detail),caseid:r.caseid||'',createdat:r.createdat||''})).filter(f=>f.date);
-  const overdue=fuItems.filter(f=>f.date<today);const todayFU=fuItems.filter(f=>f.date===today);const upcoming=fuItems.filter(f=>f.date>today);
-  function FUCard({f,color}){return<div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:'3px solid '+color,borderRadius:12,padding:'12px 14px',marginBottom:8}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:13}}>{f.caseid}</span><span style={{fontSize:12,fontWeight:700,color,background:color+'22',padding:'2px 10px',borderRadius:20}}>{f.date}</span></div>
-    <div style={{fontSize:13,color:'var(--text2)',lineHeight:1.5}}>{f.note||'ไม่มีหมายเหตุ'}</div>
+  const activeFU=followups.filter(f=>f.status!=='cancelled');
+  const pending=activeFU.filter(f=>f.status!=='done');
+  const done=activeFU.filter(f=>f.status==='done');
+  const overdue=pending.filter(f=>(f.due_date||f.date)<today);const todayFU=pending.filter(f=>(f.due_date||f.date)===today);const upcoming=pending.filter(f=>(f.due_date||f.date)>today);
+  async function markDone(f){setFollowups(xs=>xs.map(x=>x.id===f.id?{...x,status:'done',doneat:nowTH()}:x));await api('updateFollowupStatus',{id:f.id,status:'done'});}
+  function FUCard({f,color,showDone=false}){const done=f.status==='done';return<div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:'3px solid '+color,borderRadius:12,padding:'12px 14px',marginBottom:8,opacity:done?0.75:1}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5,gap:8}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:13}}>{f.caseid}</span><span style={{fontSize:12,fontWeight:700,color,background:color+'22',padding:'2px 10px',borderRadius:20}}>นัด {f.dueDisplay||formatYMDToTHBE(f.due_date||f.date)}</span></div>
+    <div style={{fontSize:11,color:'var(--text3)',marginBottom:4}}>ลงนัด {f.createdDisplay||formatTextDateToTHBE(f.createdat)}</div>
+    <div style={{fontSize:13,color:'var(--text2)',lineHeight:1.5,textDecoration:done?'line-through':'none'}}>{f.note||'ไม่มีหมายเหตุ'}</div>
+    {!done&&<div style={{marginTop:8,textAlign:'right'}}><button className="btn btn-ghost" style={{fontSize:11,padding:'4px 10px',color:'var(--green)'}} onClick={()=>markDone(f)}>✓ ทำแล้ว</button></div>}
+    {done&&<div style={{fontSize:11,color:'var(--green)',marginTop:6}}>✓ ทำแล้ว {f.doneat?formatTextDateToTHBE(f.doneat):''}</div>}
   </div>;}
-  function FUSection({items,color,title}){if(!items.length)return null;return<div style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:12,color,letterSpacing:.5,textTransform:'uppercase',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>{title}<span style={{background:color+'22',color,borderRadius:20,padding:'1px 8px',fontSize:11}}>{items.length}</span></div>{items.map((f,i)=><FUCard key={i} f={f} color={color}/>)}</div>;}
+  function FUSection({items,color,title}){if(!items.length)return null;return<div style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:12,color,letterSpacing:.5,textTransform:'uppercase',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>{title}<span style={{background:color+'22',color,borderRadius:20,padding:'1px 8px',fontSize:11}}>{items.length}</span></div>{items.map((f,i)=><FUCard key={f.id||i} f={f} color={color}/>)}</div>;}
   return<div className="page" style={{paddingBottom:80}}>
-    <div className="page-hd"><div><div className="page-title">📅 Follow-up & Notes</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>บันทึกจาก Supabase</div></div><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={load}>🔄</button></div>
+    <div className="page-hd"><div><div className="page-title">📅 Follow-up & Notes</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>บันทึกลง Supabase เห็นได้ทุกเครื่อง</div></div><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={load}>🔄</button></div>
     <div style={{display:'flex',gap:0,borderBottom:'1px solid var(--border)',marginBottom:16}}>
-      {[['followup','📅 Follow-up',fuItems.length],['note','📝 Notes',noteRows.length]].map(([k,l,cnt])=>
+      {[["followup","📅 นัด",activeFU.length],["note","📝 Notes",notes.length]].map(([k,l,cnt])=>
         <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'11px 6px',background:'none',border:'none',borderBottom:tab===k?'2px solid var(--blue)':'2px solid transparent',color:tab===k?'var(--blue)':'var(--text2)',fontSize:13,fontWeight:tab===k?700:400,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
           {l}{cnt>0&&<span style={{background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)',borderRadius:20,fontSize:10,fontWeight:700,padding:'1px 7px'}}>{cnt}</span>}
         </button>)}
     </div>
     {loading?<Loading/>:tab==='followup'?(
-      fuItems.length===0?<div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}><div style={{fontSize:48,marginBottom:12}}>📅</div><div style={{fontWeight:600,fontSize:16,marginBottom:6}}>ยังไม่มีนัดหมาย</div><div style={{fontSize:13,color:'var(--text3)'}}>กดเข้าไปที่เคสแล้วตั้งนัด Follow-up ได้เลยครับ</div></div>:
-      <><FUSection items={overdue} color="var(--red)" title="⚠️ เลยกำหนดแล้ว"/><FUSection items={todayFU} color="var(--yellow)" title="📌 วันนี้"/><FUSection items={upcoming} color="var(--blue)" title="🔜 กำลังจะมา"/></>
+      activeFU.length===0?<div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}><div style={{fontSize:48,marginBottom:12}}>📅</div><div style={{fontWeight:600,fontSize:16,marginBottom:6}}>ยังไม่มีนัดหมาย</div><div style={{fontSize:13,color:'var(--text3)'}}>กดเข้าไปที่เคสแล้วตั้งนัด Follow-up ได้เลยครับ</div></div>:
+      <><FUSection items={overdue} color="var(--red)" title="⚠️ เลยกำหนดแล้ว"/><FUSection items={todayFU} color="var(--yellow)" title="📌 วันนี้"/><FUSection items={upcoming} color="var(--blue)" title="🔜 กำลังจะมา"/><FUSection items={done.slice(0,50)} color="var(--green)" title="✅ ทำแล้ว"/></>
     ):(
-      noteRows.length===0?<div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>📝</div><div style={{fontWeight:600,marginBottom:4}}>ยังไม่มี Notes</div><div style={{fontSize:13,color:'var(--text3)'}}>กดเข้าเคสแล้วเพิ่ม Note ได้เลยครับ</div></div>:
-      noteRows.map((r,i)=><div key={i} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:'3px solid rgba(188,140,255,.6)',borderRadius:12,padding:'12px 14px',marginBottom:8}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:13}}>{r.caseid}</span><span style={{fontSize:11,color:'var(--text3)'}}>{String(r.createdat||'').split(' ')[0]}</span></div>
-        <div style={{fontSize:13,color:'var(--text)',lineHeight:1.6}}>{parseNoteText(r.detail)}</div>
+      notes.length===0?<div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>📝</div><div style={{fontWeight:600,marginBottom:4}}>ยังไม่มี Notes</div><div style={{fontSize:13,color:'var(--text3)'}}>กดเข้าเคสแล้วเพิ่ม Note ได้เลยครับ</div></div>:
+      notes.map((n,i)=><div key={n.id||i} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:'3px solid rgba(188,140,255,.6)',borderRadius:12,padding:'12px 14px',marginBottom:8}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:13}}>{n.caseid}</span><span style={{fontSize:11,color:'var(--text3)'}}>{n.createdDisplay||formatTextDateToTHBE(n.createdat)}</span></div>
+        <div style={{fontSize:13,color:'var(--text)',lineHeight:1.6}}>{n.note}</div>
       </div>)
     )}
   </div>;
@@ -2629,7 +2713,18 @@ function SalesFollowups({currentUser}){
 function SalesApp({currentUser,onLogout}){
   const [page,setPage]=useState('focus');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);const [showSearch,setShowSearch]=useState(false);const [showOnboarding,setShowOnboarding]=useState(false);const [showMobileMore,setShowMobileMore]=useState(false);
   usePushNotif(API_URL,currentUser.name);
-  useEffect(()=>{api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});function refreshNotif(){api('getNotifications',{sales:currentUser.name}).then(r=>{if(r.success){const u=r.data.filter(n=>(n.status||n['สถานะ'])==='unread');setNotifCount(u.length);}});}refreshNotif();const t=setInterval(refreshNotif,30000);try{if(!localStorage.getItem('cp_onboarded_'+currentUser.userId))setShowOnboarding(true);}catch(e){}return()=>clearInterval(t);},[currentUser.name,currentUser.userId]);
+  useEffect(()=>{
+    api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});
+    async function refreshNotif(){
+      // สร้างแจ้งเตือน Follow-up ที่ถึงวันนัดลงในระฆังก่อน แล้วค่อยนับ unread
+      await api('checkDueFollowups',{sales:currentUser.name});
+      api('getNotifications',{sales:currentUser.name}).then(r=>{if(r.success){const u=r.data.filter(n=>(n.status||n['สถานะ'])==='unread');setNotifCount(u.length);}});
+    }
+    refreshNotif();
+    const t=setInterval(refreshNotif,30000);
+    try{if(!localStorage.getItem('cp_onboarded_'+currentUser.userId))setShowOnboarding(true);}catch(e){}
+    return()=>clearInterval(t);
+  },[currentUser.name,currentUser.userId]);
   const pages={focus:<><PushNotifBanner currentUser={currentUser}/><DailyFocusPage currentUser={currentUser} onNavigate={k=>setPage(k)}/></>,market:<SalesMarket currentUser={currentUser}/>,cases:<SalesCurrentCases currentUser={currentUser} users={users}/>,claimed:<SalesClaimedCases currentUser={currentUser} users={users}/>,ai:<AIAdvisorPage currentUser={currentUser}/>,dashboard:<SalesDashboard currentUser={currentUser}/>,followup:<SalesFollowups currentUser={currentUser}/>};
   // ซ่อนเมนู AI ไว้ก่อน เพราะยังไม่พร้อมใช้งานจริง
   const navItems=[
