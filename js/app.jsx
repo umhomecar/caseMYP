@@ -177,8 +177,8 @@ async function getSearchCaseRows(force=false){
   return _searchCasesCache.rows||[];
 }
 
-const CACHEABLE=['getCases','getMarket','getMarketIds','getUsers','getBookings','getDashboard','getNotifications','getClaimedCases'];
-const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard'],sendToMarket:['getCases','getMarket','getDashboard','getMarketIds'],claimCase:['getMarket','getMarketIds','getClaimedCases','getDashboard'],returnCase:['getMarket','getMarketIds','getClaimedCases','getCases'],updateClaimed:['getClaimedCases'],closeMarketCase:['getMarket','getCases'],adminChangeSales:['getCases','getClaimedCases'],adminPullCase:['getCases','getClaimedCases'],deleteCase:['getCases','getMarket','getDashboard'],addBooking:['getBookings'],updateBooking:['getBookings']};
+const CACHEABLE=['getCases','getMarket','getMarketIds','getUsers','getBookings','getDashboard','getNotifications','getClaimedCases','getStandaloneCases'];
+const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard'],sendToMarket:['getCases','getMarket','getDashboard','getMarketIds'],claimCase:['getMarket','getMarketIds','getClaimedCases','getDashboard'],returnCase:['getMarket','getMarketIds','getClaimedCases','getCases'],updateClaimed:['getClaimedCases'],closeMarketCase:['getMarket','getCases'],adminChangeSales:['getCases','getClaimedCases'],adminPullCase:['getCases','getClaimedCases'],deleteCase:['getCases','getMarket','getDashboard'],addBooking:['getBookings'],updateBooking:['getBookings'],addStandaloneCase:['getStandaloneCases'],updateStandaloneCase:['getStandaloneCases'],deleteStandaloneCase:['getStandaloneCases']};
 
 async function api(action,data={}){
   if(CACHEABLE.includes(action)){const cached=cacheGet(action,data);if(cached)return cached;}
@@ -308,6 +308,32 @@ async function sbApi(action,data){
     case 'getUsers':{const rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate',order:'userid.asc'});return{success:true,data:(rows||[]).map(u=>({userId:u.userid,username:u.username,name:u.name,role:u.role,status:u.status,avatar:u.avatar||'',startdate:u.startdate||''}))};}
     case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbQ('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
     case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
+    case 'getStandaloneCases':{
+      const q={select:'*',order:'created_at.desc'};
+      if(data.caseType)q.case_type=`eq.${data.caseType}`;
+      const rows=await sbQ('GET','standalone_cases',q);
+      if(isSbError(rows))return{success:false,error:formatSbError(rows)};
+      return{success:true,data:rows||[]};
+    }
+    case 'addStandaloneCase':{
+      const nowIso=new Date().toISOString();
+      const row={case_type:data.caseType,name:data.name||'',sales:data.sales||'',status:data.status||'รอข้อมูล',report:data.report||'',created_by:data.createdBy||'',created_at:nowIso,updated_at:nowIso};
+      const res=await sbQ('POST','standalone_cases',{},row);
+      if(isSbError(res))return{success:false,error:formatSbError(res)};
+      return{success:true,data:Array.isArray(res)?res[0]:res};
+    }
+    case 'updateStandaloneCase':{
+      const upd={updated_at:new Date().toISOString()};
+      ['name','sales','status','report'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});
+      const res=await sbQ('PATCH','standalone_cases',{id:`eq.${data.id}`},upd);
+      if(isSbError(res))return{success:false,error:formatSbError(res)};
+      return{success:true,data:Array.isArray(res)?res[0]:res};
+    }
+    case 'deleteStandaloneCase':{
+      const res=await sbQ('DELETE','standalone_cases',{id:`eq.${data.id}`});
+      if(isSbError(res))return{success:false,error:formatSbError(res)};
+      return{success:true};
+    }
     case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'addCase':{
       const ts=data.createdat||nowTH();
@@ -1108,39 +1134,86 @@ function NotifPanel({user,onClose,onCountChange}){
 }
 
 
-function AdminSentCasesPage({currentUser,users,sentType,title,icon}){
-  const [cases,setCases]=useState([]);
+
+function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSaved}){
+  const isEdit=!!item;
+  const [form,setForm]=useState({name:item?.name||'',sales:item?.sales||'',status:item?.status||'รอข้อมูล',report:item?.report||''});
+  const [loading,setLoading]=useState(false);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  async function submit(){
+    if(!form.name.trim())return showToast('กรุณากรอกชื่อ','warn');
+    setLoading(true);
+    const payload={...form,caseType,createdBy:currentUser.name};
+    const r=isEdit?await api('updateStandaloneCase',{id:item.id,...payload}):await api('addStandaloneCase',payload);
+    setLoading(false);
+    if(r.success){showToast(isEdit?'แก้ไขข้อมูลสำเร็จ':'เพิ่มข้อมูลสำเร็จ','ok');onSaved();onClose();}
+    else showToast(r.error||'บันทึกไม่สำเร็จ','err',5000);
+  }
+  async function doDelete(){
+    if(!isEdit)return;
+    if(!confirm('ลบข้อมูลนี้ออกจาก '+title+' ใช่ไหม?'))return;
+    setLoading(true);
+    const r=await api('deleteStandaloneCase',{id:item.id});
+    setLoading(false);
+    if(r.success){showToast('ลบข้อมูลแล้ว','ok');onSaved();onClose();}
+    else showToast(r.error||'ลบไม่สำเร็จ','err',5000);
+  }
+  return <Modal title={(isEdit?'✏️ แก้ไข ':'➕ เพิ่ม ')+title} onClose={onClose} footer={<>
+    {isEdit&&<button className="btn btn-danger" onClick={doDelete} disabled={loading} style={{marginRight:'auto'}}>ลบ</button>}
+    <button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button>
+    <button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button>
+  </>}>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อ *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อลูกค้า / ชื่อบัญชี / ชื่อเคส"/></div>
+      <div className="form-group"><label>เซลส์ดูแล</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
+      <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label>รีพอร์ต</label><textarea rows={5} value={form.report} onChange={e=>set('report',e.target.value)} placeholder="รายละเอียด / ความคืบหน้า / หมายเหตุ"/></div>
+      {isEdit&&<div style={{gridColumn:'1/-1',fontSize:12,color:'var(--text3)',lineHeight:1.7,background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px'}}>
+        <div>สร้างเมื่อ: {formatTextDateToTHBE(item.created_at)}</div>
+        <div>อัปเดตล่าสุด: {formatTextDateToTHBE(item.updated_at)}</div>
+      </div>}
+    </div>
+  </Modal>;
+}
+
+function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
+  const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
   const [q,setQ]=useState('');
   const [salesFilter,setSalesFilter]=useState('all');
   const [statusFilter,setStatusFilter]=useState('');
-  const [sel,setSel]=useState(null);
-  const [showAdd,setShowAdd]=useState(false);
+  const [modalItem,setModalItem]=useState(null);
+  const [showModal,setShowModal]=useState(false);
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
-    if(r.success){setCases(safeArray(r.data).filter(c=>String(c.sent||'ปกติ').trim()===sentType));}
-    else setCases([]);
+  const load=useCallback(()=>{setLoading(true);cacheClear(['getStandaloneCases']);api('getStandaloneCases',{caseType}).then(r=>{
+    if(r.success)setRows(safeArray(r.data));else{setRows([]);showToast('โหลดข้อมูล '+title+' ไม่สำเร็จ: '+(r.error||'กรุณารัน SQL สร้างตาราง standalone_cases ก่อน'),'err',6000);}
     setLoading(false);
-  }).catch(()=>{setCases([]);setLoading(false);});},[sentType]);
+  }).catch(e=>{setRows([]);setLoading(false);showToast('โหลดข้อมูลไม่สำเร็จ','err');});},[caseType,title]);
   useEffect(()=>{load();},[load]);
-  const salesList=users.filter(u=>u.role==='Sales');
-  const filtered=safeArray(cases).filter(c=>{
-    if(salesFilter!=='all'&&c.sales!==salesFilter)return false;
-    if(statusFilter&&c.status!==statusFilter)return false;
-    if(q&&!caseMatchesSearch(c,q))return false;
-    return true;
-  }).sort((a,b)=>String(b.caseid||'').localeCompare(String(a.caseid||'')));
+  function matchRow(r){
+    if(!q.trim())return true;
+    const term=normalizeSearchText(q), loose=normalizeLoose(q);
+    const values=[r.name,r.sales,r.status,r.report,formatTextDateToTHBE(r.created_at),formatTextDateToTHBE(r.updated_at)];
+    return values.some(v=>normalizeSearchText(v).includes(term)||normalizeLoose(v).includes(loose));
+  }
+  const filtered=safeArray(rows).filter(r=>{
+    if(salesFilter!=='all'&&r.sales!==salesFilter)return false;
+    if(statusFilter&&r.status!==statusFilter)return false;
+    return matchRow(r);
+  });
   const statTotal=filtered.length;
-  const statActive=filtered.filter(c=>!CLOSED.includes(c.status)).length;
-  const statClosed=filtered.filter(c=>CLOSED.includes(c.status)).length;
+  const statActive=filtered.filter(r=>!CLOSED.includes(r.status)).length;
+  const statClosed=filtered.filter(r=>CLOSED.includes(r.status)).length;
+  function openAdd(){setModalItem(null);setShowModal(true);}
+  function openEdit(r){setModalItem(r);setShowModal(true);}
   return <div className="page admin-sent-page">
     <div className="page-hd">
       <div>
         <div className="page-title" style={{display:'flex',alignItems:'center',gap:10}}><span>{icon}</span>{title}</div>
-        <div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>แยกเคสประเภท {sentType} — ดูชื่อ เซลส์ดูแล สถานะ และรีพอร์ต พร้อมแก้ไขภายหลังได้</div>
+        <div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ข้อมูลแยกอิสระ ไม่เกี่ยวกับเคสปัจจุบัน และไม่มีรหัสเคส</div>
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-        <button className="btn btn-primary" onClick={()=>setShowAdd(true)}>➕ เพิ่ม{title}</button>
+        <button className="btn btn-primary" onClick={openAdd}>➕ เพิ่ม{title}</button>
         <button className="btn btn-ghost" onClick={load}>รีเฟรช</button>
       </div>
     </div>
@@ -1148,37 +1221,34 @@ function AdminSentCasesPage({currentUser,users,sentType,title,icon}){
     <div className="stat-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))'}}>
       <div className="stat-card"><div className="stat-num" style={{color:'var(--blue)'}}>{statTotal}</div><div className="stat-lbl">ทั้งหมด</div></div>
       <div className="stat-card"><div className="stat-num" style={{color:'var(--green)'}}>{statActive}</div><div className="stat-lbl">กำลังดูแล</div></div>
-      <div className="stat-card"><div className="stat-num" style={{color:'var(--red)'}}>{statClosed}</div><div className="stat-lbl">ปิด/จบเคส</div></div>
+      <div className="stat-card"><div className="stat-num" style={{color:'var(--red)'}}>{statClosed}</div><div className="stat-lbl">ปิด/จบ</div></div>
     </div>
 
     <div className="card" style={{marginBottom:14}}>
       <div className="search-bar">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ชื่อ / เบอร์ / รหัสเคส / รีพอร์ต" style={{minWidth:220,flex:1}}/>
-        <select value={salesFilter} onChange={e=>setSalesFilter(e.target.value)} style={{width:170}}><option value="all">ทุกเซลส์</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ชื่อ / เซลส์ / สถานะ / รีพอร์ต" style={{minWidth:220,flex:1}}/>
+        <select value={salesFilter} onChange={e=>setSalesFilter(e.target.value)} style={{width:170}}><option value="all">ทุกเซลส์</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>
         <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{width:170}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
       </div>
     </div>
 
-    {loading?<Loading/>:filtered.length===0?<div className="card" style={{textAlign:'center',padding:34,color:'var(--text2)'}}><div style={{fontSize:36,marginBottom:8}}>{icon}</div>ยังไม่มีข้อมูลในแทบ {title}</div>:
+    {loading?<Loading/>:filtered.length===0?<div className="card" style={{textAlign:'center',padding:34,color:'var(--text2)'}}><div style={{fontSize:36,marginBottom:8}}>{icon}</div>ยังไม่มีข้อมูลใน {title}</div>:
       <div className="sent-case-grid">
-        {filtered.map(c=><div key={c.caseid} className="sent-case-card" onClick={()=>setSel(c)}>
+        {filtered.map(r=><div key={r.id} className="sent-case-card" onClick={()=>openEdit(r)}>
           <div className="sent-case-card-top">
             <div>
-              <div className="sent-case-id">#{c.caseid}</div>
-              <div className="sent-case-name">{c.customername||'-'}</div>
+              <div className="sent-case-id">สร้างเมื่อ {formatTextDateToTHBE(r.created_at)}</div>
+              <div className="sent-case-name">{r.name||'-'}</div>
             </div>
-            <span className={`badge ${getStatusClass(c.status)}`}>{c.status||'-'}</span>
+            <span className={`badge ${getStatusClass(r.status)}`}>{r.status||'-'}</span>
           </div>
-          <div className="sent-case-meta"><span>👤 เซลส์ดูแล</span><b>{c.sales||'-'}</b></div>
-          <div className="sent-case-report"><div style={{fontSize:11,color:'var(--text3)',marginBottom:4}}>รีพอร์ต</div>{c.report||'ยังไม่มีรีพอร์ต'}</div>
-          <div className="sent-case-actions">
-            <button className="btn btn-primary" onClick={e=>{e.stopPropagation();setSel(c);}}>แก้ไขข้อมูล</button>
-          </div>
+          <div className="sent-case-meta"><span>👤 เซลส์ดูแล</span><b>{r.sales||'-'}</b></div>
+          <div className="sent-case-report"><div style={{fontSize:11,color:'var(--text3)',marginBottom:4}}>รีพอร์ต</div>{r.report||'ยังไม่มีรีพอร์ต'}</div>
+          <div className="sent-case-actions"><button className="btn btn-primary" onClick={e=>{e.stopPropagation();openEdit(r);}}>แก้ไขข้อมูล</button></div>
         </div>)}
       </div>}
 
-    {showAdd&&<AddCaseModal users={users} currentUser={currentUser} forcedSent={sentType} onClose={()=>setShowAdd(false)} onAdded={load}/>}    
-    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}    
+    {showModal&&<StandaloneCaseModal item={modalItem} users={users} currentUser={currentUser} caseType={caseType} title={title} onClose={()=>setShowModal(false)} onSaved={load}/>}    
   </div>;
 }
 
@@ -2672,8 +2742,8 @@ function AdminApp({currentUser,onLogout}){
 
   const pages={
     cases:<AdminCurrentCases currentUser={currentUser} users={users}/>,
-    private_cases:<AdminSentCasesPage currentUser={currentUser} users={users} sentType="ส่วนตัว" title="เคสส่วนตัว" icon="🔒"/>,
-    line_oa:<AdminSentCasesPage currentUser={currentUser} users={users} sentType="Line OA" title="Line OA" icon="💬"/>,
+    private_cases:<AdminSentCasesPage currentUser={currentUser} users={users} caseType="private" title="เคสส่วนตัว" icon="🔒"/>,
+    line_oa:<AdminSentCasesPage currentUser={currentUser} users={users} caseType="line_oa" title="Line OA" icon="💬"/>,
     market:<AdminMarket currentUser={currentUser} users={users}/>,
     dashboard:<AdminDashboard currentUser={currentUser}/>,
     bookings:<AdminBookings currentUser={currentUser} users={users}/>,
