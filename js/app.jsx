@@ -2686,25 +2686,22 @@ function AdminApp({currentUser,onLogout}){
 
   const allNavItems=[
     {key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},
-    {key:'private_cases',icon:<span style={{fontSize:18,lineHeight:1}}>🔒</span>,label:'เคสส่วนตัว'},
-    {key:'line_oa',icon:<span style={{fontSize:18,lineHeight:1}}>💬</span>,label:'Line OA'},
     {key:'market',icon:<Ico.market/>,label:'ตลาดเคส'},
     {key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},
     {key:'summary',icon:<span style={{fontSize:18,lineHeight:1}}>📈</span>,label:'สรุปยอด',href:'https://umhome-summary-web.vercel.app/'},
     {key:'bookings',icon:<Ico.book/>,label:'การจอง'},
     {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
     {key:'team',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/> <circle cx="9" cy="7" r="4"/> <path d="M23 21v-2a4 4 0 0 0-3-3.87"/> <path d="M16 3.13a4 4 0 0 1 0 7.75"/> </svg>,label:'ทีม'},
-    {key:'ai',icon:<Ico.ai/>,label:'AI Admin'},
-    {key:'analytics',icon:<Ico.report/>,label:'Analytics'},
+    {key:'private_cases',icon:<span style={{fontSize:18,lineHeight:1}}>🔒</span>,label:'เคสส่วนตัว'},
+    {key:'line_oa',icon:<span style={{fontSize:18,lineHeight:1}}>💬</span>,label:'Line OA'},
   ];
 
   const bottomNavItems=[
     {key:'cases',icon:<Ico.home/>,label:'เคส'},
     {key:'market',icon:<Ico.market/>,label:'ตลาด'},
     {key:'dashboard',icon:<Ico.dash/>,label:'Dash'},
-    {key:'team',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/> <circle cx="9" cy="7" r="4"/> <path d="M23 21v-2a4 4 0 0 0-3-3.87"/> <path d="M16 3.13a4 4 0 0 1 0 7.75"/> </svg>,label:'ทีม'},
-    {key:'ai',icon:<Ico.ai/>,label:'AI'},
-    {key:'analytics',icon:<Ico.report/>,label:'Graph'},
+    {key:'private_cases',icon:<span style={{fontSize:18,lineHeight:1}}>🔒</span>,label:'ส่วนตัว'},
+    {key:'line_oa',icon:<span style={{fontSize:18,lineHeight:1}}>💬</span>,label:'Line OA'},
     {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
   ];
 
@@ -2884,15 +2881,74 @@ class ErrorBoundary extends React.Component{
   }
 }
 
+
+const CASEPOOL_SESSION_KEY='casepool_persistent_session_v2';
+const CASEPOOL_IDLE_LIMIT_MS=15*24*60*60*1000;
+function readPersistedSession(){
+  try{
+    const raw=localStorage.getItem(CASEPOOL_SESSION_KEY);
+    if(raw){
+      const data=JSON.parse(raw);
+      const user=data?.user||null;
+      const last=Number(data?.lastActivity||0);
+      if(user&&last&&(Date.now()-last)<=CASEPOOL_IDLE_LIMIT_MS)return user;
+      localStorage.removeItem(CASEPOOL_SESSION_KEY);
+    }
+    // migrate old one-tab/session login if it exists
+    const old=sessionStorage.getItem('casepool_user');
+    if(old){const user=JSON.parse(old);savePersistedSession(user);return user;}
+  }catch(e){try{localStorage.removeItem(CASEPOOL_SESSION_KEY);}catch(_){}}
+  return null;
+}
+function savePersistedSession(user){
+  try{localStorage.setItem(CASEPOOL_SESSION_KEY,JSON.stringify({user,lastActivity:Date.now()}));}catch(e){}
+  try{sessionStorage.setItem('casepool_user',JSON.stringify(user));}catch(e){}
+}
+function touchPersistedSession(user){
+  if(!user)return;
+  try{localStorage.setItem(CASEPOOL_SESSION_KEY,JSON.stringify({user,lastActivity:Date.now()}));}catch(e){}
+}
+function clearPersistedSession(){
+  try{localStorage.removeItem(CASEPOOL_SESSION_KEY);}catch(e){}
+  try{sessionStorage.removeItem('casepool_user');}catch(e){}
+}
+
 function App(){
-  const [user,setUser]=useState(()=>{try{const s=sessionStorage.getItem('casepool_user');return s?JSON.parse(s):null;}catch{return null;}});
+  const [user,setUser]=useState(()=>readPersistedSession());
   const [showLogoutConfirm,setShowLogoutConfirm]=useState(false);
   useEffect(()=>{const el=document.getElementById('app-loader');if(el){el.style.pointerEvents='none';el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),400);}},[]);
-  function handleLogin(u){sessionStorage.setItem('casepool_user',JSON.stringify(u));setUser(u);setTimeout(()=>initFCM(),2000);}
+  useEffect(()=>{
+    if(!user)return;
+    let lastWrite=0;
+    const activityEvents=['click','keydown','mousemove','touchstart','scroll'];
+    const onActivity=()=>{
+      const now=Date.now();
+      if(now-lastWrite>60000){lastWrite=now;touchPersistedSession(user);}
+    };
+    const checkExpired=()=>{
+      try{
+        const raw=localStorage.getItem(CASEPOOL_SESSION_KEY);
+        const data=raw?JSON.parse(raw):null;
+        const last=Number(data?.lastActivity||0);
+        if(!last||Date.now()-last>CASEPOOL_IDLE_LIMIT_MS){
+          clearPersistedSession();
+          try{if(supabase)supabase.removeAllChannels();}catch(e){}
+          Object.keys(_cache).forEach(k=>delete _cache[k]);
+          setUser(null);
+        }
+      }catch(e){clearPersistedSession();setUser(null);}
+    };
+    touchPersistedSession(user);
+    activityEvents.forEach(ev=>window.addEventListener(ev,onActivity,{passive:true}));
+    const timer=setInterval(checkExpired,60*60*1000);
+    const fcmTimer=setTimeout(()=>initFCM(),2000);
+    return()=>{activityEvents.forEach(ev=>window.removeEventListener(ev,onActivity));clearInterval(timer);clearTimeout(fcmTimer);};
+  },[user?.userId]);
+  function handleLogin(u){savePersistedSession(u);setUser(u);setTimeout(()=>initFCM(),2000);}
   function handleLogout(){
     // ปิด realtime channels ทั้งหมดก่อน logout
     try{if(supabase)supabase.removeAllChannels();}catch(e){}
-    sessionStorage.removeItem('casepool_user');
+    clearPersistedSession();
     Object.keys(_cache).forEach(k=>delete _cache[k]);
     setUser(null);
     setShowLogoutConfirm(false);
