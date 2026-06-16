@@ -92,7 +92,7 @@ function showToast(msg,type='ok',duration=3000){
 const STATUSES = ['รอข้อมูล','ไปต่อได้','กำลังติดต่อ','เคสเลี้ยง','เคสวัด 50/50','ติดต่อไม่ได้','ยังไม่สะดวก','จอง','รอเซ็นต์','รอผล','อนุมัติ','ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
 const BOOK_STATUSES = ['จองแล้ว','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยรถ','รีเจค','ปิดเคส'];
 const CONTACT_BY = ['เบอร์','ไลน์','QR Code','เบอร์&ไลน์'];
-const SENT_TYPES = ['ปกติ','ส่วนตัว'];
+const SENT_TYPES = ['ปกติ','ส่วนตัว','Line OA'];
 const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V','CR-V','Accord','Mobilio'],Toyota:['Yaris','Vios','Altis','Revo','VIGO','Fortuner','Cross','C-HR','Camry','Veloz','Alphard','Sienta','Avanza','Prius','Innova'],Isuzu:['D-Max','MU-X','MU-7','X-Series'],Mazda:['2','3','CX-3','CX-30','BT-50'],MG:['3','5','ZS'],Nissan:['Navara','Almera','Note','March','Sylphy','Teana','Juke'],Mitsubishi:['Triton','Mirage','Attrage','Xpander','Pajero'],Suzuki:['Swift','Ciaz','Carry']};
 
 function getStatusClass(s){const m={'รอข้อมูล':'s-wait','ไปต่อได้':'s-go','กำลังติดต่อ':'s-calling','เคสเลี้ยง':'s-nurse','เคสวัด 50/50':'s-half','ติดต่อไม่ได้':'s-cant','ยังไม่สะดวก':'s-later','จอง':'s-book','รอเซ็นต์':'s-sign','รอผล':'s-wait2','อนุมัติ':'s-approve','ปิดเคส':'s-close','รีเจค':'s-reject','ปล่อยแล้ว':'s-release','ได้รถจากที่อื่น':'s-other','โยนเคส':'s-throw','จองแล้ว':'s-book'};return m[s]||'s-wait';}
@@ -1009,13 +1009,13 @@ function ImageUploader({value,onChange,caseId='',label='📷',accept='image/*',m
 }
 function QrUploader({value,onChange,caseId=''}){return <ImageUploader value={value} onChange={onChange} caseId={caseId} label="📷" maxMB={10}/>;}
 
-function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false}){
+function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedSent=''}){
   const pad=n=>String(n).padStart(2,'0');
   const today=new Date();
   const lastMonthDate=new Date(today.getFullYear(),today.getMonth()-1,Math.min(today.getDate(),28));
   const defaultBackMonth=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}`;
   const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
-  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:'ปกติ',clipad:''});
+  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||'ปกติ',clipad:''});
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
   const [backMonth,setBackMonth]=useState(defaultBackMonth);
   const [backDate,setBackDate]=useState(defaultBackDate);
@@ -1029,6 +1029,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false}){
     if(backdated&&!backDate)return showToast('กรุณาเลือกวันที่ย้อนหลัง','warn');
     setLoading(true);
     const submitData={...form};
+    if(forcedSent) submitData.sent=forcedSent;
     // เก็บ clipad ใน attachment field โดย prefix [CLIP:...]
     if(submitData.clipad){submitData.attachment='[CLIP:'+submitData.clipad+']';}
     delete submitData.clipad;
@@ -1063,7 +1064,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false}){
       <div className="form-group"><label>ติดต่อโดย</label><select value={form.contact_by} onChange={e=>set('contact_by',e.target.value)}>{CONTACT_BY.map(c=><option key={c}>{c}</option>)}</select></div>
       <div className="form-group"><label>ข้อมูลติดต่อ</label>{form.contact_by==='QR Code'?<QrUploader value={form.contact} onChange={v=>set('contact',v)}/>:<div><input value={form.contact} onChange={e=>set('contact',e.target.value)} placeholder="เบอร์ / ไลน์ / ID"/>{form.contact_by==='เบอร์'&&form.contact&&!/^0\d{8,9}$/.test(form.contact.replace(/\D/g,''))&&<div style={{fontSize:11,color:'var(--yellow)',marginTop:3}}>⚠️ เบอร์ไม่ครบ 10 หลัก</div>}</div>}</div>
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-      <div className="form-group"><label>ส่ง</label><select value={form.sent} onChange={e=>set('sent',e.target.value)}>{SENT_TYPES.map(s=><option key={s}>{s}</option>)}</select></div>
+      <div className="form-group"><label>ส่ง</label>{forcedSent?<div style={{background:'linear-gradient(135deg,rgba(88,166,255,.10),rgba(188,140,255,.08))',border:'1px solid rgba(88,166,255,.28)',borderRadius:8,padding:'9px 12px',fontSize:14,fontWeight:800,color:'var(--blue)'}}>{forcedSent}</div>:<select value={form.sent} onChange={e=>set('sent',e.target.value)}>{SENT_TYPES.map(s=><option key={s}>{s}</option>)}</select>}</div>
       {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>}
       {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1',background:'rgba(210,153,34,.06)',border:'1px solid rgba(210,153,34,.25)',borderRadius:8,padding:'10px 12px'}}>
         <label style={{display:'flex',alignItems:'center',gap:6,color:'var(--yellow)',marginBottom:6}}>🎬 ข้อมูลคลิปแอด <span style={{fontSize:11,fontWeight:400,color:'var(--text3)'}}>เห็นเฉพาะ Admin</span></label>
@@ -1103,6 +1104,81 @@ function NotifPanel({user,onClose,onCountChange}){
   return <div style={{position:'fixed',top:56,right:16,width:320,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,boxShadow:'var(--shadow)',zIndex:200,maxHeight:420,overflowY:'auto'}}>
     <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:700}}>การแจ้งเตือน</span><div style={{display:'flex',gap:6}}><button className="btn btn-ghost" style={{padding:'2px 8px',fontSize:11}} onClick={markAllRead}>อ่านทั้งหมด</button><button className="btn btn-ghost" style={{padding:'2px 8px'}} onClick={onClose}><Ico.x/></button></div></div>
     {loading?<Loading/>:notifs.length===0?<p style={{padding:20,textAlign:'center',color:'var(--text2)',fontSize:13}}>ไม่มีการแจ้งเตือน</p>:notifs.slice(0,30).map(n=><div key={n.notifId} style={{padding:'10px 16px',borderBottom:'1px solid var(--border)',background:(n.status||n['สถานะ'])==='unread'?'rgba(88,166,255,.06)':'transparent',cursor:'pointer'}} onClick={()=>markRead(n.notifId)}><div style={{fontSize:13,display:'flex',gap:8,alignItems:'flex-start'}}>{(n.status||n['สถานะ'])==='unread'&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--blue)',flexShrink:0,marginTop:4}}/>}<span style={{color:(n.status||n['สถานะ'])==='unread'?'var(--text)':'var(--text2)'}}>{n.message}</span></div><div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>{String(n['วันที่']||'')}</div></div>)}
+  </div>;
+}
+
+
+function AdminSentCasesPage({currentUser,users,sentType,title,icon}){
+  const [cases,setCases]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [q,setQ]=useState('');
+  const [salesFilter,setSalesFilter]=useState('all');
+  const [statusFilter,setStatusFilter]=useState('');
+  const [sel,setSel]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
+  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
+    if(r.success){setCases(safeArray(r.data).filter(c=>String(c.sent||'ปกติ').trim()===sentType));}
+    else setCases([]);
+    setLoading(false);
+  }).catch(()=>{setCases([]);setLoading(false);});},[sentType]);
+  useEffect(()=>{load();},[load]);
+  const salesList=users.filter(u=>u.role==='Sales');
+  const filtered=safeArray(cases).filter(c=>{
+    if(salesFilter!=='all'&&c.sales!==salesFilter)return false;
+    if(statusFilter&&c.status!==statusFilter)return false;
+    if(q&&!caseMatchesSearch(c,q))return false;
+    return true;
+  }).sort((a,b)=>String(b.caseid||'').localeCompare(String(a.caseid||'')));
+  const statTotal=filtered.length;
+  const statActive=filtered.filter(c=>!CLOSED.includes(c.status)).length;
+  const statClosed=filtered.filter(c=>CLOSED.includes(c.status)).length;
+  return <div className="page admin-sent-page">
+    <div className="page-hd">
+      <div>
+        <div className="page-title" style={{display:'flex',alignItems:'center',gap:10}}><span>{icon}</span>{title}</div>
+        <div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>แยกเคสประเภท {sentType} — ดูชื่อ เซลส์ดูแล สถานะ และรีพอร์ต พร้อมแก้ไขภายหลังได้</div>
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <button className="btn btn-primary" onClick={()=>setShowAdd(true)}>➕ เพิ่ม{title}</button>
+        <button className="btn btn-ghost" onClick={load}>รีเฟรช</button>
+      </div>
+    </div>
+
+    <div className="stat-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))'}}>
+      <div className="stat-card"><div className="stat-num" style={{color:'var(--blue)'}}>{statTotal}</div><div className="stat-lbl">ทั้งหมด</div></div>
+      <div className="stat-card"><div className="stat-num" style={{color:'var(--green)'}}>{statActive}</div><div className="stat-lbl">กำลังดูแล</div></div>
+      <div className="stat-card"><div className="stat-num" style={{color:'var(--red)'}}>{statClosed}</div><div className="stat-lbl">ปิด/จบเคส</div></div>
+    </div>
+
+    <div className="card" style={{marginBottom:14}}>
+      <div className="search-bar">
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ชื่อ / เบอร์ / รหัสเคส / รีพอร์ต" style={{minWidth:220,flex:1}}/>
+        <select value={salesFilter} onChange={e=>setSalesFilter(e.target.value)} style={{width:170}}><option value="all">ทุกเซลส์</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>
+        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{width:170}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
+      </div>
+    </div>
+
+    {loading?<Loading/>:filtered.length===0?<div className="card" style={{textAlign:'center',padding:34,color:'var(--text2)'}}><div style={{fontSize:36,marginBottom:8}}>{icon}</div>ยังไม่มีข้อมูลในแทบ {title}</div>:
+      <div className="sent-case-grid">
+        {filtered.map(c=><div key={c.caseid} className="sent-case-card" onClick={()=>setSel(c)}>
+          <div className="sent-case-card-top">
+            <div>
+              <div className="sent-case-id">#{c.caseid}</div>
+              <div className="sent-case-name">{c.customername||'-'}</div>
+            </div>
+            <span className={`badge ${getStatusClass(c.status)}`}>{c.status||'-'}</span>
+          </div>
+          <div className="sent-case-meta"><span>👤 เซลส์ดูแล</span><b>{c.sales||'-'}</b></div>
+          <div className="sent-case-report"><div style={{fontSize:11,color:'var(--text3)',marginBottom:4}}>รีพอร์ต</div>{c.report||'ยังไม่มีรีพอร์ต'}</div>
+          <div className="sent-case-actions">
+            <button className="btn btn-primary" onClick={e=>{e.stopPropagation();setSel(c);}}>แก้ไขข้อมูล</button>
+          </div>
+        </div>)}
+      </div>}
+
+    {showAdd&&<AddCaseModal users={users} currentUser={currentUser} forcedSent={sentType} onClose={()=>setShowAdd(false)} onAdded={load}/>}    
+    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}    
   </div>;
 }
 
@@ -2596,6 +2672,8 @@ function AdminApp({currentUser,onLogout}){
 
   const pages={
     cases:<AdminCurrentCases currentUser={currentUser} users={users}/>,
+    private_cases:<AdminSentCasesPage currentUser={currentUser} users={users} sentType="ส่วนตัว" title="เคสส่วนตัว" icon="🔒"/>,
+    line_oa:<AdminSentCasesPage currentUser={currentUser} users={users} sentType="Line OA" title="Line OA" icon="💬"/>,
     market:<AdminMarket currentUser={currentUser} users={users}/>,
     dashboard:<AdminDashboard currentUser={currentUser}/>,
     bookings:<AdminBookings currentUser={currentUser} users={users}/>,
@@ -2608,6 +2686,8 @@ function AdminApp({currentUser,onLogout}){
 
   const allNavItems=[
     {key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},
+    {key:'private_cases',icon:<span style={{fontSize:18,lineHeight:1}}>🔒</span>,label:'เคสส่วนตัว'},
+    {key:'line_oa',icon:<span style={{fontSize:18,lineHeight:1}}>💬</span>,label:'Line OA'},
     {key:'market',icon:<Ico.market/>,label:'ตลาดเคส'},
     {key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},
     {key:'summary',icon:<span style={{fontSize:18,lineHeight:1}}>📈</span>,label:'สรุปยอด',href:'https://umhome-summary-web.vercel.app/'},
