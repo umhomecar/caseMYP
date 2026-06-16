@@ -1336,3 +1336,77 @@ html{scroll-behavior:smooth;}
     box-shadow:none!important;
   }
 }
+
+/* ═══════════════════════════════════════
+   Admin separated tabs: เคสส่วนตัว / Line OA
+═══════════════════════════════════════ */
+.sent-case-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:14px;
+}
+.sent-case-card{
+  background:linear-gradient(145deg,rgba(22,27,34,.96),rgba(13,17,23,.92));
+  border:1px solid rgba(88,166,255,.16);
+  border-radius:16px;
+  padding:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  cursor:pointer;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.sent-case-card:hover{
+  transform:translateY(-2px);
+  border-color:rgba(88,166,255,.42);
+  box-shadow:0 16px 36px rgba(31,111,235,.16);
+}
+.sent-case-card-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:12px;
+}
+.sent-case-id{font-size:12px;color:var(--blue);font-weight:800;margin-bottom:4px;}
+.sent-case-name{font-size:17px;font-weight:800;color:var(--text);line-height:1.35;}
+.sent-case-meta{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  font-size:13px;
+  color:var(--text2);
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;
+  padding:9px 11px;
+  margin-bottom:10px;
+}
+.sent-case-meta b{color:var(--text);font-weight:800;}
+.sent-case-report{
+  font-size:13px;
+  color:var(--text2);
+  line-height:1.65;
+  min-height:72px;
+  max-height:118px;
+  overflow:hidden;
+  background:rgba(0,0,0,.16);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px 12px;
+  margin-bottom:12px;
+}
+.sent-case-actions{display:flex;gap:8px;}
+.sent-case-actions .btn{width:100%;}
+body.light .sent-case-card{
+  background:rgba(255,255,255,.94);
+  border-color:#dce4ef;
+  box-shadow:0 4px 18px rgba(15,23,42,.07);
+}
+body.light .sent-case-card:hover{border-color:#2563eb;box-shadow:0 8px 24px rgba(37,99,235,.12);}
+body.light .sent-case-meta{background:#f8fafc;border-color:#e2e8f0;}
+body.light .sent-case-report{background:#f8fafc;}
+@media(max-width:768px){
+  .sent-case-grid{grid-template-columns:1fr;gap:10px;}
+  .sent-case-card{border-radius:14px;padding:14px;}
+  .sent-case-name{font-size:16px;}
+}
