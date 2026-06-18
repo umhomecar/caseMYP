@@ -203,6 +203,18 @@ function todayYMD(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${
 function toBEYear(y){y=parseInt(y,10)||0;return y&&y<2400?y+543:y;}
 function formatYMDToTHBE(ymd){const s=String(ymd||'').trim();const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return s||'-';return `${m[3]}/${m[2]}/${toBEYear(m[1])}`;}
 function formatTextDateToTHBE(v){const s=String(v||'').trim();if(!s)return '-';const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(iso)return formatYMDToTHBE(s)+(s.includes('T')?' '+s.slice(11,16):'');const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(.*)$/);if(m){const dd=String(m[1]).padStart(2,'0'),mm=String(m[2]).padStart(2,'0'),yy=toBEYear(m[3]);return `${dd}/${mm}/${yy}${m[4]||''}`;}const d=new Date(s);if(!isNaN(d)){const pad=n=>String(n).padStart(2,'0');return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${toBEYear(d.getFullYear())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;}return s;}
+function parseTHDateTime(v){
+  const s=String(v||'').trim();
+  if(!s)return null;
+  // รองรับ dd/mm/yyyy HH:mm[:ss] ทั้ง ค.ศ. และ พ.ศ.
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m){let y=parseInt(m[3],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[1],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
+  // รองรับ yyyy-mm-dd / ISO ทั้ง ค.ศ. และ พ.ศ.
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m){let y=parseInt(m[1],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[3],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
+  const d=new Date(s);return isNaN(d)?null:d;
+}
+
 function mapCaseNote(r){return{id:r.id,caseid:r.caseid,sales:r.sales,note:r.note||'',createdat:r.createdat||'',createdDisplay:formatTextDateToTHBE(r.createdat||''),deletedat:r.deletedat||''};}
 function mapCaseFollowup(r){return{id:r.id,caseid:r.caseid,sales:r.sales,customername:r.customername||'',due_date:r.due_date||'',date:r.due_date||'',note:r.note||'',status:r.status||'pending',createdat:r.createdat||'',createdDisplay:formatTextDateToTHBE(r.createdat||''),dueDisplay:formatYMDToTHBE(r.due_date||''),doneat:r.doneat||'',deletedat:r.deletedat||'',notified_on:r.notified_on||''};}
 
@@ -462,7 +474,7 @@ async function sbApi(action,data){
     }
     case 'getClaimedCases':{const q={order:'assignedat.desc'};if(data.sales)q.sale=`eq.${data.sales}`;const rows=await sbQ('GET','claimedcases',q);return{success:true,data:(rows||[]).map(mapClaimed)};}
     case 'updateClaimed':{const upd={};if(data.newstatus!==undefined)upd.newstatus=data.newstatus;if(data.Notes!==undefined)upd.notes=data.Notes;const q={caseid:`eq.${data.caseId}`};if(data.sales)q.sale=`eq.${data.sales}`;await sbQ('PATCH','claimedcases',q,upd);sbHist(data.caseId,data.sales||'ระบบ','แก้ไข','เปลี่ยนสถานะเป็น '+data.newstatus);return{success:true};}
-    case 'returnCase':{const isSkip=String(data.sales||'').startsWith('_skip_');const realSales=isSkip?data.sales.replace('_skip_',''):data.sales;if(!isSkip){const cl=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});if(cl?.length&&cl[0].assignedat){const m=String(cl[0].assignedat).match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(m){const t=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));const hrs=(Date.now()-t.getTime())/3600000;if(hrs<24){const rem=Math.ceil(24-hrs);return{success:false,error:'ต้องรออย่างน้อย 24 ชั่วโมงหลังรับเคส ก่อนคืนตลาด (เหลือ '+rem+' ชม.)'};}}}}await sbQ('DELETE','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});const[mk,uRows]=await Promise.all([sbQ('GET','market',{id:`eq.${data.caseId}`}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'name'})]);const allSales=(uRows||[]).map(u=>u.name);if(mk?.length){const exp=mk[0].expiredsales?String(mk[0].expiredsales).split(',').filter(Boolean):[];if(!exp.includes(realSales))exp.push(realSales);const done=allSales.every(n=>exp.includes(n));await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:done?'ปิด':'เปิด',expiredsales:exp.join(',')});if(done)await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');return{success:true,allClosed:done};}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(cr?.length){const c=cr[0];await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:realSales,expiredsales:realSales,poolstatus:'เปิด'});}sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');return{success:true,allClosed:false};}}
+    case 'returnCase':{const isSkip=String(data.sales||'').startsWith('_skip_');const realSales=isSkip?data.sales.replace('_skip_',''):data.sales;if(!isSkip){const cl=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});if(cl?.length&&cl[0].assignedat){const t=parseTHDateTime(cl[0].assignedat);if(t){const hrs=(Date.now()-t.getTime())/3600000;if(hrs<24){const rem=Math.ceil(24-hrs);return{success:false,error:'ต้องรออย่างน้อย 24 ชั่วโมงหลังรับเคส ก่อนคืนตลาด (เหลือ '+rem+' ชม.)'};}}}}await sbQ('DELETE','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});const[mk,uRows]=await Promise.all([sbQ('GET','market',{id:`eq.${data.caseId}`}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'name'})]);const allSales=(uRows||[]).map(u=>u.name);if(mk?.length){const exp=mk[0].expiredsales?String(mk[0].expiredsales).split(',').filter(Boolean):[];if(!exp.includes(realSales))exp.push(realSales);const done=allSales.every(n=>exp.includes(n));await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:done?'ปิด':'เปิด',expiredsales:exp.join(',')});if(done)await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');return{success:true,allClosed:done};}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(cr?.length){const c=cr[0];await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:realSales,expiredsales:realSales,poolstatus:'เปิด'});}sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');return{success:true,allClosed:false};}}
     case 'getBookings':{const q={order:'createdat.desc'};if(data.sales)q.sales=`eq.${data.sales}`;const rows=await sbQ('GET','bookings',q);return{success:true,data:(rows||[]).map(mapBooking)};}
     case 'addBooking':{await sbQ('POST','bookings',{},{createdat:nowTH(),caseid:data.caseId,sales:data.sales,customer:data.customer,facebook:data.facebook||'',ads:data.ads||'',brand:data.brand||'',model:data.model||'',plate:data.plate||'',status:data.status||'จองแล้ว',note:data.note||''});sbHist(data.caseId,data.sales,'จอง','เพิ่มการจอง '+(data.brand||'')+' '+(data.model||''));return{success:true};}
     case 'updateBooking':{const upd={};if(data.status!==undefined)upd.status=data.status;if(data.note!==undefined)upd.note=data.note;await sbQ('PATCH','bookings',{caseid:`eq.${data.caseId}`},upd);return{success:true};}
@@ -718,10 +730,14 @@ const AUTO_MARKET_HOURS = 60;
 // ถ้าต้องการให้หน้าเว็บช่วย fallback ค่อยเปลี่ยนเป็น true
 const AUTO_MARKET_CLIENT_ENABLED = false;
 const AUTO_MARKET_CLOSED = ['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-function parseTHDateTime(s){
-  const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);
-  if(!m)return null;
-  return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));
+function parseTHDateTime(v){
+  const s=String(v||'').trim();
+  if(!s)return null;
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m){let y=parseInt(m[3],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[1],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m){let y=parseInt(m[1],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[3],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
+  const d=new Date(s);return isNaN(d)?null:d;
 }
 function caseAgeHoursFromNow(c){
   const d=parseTHDateTime(c?.updatedat||c?.createdat);
@@ -2387,7 +2403,7 @@ function SalesClaimedCases({currentUser,users}){
   useEffect(()=>{if(!currentUser.name||!supabase)return;const ch=supabase.channel('claimed-'+currentUser.name).on('postgres_changes',{event:'*',schema:'public',table:'claimedcases'},(p)=>{const sale=(p.new&&p.new.sale)||(p.old&&p.old.sale)||'';if(sale!==currentUser.name)return;const cid=(p.new&&p.new.caseid)||'';cacheClear(['getClaimedCases']);load();if(p.eventType==='INSERT'||p.eventType==='UPDATE'){if(cid)setNewCaseId(cid);showToast('📩 ได้รับเคสใหม่'+(cid?' — '+cid:''),'info',4000);}}).subscribe();return()=>{supabase.removeChannel(ch);};},[currentUser.name]);
   useEffect(()=>{if(newCaseId){const t=setTimeout(()=>setNewCaseId(null),5000);return()=>clearTimeout(t);}},[newCaseId]);
   useEffect(()=>{load();},[load]);useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(t);},[]);
-  function parseAssignedAt(s){if(!s)return null;const m=String(s).match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));}
+  function parseAssignedAt(s){return parseTHDateTime(s);}
   function canReturn(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return true;return(now-dt.getTime())>=24*3600*1000;}
   function timeLeft(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return '';const ms=24*3600*1000-(now-dt.getTime());if(ms<=0)return '';const h=Math.floor(ms/3600000);const min=Math.floor((ms%3600000)/60000);return h>0?`${h} ชม. ${min} น.`:`${min} น.`;}
   async function doReturn(caseId){const r=await api('returnCase',{caseId,sales:currentUser.name});if(!r.success){showToast(r.error||'ไม่สามารถคืนเคสได้','err');return;}load();}
