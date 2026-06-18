@@ -2141,7 +2141,21 @@ function SalesClaimedCases({currentUser,users}){
   function parseAssignedAt(s){return parseTHDateTime(s);}
   function canReturn(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return true;return(now-dt.getTime())>=24*3600*1000;}
   function timeLeft(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return '';const ms=24*3600*1000-(now-dt.getTime());if(ms<=0)return '';const h=Math.floor(ms/3600000);const min=Math.floor((ms%3600000)/60000);return h>0?`${h} ชม. ${min} น.`:`${min} น.`;}
-  async function doReturn(caseId){const r=await api('returnCase',{caseId,sales:currentUser.name});if(!r.success){showToast(r.error||'ไม่สามารถคืนเคสได้','err');return;}load();}
+  async function doReturn(caseId){
+    // Optimistic UI: ลบออกจากหน้าจอทันที
+    setCases(prev=>prev.filter(c=>c.caseID!==caseId));
+    const r=await api('returnCase',{caseId,sales:currentUser.name});
+    // ล้าง cache ทุกกรณีเพื่อ force reload ข้อมูลจาก DB
+    cacheClear(['getClaimedCases','getMarket','getMarketIds','getCases']);
+    if(!r.success){
+      showToast(r.error||'คืนเคสไม่สำเร็จ กรุณาลองใหม่','err');
+      load(); // คืนข้อมูลจาก DB ถ้า error
+      return;
+    }
+    showToast('คืนเคสสำเร็จ ✅ เคสกลับเข้าตลาดแล้ว','ok',3000);
+    // delay 800ms ให้ DB อัปเดตก่อน reload
+    setTimeout(()=>load(), 800);
+  }
   return <div className="page">
     <div className="page-hd"><div className="page-title">📥 เคสที่รับจากตลาด</div><button className="btn btn-ghost" onClick={load}>🔄</button></div>
     {loading?<SkeletonCards n={3}/>:cases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:cases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer'}}>
@@ -2150,8 +2164,19 @@ function SalesClaimedCases({currentUser,users}){
       <div style={{fontSize:12,color:'var(--text2)',marginBottom:6}}>รับมาจาก: <span style={{color:'var(--orange)'}}>{c.fromsales||'-'}</span>{' · '}รับเมื่อ: {String(c.AssignedAt||'').split(' ')[0]}</div>
       {!ok&&<div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(210,153,34,.10)',border:'1px solid rgba(210,153,34,.35)',borderRadius:6,padding:'5px 10px',marginBottom:8,fontSize:12,color:'var(--yellow)'}}>🔒 คืนเคสได้หลังจากอีก <strong style={{marginLeft:4}}>{left}</strong></div>}
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px',color:'var(--green)'}} onClick={e=>{e.stopPropagation();copyText(formatContact(c.contact)||'');}}><Ico.copy/> {formatContact(c.contact)||'ไม่มีเบอร์'}</button>
-        {formatContact(c.contact)&&/^\d{9,10}$/.test(String(formatContact(c.contact)).replace(/\D/g,''))&&<a href={`tel:${formatContact(c.contact)}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}
+        {(()=>{
+          const raw=c.contact||'';
+          const isQR=raw.startsWith('data:image')||raw.startsWith('https://drive.google.com');
+          const cv=formatContact(raw);
+          const isPhone=cv&&/^\d{9,10}$/.test(cv.replace(/\D/g,''));
+          if(isQR) return <div style={{display:'flex',alignItems:'center',gap:8,flex:1}} onClick={e=>e.stopPropagation()}>
+            {raw.startsWith('data:image')&&<img src={raw} alt="QR Contact" style={{width:52,height:52,borderRadius:8,objectFit:'contain',border:'1px solid var(--border)',background:'#fff',flexShrink:0}}/>}
+            <div><div style={{fontSize:12,fontWeight:700,color:'var(--purple)'}}>📷 QR Code</div><div style={{fontSize:11,color:'var(--text3)'}}>เปิดเคสเพื่อดูรูป QR</div></div>
+          </div>;
+          return <><button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px',color:'var(--green)'}} onClick={e=>{e.stopPropagation();copyText(cv||'');}}><Ico.copy/> {cv||'ไม่มีเบอร์'}</button>
+          {isPhone&&<a href={`tel:${cv}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}
+          {isPhone&&<a href={`https://line.me/ti/p/~${cv}`} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none'}}>💬 Line</a>}</>;
+        })()}
         <button className={ok?'btn btn-danger':'btn btn-ghost'} style={{fontSize:12,padding:'4px 10px',marginLeft:'auto',opacity:ok?1:0.45,cursor:ok?'pointer':'not-allowed'}} disabled={!ok} onClick={e=>{e.stopPropagation();if(ok)setConfirm(c.caseID);}}>{ok?'↩ คืนเคส':'🔒 ยังคืนไม่ได้'}</button>
       </div>
     </div>;})}
