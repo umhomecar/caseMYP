@@ -38,9 +38,14 @@ const API_URL  = SUPA_URL;
 let supabase=null;
 try{if(window.supabase)supabase=window.supabase.createClient(SUPA_URL,SUPA_KEY,{realtime:{params:{eventsPerSecond:10}}});}catch(e){console.warn('Supabase init failed',e);}
 
-// ── ✅ FIX: Anthropic Key helpers ──
-function getAnthropicKey(){ try{ return localStorage.getItem('cp_ant_key')||''; }catch(e){ return ''; } }
-function saveAnthropicKey(k){ try{ localStorage.setItem('cp_ant_key', k.trim()); }catch(e){} }
+function initFCM(){
+  try{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./firebase-messaging-sw.js').catch(()=>{});
+    }
+  }catch(e){}
+}
+
 
 (function(){
   try{ if(localStorage.getItem('cp_theme')==='light') document.body.classList.add('light'); }catch(e){}
@@ -576,8 +581,6 @@ const Ico = {
   trophy:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4a2 2 0 01-2-2V5h4m14 4h2a2 2 0 002-2V5h-4"/><path d="M6 5h12v8a6 6 0 01-12 0zm6 13v3m-4 0h8"/></svg>,
   phone:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.16 6.16l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>,
   gsearch:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
-  ai:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>,
-  key:()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
   report:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
   team: () => ( <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/> <path d="M8 11c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3z"/> <path d="M2 20c0-2.5 4-4 6-4s6 1.5 6 4"/> <path d="M14 20c0-2.5 4-4 6-4s6 1.5 6 4"/> </svg> )
 };
@@ -602,49 +605,6 @@ function SkeletonRows({n=5,cols=6}){return <>{Array.from({length:n}).map((_,i)=>
 
 function Confirm({msg,onOk,onCancel}){
   return <div className="overlay"><div className="modal" style={{maxWidth:340}}><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}}>⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button className="btn btn-ghost" onClick={onCancel}>ยกเลิก</button><button className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
-}
-
-// ============================================================
-// ✅ API KEY MANAGER COMPONENT (ใช้ใน AdminAIPage และ AIAdvisorPage)
-// ============================================================
-function ApiKeyManager({onKeyReady}){
-  const [key, setKey] = useState(getAnthropicKey);
-  const [input, setInput] = useState('');
-  const [saved, setSaved] = useState(false);
-
-  useEffect(()=>{ if(key) onKeyReady(key); },[key]);
-
-  function handleSave(){
-    const k = input.trim();
-    if(!k.startsWith('sk-ant-')){ showToast('API Key ต้องขึ้นต้นด้วย sk-ant-','warn'); return; }
-    saveAnthropicKey(k);
-    setKey(k);
-    setSaved(true);
-    onKeyReady(k);
-    setTimeout(()=>setSaved(false), 3000);
-  }
-
-  if(key) return <div className="api-key-banner success" style={{marginBottom:12,display:'flex',alignItems:'center',gap:10,padding:'10px 14px'}}>
-    <span style={{fontSize:16}}>🔑</span>
-    <span style={{fontSize:12,color:'var(--green)',flex:1}}>API Key พร้อมใช้งานแล้ว</span>
-    <button className="btn btn-ghost" style={{fontSize:11,padding:'3px 10px'}} onClick={()=>{saveAnthropicKey('');setKey('');setInput('');}}>เปลี่ยน Key</button>
-  </div>;
-
-  return <div className="api-key-banner warning" style={{marginBottom:16}}>
-    <div style={{fontWeight:700,fontSize:13,marginBottom:6,display:'flex',alignItems:'center',gap:6}}><Ico.key/> ต้องการ Anthropic API Key ก่อนใช้ AI</div>
-    <div style={{fontSize:12,color:'var(--text2)',marginBottom:10,lineHeight:1.6}}>
-      หา key ได้ที่ <strong>console.anthropic.com</strong> → API Keys → Create Key<br/>
-      Key จะขึ้นต้นด้วย <code style={{background:'var(--bg3)',padding:'1px 6px',borderRadius:4}}>sk-ant-...</code>
-    </div>
-    <div style={{display:'flex',gap:8}}>
-      <input type="password" value={input} onChange={e=>setInput(e.target.value)}
-        onKeyDown={e=>e.key==='Enter'&&handleSave()}
-        placeholder="sk-ant-api03-..." style={{flex:1,fontSize:12}}/>
-      <button className="btn btn-primary" style={{fontSize:12,padding:'8px 14px',whiteSpace:'nowrap'}} onClick={handleSave}>
-        {saved?'✅ บันทึก!':'บันทึก'}
-      </button>
-    </div>
-  </div>;
 }
 
 // ============================================================
@@ -730,15 +690,6 @@ const AUTO_MARKET_HOURS = 60;
 // ถ้าต้องการให้หน้าเว็บช่วย fallback ค่อยเปลี่ยนเป็น true
 const AUTO_MARKET_CLIENT_ENABLED = false;
 const AUTO_MARKET_CLOSED = ['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-function parseTHDateTime(v){
-  const s=String(v||'').trim();
-  if(!s)return null;
-  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if(m){let y=parseInt(m[3],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[1],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
-  m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if(m){let y=parseInt(m[1],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[3],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
-  const d=new Date(s);return isNaN(d)?null:d;
-}
 function caseAgeHoursFromNow(c){
   const d=parseTHDateTime(c?.updatedat||c?.createdat);
   if(!d)return 0;
@@ -975,8 +926,8 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
               <div style={{display:'flex',gap:6}}>
                 {SENT_TYPES.map(t=><button key={t} type="button"
                   onClick={()=>setSentType(t)}
-                  style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,borderRadius:8,cursor:'pointer',border:'2px solid '+(sentType===t?(t==='ส่วนตัว'?'var(--purple)':'var(--green)'):'var(--border)'),background:sentType===t?(t==='ส่วนตัว'?'rgba(188,140,255,.15)':'rgba(63,185,80,.12)'):'var(--bg3)',color:sentType===t?(t==='ส่วนตัว'?'var(--purple)':'var(--green)'):'var(--text2)',transition:'all .15s'}}
-                >{t==='ส่วนตัว'?'🔒 ส่วนตัว':'📤 ปกติ'}</button>)}
+                  style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,borderRadius:8,cursor:'pointer',border:'2px solid '+(sentType===t?(t==='ส่วนตัว'?'var(--purple)':t==='Line OA'?'var(--blue)':'var(--green)'):'var(--border)'),background:sentType===t?(t==='ส่วนตัว'?'rgba(188,140,255,.15)':t==='Line OA'?'rgba(88,166,255,.12)':'rgba(63,185,80,.12)'):'var(--bg3)',color:sentType===t?(t==='ส่วนตัว'?'var(--purple)':t==='Line OA'?'var(--blue)':'var(--green)'):'var(--text2)',transition:'all .15s'}}
+                >{t==='ส่วนตัว'?'🔒 ส่วนตัว':t==='Line OA'?'📱 Line OA':'📤 ปกติ'}</button>)}
               </div>
             </div>
           </div>
@@ -1269,15 +1220,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
 }
 
 function AdminCurrentCases({currentUser,users}){
-  // ✅ โหลดข้อมูลจาก localStorage ตอนเริ่มต้น
-  const [cases,setCases]=useState(()=>{
-    try {
-      const saved = localStorage.getItem('cases');
-      return saved ? JSON.parse(saved) : [];
-    } catch(e) {
-      return [];
-    }
-  });
+  const [cases,setCases]=useState([]);
   const [loading,setLoading]=useState(true);
   const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
   const [sortDir,setSortDir]=useState('desc');
@@ -1288,14 +1231,7 @@ function AdminCurrentCases({currentUser,users}){
   const [showExportModal,setShowExportModal]=useState(false);
   const [showExport,setShowExport]=useState(false);
   const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:'',includeMarket:false});
-  const [marketIds,setMarketIds]=useState(()=>{
-    try {
-      const saved = localStorage.getItem('marketIds');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch(e) {
-      return new Set();
-    }
-  });
+  const [marketIds,setMarketIds]=useState(new Set());
   const [sending,setSending]=useState(null);
   const [confirmMarket,setConfirmMarket]=useState(null); // {caseId, salesName}
   const load=useCallback(()=>{setLoading(true);cacheClear(['getCases','getMarketIds']);Promise.all([api('getCases',{all:'true'}),api('getMarketIds',{})]).then(([r,mr])=>{
@@ -1303,12 +1239,6 @@ function AdminCurrentCases({currentUser,users}){
     const marketData = safeArray(mr.data);
     setCases(casesData);
     setMarketIds(new Set(marketData));
-    // ✅ บันทึกลง localStorage
-    try {
-      localStorage.setItem('cases', JSON.stringify(casesData));
-      localStorage.setItem('marketIds', JSON.stringify(Array.from(marketData)));
-    } catch(e) {
-    }
     setLoading(false);
   }).catch(()=>{setCases([]);setLoading(false);});},[]);
   async function sendToMarketDirect(caseId,salesName){
@@ -1323,7 +1253,7 @@ function AdminCurrentCases({currentUser,users}){
     showToast('ส่งเคส '+caseId+' เข้าตลาดสำเร็จ!','ok',2500);
     setSending(null);
     // อัปเดต state ทันที — UI เปลี่ยนเลยไม่ต้องรอ
-    setMarketIds(prev=>{const s=new Set(prev);s.add(String(caseId));try{localStorage.setItem('marketIds',JSON.stringify(Array.from(s)));}catch(e){}return s;});
+    setMarketIds(prev=>{const s=new Set(prev);s.add(String(caseId));return s;});
     setCases(prev=>prev.map(c=>String(c.caseid)===String(caseId)?{...c,market:true}:c));
   }
   useEffect(()=>{load();},[load]);
@@ -1514,22 +1444,8 @@ function daysAgo(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d
 function parseHistDate(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}function getDateBadge(c){const id=String(c.ID||'');if(id.length>=6){const yy=id.slice(0,2),mm=id.slice(2,4);const year=2000+parseInt(yy);const monthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const monthName=monthNames[parseInt(mm)-1]||mm;return`${monthName} ${year}`;}return '';}
 
 function AdminMarket({currentUser,users}){
-  const [cases,setCases]=useState(()=>{
-    try {
-      const saved = localStorage.getItem('marketCases');
-      return saved ? JSON.parse(saved) : [];
-    } catch(e) {
-      return [];
-    }
-  });
-  const [allCases,setAllCases]=useState(()=>{
-    try {
-      const saved = localStorage.getItem('marketCases');
-      return saved ? JSON.parse(saved) : [];
-    } catch(e) {
-      return [];
-    }
-  });
+  const [cases,setCases]=useState([]);
+  const [allCases,setAllCases]=useState([]);
   const [loading,setLoading]=useState(true);
   const [confirm,setConfirm]=useState(null);
   const [dashboard,setDashboard]=useState(null);
@@ -1540,11 +1456,6 @@ function AdminMarket({currentUser,users}){
       const marketData = mr.data||[];
       setCases(marketData);
       setAllCases(marketData);
-      // ✅ บันทึกลง localStorage
-      try {
-        localStorage.setItem('marketCases', JSON.stringify(marketData));
-      } catch(e) {
-      }
     }
     if(dr.success)setDashboard(dr.data);
     setLoading(false);
@@ -1817,191 +1728,6 @@ function AdminUsers({currentUser}){
   </div>;
 }
 
-// ============================================================
-// ✅ ADMIN AI PAGE — แก้ไขแล้ว (มี API Key input + headers ถูกต้อง)
-// ============================================================
-function AdminAIPage({currentUser}){
-  const [cases,setCases]=useState([]);
-  const [users,setUsers]=useState([]);
-  const [loading,setLoading]=useState(true);
-  const [aiText,setAiText]=useState('');
-  const [aiLoading,setAiLoading]=useState(false);
-  const [aiDone,setAiDone]=useState(false);
-  const [tab,setTab]=useState('urgent');
-  const [apiKey,setApiKey]=useState(getAnthropicKey);
-  const abortRef=useRef(null);
-
-  const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-
-  const load=useCallback(()=>{
-    setLoading(true);
-    Promise.all([api('getCases',{all:'true'}),api('getUsers')]).then(([cr,ur])=>{
-      if(cr.success)setCases((cr.data||[]).filter(c=>!CLOSED.includes(c.status)));
-      if(ur.success)setUsers((ur.data||[]).filter(u=>u.role==='Sales'&&u.status==='active'));
-      setLoading(false);
-    });
-  },[]);
-  useEffect(()=>{load();},[load]);
-
-  // ✅ FIX: streamAI ที่มี headers ถูกต้อง
-  async function streamAI(prompt,sys){
-    if(!apiKey){setAiText('❌ กรุณาใส่ Anthropic API Key ก่อน');setAiDone(true);setAiLoading(false);return;}
-    setAiLoading(true);setAiText('');setAiDone(false);
-    if(abortRef.current)abortRef.current.abort();
-    const ctrl=new AbortController();abortRef.current=ctrl;
-    try{
-      const res=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',signal:ctrl.signal,
-        headers:{
-          'Content-Type':'application/json',
-          'x-api-key': apiKey,                                    // ✅ API Key header
-          'anthropic-version': '2023-06-01',                     // ✅ version header
-          'anthropic-dangerous-direct-browser-access': 'true'    // ✅ browser CORS header
-        },
-        body:JSON.stringify({
-          model:'claude-sonnet-4-20250514',max_tokens:2000,stream:true,
-          system:sys||'คุณคือที่ปรึกษาผู้จัดการทีมขายรถยนต์ ให้คำแนะนำเป็นภาษาไทย กระชับ ตรงประเด็น ใช้ emoji',
-          messages:[{role:'user',content:prompt}]
-        })
-      });
-      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API error ${res.status}`);}
-      const reader=res.body.getReader();const dec=new TextDecoder();
-      while(true){const{done,value}=await reader.read();if(done)break;
-        for(const line of dec.decode(value).split('\n')){if(!line.startsWith('data:'))continue;const d=line.slice(5).trim();if(d==='[DONE]')continue;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta?.text)setAiText(t=>t+j.delta.text);}catch(e){}}}
-      setAiDone(true);
-    }catch(err){if(err.name!=='AbortError')setAiText(t=>t+(t?'\n\n':'')+'❌ '+err.message);setAiDone(true);}
-    setAiLoading(false);
-  }
-
-  function buildTeamSummary(){
-    const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
-    return users.map(u=>{const my=cases.filter(c=>c.sales===u.name);const thisMonth=my.filter(c=>String(c.caseid||'').startsWith(pre));const sold=thisMonth.filter(c=>c.status==='ปล่อยแล้ว').length;const active=thisMonth.filter(c=>!CLOSED.includes(c.status)).length;const stale=my.filter(c=>daysAgo(c.updatedat)>=2).length;return`${u.name}: เคสเดือนนี้ ${thisMonth.length} | ปิดได้ ${sold} | active ${active} | ค้างนาน ${stale}`;}).join('\n');
-  }
-
-  function buildUrgentSummary(){
-    return [...cases].sort((a,b)=>daysAgo(b.updatedat)-daysAgo(a.updatedat)).slice(0,50).map((c,i)=>`${i+1}. [${c.caseid}] ${c.customername} | เซลส์: ${c.sales} | สถานะ: ${c.status} | ไม่อัปเดต: ${daysAgo(c.updatedat)} วัน | รีพอร์ต: ${(c.report||'ไม่มี').slice(0,80)}`).join('\n');
-  }
-
-  async function askAI(){
-    if(loading){setAiText('❌ กำลังโหลดข้อมูล กรุณารอสักครู่');setAiDone(true);return;}
-    if(tab==='urgent'){await streamAI(`ทีมขายรถยนต์มีเคส active ดังนี้:\n\n${buildUrgentSummary()}\n\nวิเคราะห์:\n1. 🚨 TOP 10 เคสที่ต้องติดตามด่วนที่สุด พร้อมเหตุผล\n2. ⚠️ pattern ที่น่าเป็นห่วง\n3. 💡 คำแนะนำให้ทีม`);}
-    else if(tab==='performance'){await streamAI(`สรุปผลงานทีมขาย:\n\n${buildTeamSummary()}\n\nวิเคราะห์:\n1. 🏆 จัดอันดับ performance พร้อมเหตุผล\n2. 💪 จุดแข็งของแต่ละคน\n3. ⚠️ ใครต้องการความช่วยเหลือ\n4. 💡 คำแนะนำสำหรับผู้จัดการ`);}
-    else if(tab==='winrate'){const top=cases.filter(c=>['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'].includes(c.status)).slice(0,40);const prompt=top.map((c,i)=>`${i+1}. [${c.caseid}] ${c.customername} | เซลส์: ${c.sales} | สถานะ: ${c.status} | รีพอร์ต: ${(c.report||'ไม่มี').slice(0,80)}`).join('\n');await streamAI(`เคสที่มีสถานะดี:\n\n${prompt}\n\nประเมิน Win Rate % จัดอันดับจากสูงสุด พร้อมบอกว่าเซลส์คนไหนควรได้รับ support`);}
-    else if(tab==='assign'){const teamSummary=buildTeamSummary();const newCases=cases.filter(c=>c.status==='รอข้อมูล'&&daysAgo(c.updatedat)===0).slice(0,20);const newList=newCases.map((c,i)=>`${i+1}. [${c.caseid}] ${c.customername} | ปัจจุบัน: ${c.sales}`).join('\n');await streamAI(`ภาระงานทีม:\n${teamSummary}\n\nเคสใหม่วันนี้:\n${newList||'ไม่มีเคสใหม่'}\n\nแนะนำการ assign เคสใหม่ พร้อมเหตุผล`);}
-  }
-
-  const TABS=[['urgent','🚨 เร่งด่วน'],['performance','📊 Performance'],['winrate','🎯 Win Rate ทีม'],['assign','💡 แนะนำ Assign']];
-
-  return <div className="page">
-    <div className="page-hd">
-      <div><div className="page-title">🧠 AI Admin</div>
-        <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{loading?'กำลังโหลด...':`เคส active ${cases.length} ใบ · เซลส์ ${users.length} คน`}</div>
-      </div>
-      <button className="btn btn-ghost" style={{fontSize:13}} onClick={load}>🔄</button>
-    </div>
-
-    {/* ✅ API Key Manager */}
-    <ApiKeyManager onKeyReady={setApiKey}/>
-
-    {/* Tabs */}
-    <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto',paddingBottom:4}}>
-      {TABS.map(([k,l])=><button key={k} onClick={()=>{setTab(k);setAiText('');setAiDone(false);}} style={{padding:'7px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)',transition:'all .15s'}}>{l}</button>)}
-    </div>
-
-    {/* Stats */}
-    {!loading&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(100px,1fr))',gap:8,marginBottom:14}}>
-      {[['เคส Active',cases.length,'var(--blue)'],['ค้าง >2 วัน',cases.filter(c=>daysAgo(c.updatedat)>=2).length,'var(--yellow)'],['ค้าง >3 วัน',cases.filter(c=>daysAgo(c.updatedat)>=3).length,'var(--red)'],['สถานะดี',cases.filter(c=>['ไปต่อได้','จอง','รอเซ็นต์','รอผล','อนุมัติ'].includes(c.status)).length,'var(--green)']].map(([l,v,c])=>
-        <div key={l} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}>
-          <div style={{fontSize:20,fontWeight:800,color:c}}>{v}</div>
-          <div style={{fontSize:11,color:'var(--text2)'}}>{l}</div>
-        </div>
-      )}
-    </div>}
-
-    {/* Description */}
-    {!aiText&&!aiLoading&&<div style={{background:'var(--bg3)',borderRadius:10,padding:'14px',fontSize:13,color:'var(--text2)',lineHeight:1.9,marginBottom:14}}>
-      {tab==='urgent'&&<>🚨 <strong>เร่งด่วน</strong> — AI คัด 10 เคสที่ต้องติดตามก่อนจากทั้งทีม</>}
-      {tab==='performance'&&<>📊 <strong>Performance</strong> — วิเคราะห์ผลงานเซลส์แต่ละคน จัดอันดับ หาจุดแข็ง/อ่อน</>}
-      {tab==='winrate'&&<>🎯 <strong>Win Rate ทีม</strong> — หาเคสที่มีโอกาสปิดสูงทั่วทั้งทีม</>}
-      {tab==='assign'&&<>💡 <strong>แนะนำ Assign</strong> — AI แนะนำว่าเคสใหม่ควรให้ใคร ดูจากภาระงาน + performance</>}
-    </div>}
-
-    {/* Ask button */}
-    {!aiLoading&&(!aiText||aiDone)&&<button
-      className="btn btn-primary"
-      style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,borderRadius:10,background:apiKey?'linear-gradient(135deg,#1f6feb,#8250df)':'var(--bg3)',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',gap:8,color:apiKey?'#fff':'var(--text3)'}}
-      disabled={loading||!apiKey}
-      onClick={askAI}>
-      <span style={{fontSize:20}}>🧠</span>
-      {!apiKey?'ใส่ API Key ก่อนใช้งาน':tab==='urgent'?'วิเคราะห์เคสเร่งด่วนทั้งทีม':tab==='performance'?'วิเคราะห์ Performance ทีม':tab==='winrate'?'หาเคสโอกาสปิดสูงทั่วทีม':'แนะนำการ Assign เคส'}
-    </button>}
-
-    {/* Output */}
-    {(aiText||aiLoading)&&<div className="card" style={{marginBottom:14}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <div style={{fontWeight:700,fontSize:13,color:'var(--purple)',display:'flex',alignItems:'center',gap:6}}>
-          🧠 {aiLoading?'AI กำลังวิเคราะห์...':'ผลวิเคราะห์'}
-        </div>
-        <div style={{display:'flex',gap:6}}>
-          {aiLoading&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>abortRef.current?.abort()}>หยุด</button>}
-          {aiDone&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>{setAiText('');setAiDone(false);}}>ล้าง</button>}
-        </div>
-      </div>
-      <div className="ai-stream">{aiText}{aiLoading&&<span className="ai-cursor"/>}</div>
-    </div>}
-  </div>;
-}
-
-// ============================================================
-// SALES AI ADVISOR
-// ============================================================
-function AIAdvisorPage({currentUser}){
-  const [cases,setCases]=useState([]);const [claimedCases,setClaimedCases]=useState([]);const [loading,setLoading]=useState(true);const [aiText,setAiText]=useState('');const [aiLoading,setAiLoading]=useState(false);const [aiDone,setAiDone]=useState(false);const [tab,setTab]=useState('recommend');const [scriptCase,setScriptCase]=useState('');const [apiKey,setApiKey]=useState(getAnthropicKey);const abortRef=useRef(null);
-  const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-  const load=useCallback(()=>{setLoading(true);Promise.all([api('getCases',{sales:currentUser.name,all:'true'}),api('getClaimedCases',{sales:currentUser.name})]).then(([cr,ccr])=>{if(cr.success)setCases((cr.data||[]).filter(c=>!CLOSED.includes(c.status)));if(ccr.success)setClaimedCases(ccr.data||[]);setLoading(false);});},[currentUser.name]);
-  useEffect(()=>{load();},[load]);
-  function buildCaseSummary(){return[...cases.map(c=>({id:c.caseid,name:c.customername,status:c.status,report:(c.report||'').slice(0,120),daysNoUpdate:daysAgo(c.updatedat),source:'เคสของฉัน'})),...claimedCases.map(c=>({id:c.caseID,name:c.customername,status:c.newstatus||c.status,report:(c.report||'').slice(0,120),daysNoUpdate:daysAgo(c.date),source:'รับจากตลาด'}))];}
-
-  // ✅ FIX: headers ถูกต้อง
-  async function askAI(promptType){
-    if(!apiKey){setAiText('❌ กรุณาใส่ Anthropic API Key ก่อน');setAiDone(true);return;}
-    const summary=buildCaseSummary();if(summary.length===0){setAiText('❌ ไม่มีเคสที่ active');setAiDone(true);return;}
-    setAiLoading(true);setAiText('');setAiDone(false);
-    if(abortRef.current)abortRef.current.abort();const ctrl=new AbortController();abortRef.current=ctrl;
-    let prompt='';
-    if(promptType==='recommend'){prompt=`เซลส์ "${currentUser.name}" มีเคส:\n\n`+summary.map((c,i)=>`${i+1}. [${c.id}] ${c.name} | สถานะ: ${c.status} | ไม่อัปเดต: ${c.daysNoUpdate} วัน | ${c.source}\n   รีพอร์ต: ${c.report||'ไม่มี'}`).join('\n\n')+`\n\nวิเคราะห์:\n1. 🎯 TOP 5 เคสที่ควรปิดก่อน\n2. ⚠️ เคสที่ต้องระวัง\n3. 💡 คำแนะนำเฉพาะ`;}
-    else if(promptType==='winrate'){prompt=`เคสของเซลส์ "${currentUser.name}":\n\n`+summary.map((c,i)=>`${i+1}. [${c.id}] ${c.name} | สถานะ: ${c.status} | ไม่อัปเดต: ${c.daysNoUpdate} วัน\n   รีพอร์ต: ${c.report||'ไม่มี'}`).join('\n\n')+`\n\nประเมิน Win Rate % แต่ละเคส จัดเรียงจากสูงสุด`;}
-    else if(promptType==='script'){const c=cases.find(x=>x.caseid===scriptCase)||claimedCases.find(x=>x.caseID===scriptCase);if(!c){setAiText('❌ ไม่พบเคสนี้');setAiLoading(false);setAiDone(true);return;}prompt=`สร้าง Script โทรหาลูกค้า:\nชื่อ: ${c.customername||c.name}\nสถานะ: ${c.status||c.newstatus}\nรีพอร์ต: ${c.report||'ไม่มี'}\n\nสร้าง Script ภาษาไทย เป็นธรรมชาติ มี opening, body, closing, objection handling`;}
-    try{
-      const res=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',signal:ctrl.signal,
-        headers:{
-          'Content-Type':'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,stream:true,system:'คุณคือที่ปรึกษาเซลส์รถยนต์มืออาชีพ ตอบภาษาไทย กระชับ ใช้ emoji',messages:[{role:'user',content:prompt}]})
-      });
-      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API error ${res.status}`);}
-      const reader=res.body.getReader();const dec=new TextDecoder();
-      while(true){const{done,value}=await reader.read();if(done)break;for(const line of dec.decode(value).split('\n')){if(!line.startsWith('data:'))continue;const d=line.slice(5).trim();if(d==='[DONE]')continue;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta?.text)setAiText(t=>t+j.delta.text);}catch(e){}}}
-      setAiDone(true);
-    }catch(err){if(err.name!=='AbortError')setAiText(t=>t+(t?'\n\n':'')+'❌ '+err.message);setAiDone(true);}
-    setAiLoading(false);
-  }
-  const activeCases=[...cases,...claimedCases.map(c=>({...c,caseid:c.caseID,customername:c.customername}))];
-  return <div className="page">
-    <div className="page-hd"><div><div className="page-title">🧠 AI แนะนำ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>วิเคราะห์เคสด้วย AI Claude</div></div><button className="btn btn-ghost" style={{fontSize:13}} onClick={load}>🔄</button></div>
-    <ApiKeyManager onKeyReady={setApiKey}/>
-    <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto',paddingBottom:4}}>{[['recommend','🎯 แนะนำลำดับ'],['winrate','📊 Win Rate'],['script','📞 Script โทร']].map(([k,l])=><button key={k} onClick={()=>{setTab(k);setAiText('');setAiDone(false);}} style={{padding:'7px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap',background:tab===k?'var(--blue2)':'var(--bg3)',color:tab===k?'#fff':'var(--text2)',transition:'all .15s'}}>{l}</button>)}</div>
-    {tab==='script'&&<div className="card" style={{marginBottom:14}}><div style={{fontWeight:600,fontSize:13,marginBottom:8}}>เลือกเคส</div>{loading?<Loading/>:<select value={scriptCase} onChange={e=>setScriptCase(e.target.value)}><option value="">-- เลือกเคส --</option>{activeCases.map(c=><option key={c.caseid} value={c.caseid}>[{c.caseid}] {c.customername}</option>)}</select>}</div>}
-    {!aiText&&!aiLoading&&<div style={{background:'var(--bg3)',borderRadius:10,padding:'16px',fontSize:13,color:'var(--text2)',lineHeight:1.8,marginBottom:14}}>🎯 แนะนำลำดับ — Top 5 เคสที่ควรปิดก่อน<br/>📊 Win Rate — ประเมินโอกาสปิด %<br/>📞 Script โทร — สร้างบทพูดสำหรับเคส</div>}
-    {!aiLoading&&(!aiText||aiDone)&&<button className="btn btn-primary" style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,borderRadius:10,background:apiKey?'linear-gradient(135deg,#1f6feb,#8250df)':'var(--bg3)',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',gap:8,color:apiKey?'#fff':'var(--text3)'}} disabled={loading||!apiKey||(tab==='script'&&!scriptCase)} onClick={()=>askAI(tab)}><span style={{fontSize:20}}>🧠</span>{!apiKey?'ใส่ API Key ก่อน':tab==='recommend'?'วิเคราะห์เคสทั้งหมด':tab==='winrate'?'ประเมิน Win Rate':'สร้าง Script โทร'}</button>}
-    {(aiText||aiLoading)&&<div className="card" style={{marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontWeight:700,fontSize:13,color:'var(--purple)'}}>{aiLoading?'🧠 AI กำลังวิเคราะห์...':'🧠 ผลวิเคราะห์'}</div><div style={{display:'flex',gap:6}}>{aiLoading&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>abortRef.current?.abort()}>หยุด</button>}{aiDone&&<button className="btn btn-ghost" style={{fontSize:12,padding:'3px 10px'}} onClick={()=>{setAiText('');setAiDone(false);}}>ล้าง</button>}</div></div><div className="ai-stream">{aiText}{aiLoading&&<span className="ai-cursor"/>}</div></div>}
-  </div>;
-}
-
 // ── remaining Sales pages (unchanged) ──
 function DailyFocusPage({currentUser,onNavigate}){
   const [myCases,setMyCases]=useState([]);const [marketCaseIds,setMarketCaseIds]=useState(new Set());const [claimedCases,setClaimedCases]=useState([]);const [marketCount,setMarketCount]=useState(0);const [loading,setLoading]=useState(true);const [selCase,setSelCase]=useState(null);const now=Date.now();
@@ -2123,6 +1849,7 @@ function usePushNotif(apiUrl,salesName){
         });
         if(fresh.length>0){
           fresh.forEach(n=>seenRef.current.add(String(n.id||n.notifId||n.createdat||n.message||'')));
+          if(seenRef.current.size>500){const arr=[...seenRef.current];seenRef.current=new Set(arr.slice(arr.length-300));}
           try{localStorage.setItem('cp_seen_notifs',JSON.stringify([...seenRef.current]));}catch(e){}
           const body=fresh.length===1?fresh[0].message:fresh.length+' การแจ้งเตือนใหม่';
           try{new Notification('🚗 CasePool',{body,icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png',tag:'casepool',renotify:true});}catch(e){}
@@ -2395,6 +2122,14 @@ function SalesCurrentCases({currentUser,users}){
 }
 
 // QR placeholder
+
+// ── QR Scanner Stubs ──
+function QRScanner({onClose,onResult}){
+  return <div className="overlay" onClick={onClose}><div className="modal" style={{maxWidth:320,textAlign:'center',padding:32}}><div style={{fontSize:48,marginBottom:16}}>📷</div><div style={{fontWeight:700,fontSize:16,marginBottom:8}}>QR Scanner</div><div style={{fontSize:13,color:'var(--text2)',marginBottom:16}}>ฟีเจอร์นี้ยังไม่รองรับบนเว็บเบราว์เซอร์</div><button className="btn btn-ghost" onClick={onClose}>ปิด</button></div></div>;
+}
+function QRResultPopup({result,onClose}){
+  return <div className="overlay" onClick={onClose}><div className="modal" style={{maxWidth:320,padding:24}}><div style={{fontWeight:700,fontSize:15,marginBottom:12}}>📷 ผลลัพธ์ QR</div><div style={{fontSize:13,color:'var(--text2)',wordBreak:'break-all',marginBottom:16}}>{result}</div><div style={{display:'flex',gap:8}}><button className="btn btn-primary" onClick={()=>{copyText(result);onClose();}}>คัดลอก</button><button className="btn btn-ghost" onClick={onClose}>ปิด</button></div></div></div>;
+}
 
 function SalesClaimedCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [confirm,setConfirm]=useState(null);const [now,setNow]=useState(Date.now());
@@ -2766,7 +2501,6 @@ function AdminApp({currentUser,onLogout}){
     followups:<AdminTeam users={users} currentUser={currentUser}/>,
     users:<AdminUsers currentUser={currentUser}/>,
     team:<AdminTeam users={users} currentUser={currentUser}/>,
-    ai:<AdminAIPage currentUser={currentUser}/>,
     analytics:<AdminAnalytics currentUser={currentUser}/>,
   };
 
@@ -2888,7 +2622,7 @@ function SalesApp({currentUser,onLogout}){
     try{if(!localStorage.getItem('cp_onboarded_'+currentUser.userId))setShowOnboarding(true);}catch(e){}
     return()=>clearInterval(t);
   },[currentUser.name,currentUser.userId]);
-  const pages={focus:<><PushNotifBanner currentUser={currentUser}/><DailyFocusPage currentUser={currentUser} onNavigate={k=>setPage(k)}/></>,market:<SalesMarket currentUser={currentUser}/>,cases:<SalesCurrentCases currentUser={currentUser} users={users}/>,claimed:<SalesClaimedCases currentUser={currentUser} users={users}/>,ai:<AIAdvisorPage currentUser={currentUser}/>,dashboard:<SalesDashboard currentUser={currentUser}/>,followup:<SalesFollowups currentUser={currentUser}/>};
+  const pages={focus:<><PushNotifBanner currentUser={currentUser}/><DailyFocusPage currentUser={currentUser} onNavigate={k=>setPage(k)}/></>,market:<SalesMarket currentUser={currentUser}/>,cases:<SalesCurrentCases currentUser={currentUser} users={users}/>,claimed:<SalesClaimedCases currentUser={currentUser} users={users}/>,dashboard:<SalesDashboard currentUser={currentUser}/>,followup:<SalesFollowups currentUser={currentUser}/>};
   // ซ่อนเมนู AI ไว้ก่อน เพราะยังไม่พร้อมใช้งานจริง
   const navItems=[
     {key:'focus',icon:<Ico.focus/>,label:'วันนี้'},
