@@ -2134,6 +2134,8 @@ function QRResultPopup({result,onClose}){
 function SalesClaimedCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [confirm,setConfirm]=useState(null);const [now,setNow]=useState(Date.now());
   const [showScanner,setShowScanner]=useState(false);const [scanResult,setScanResult]=useState(null);const [newCaseId,setNewCaseId]=useState(null);
+  // excludedCases: ซ่อน case ที่คืนแล้ว ป้องกัน load() เอากลับมา
+  const [excludedCases,setExcludedCases]=useState(new Set());
   const load=useCallback(()=>{setLoading(true);cacheClear(['getClaimedCases']);api('getClaimedCases',{sales:currentUser.name}).then(r=>{if(r.success){const sorted=safeArray(r.data).sort((a,b)=>String(b.AssignedAt||'').localeCompare(String(a.AssignedAt||'')));setCases(sorted);}setLoading(false);});},[currentUser.name]);
   useEffect(()=>{if(!currentUser.name||!supabase)return;const ch=supabase.channel('claimed-'+currentUser.name).on('postgres_changes',{event:'*',schema:'public',table:'claimedcases'},(p)=>{const sale=(p.new&&p.new.sale)||(p.old&&p.old.sale)||'';if(sale!==currentUser.name)return;const cid=(p.new&&p.new.caseid)||'';cacheClear(['getClaimedCases']);load();if(p.eventType==='INSERT'||p.eventType==='UPDATE'){if(cid)setNewCaseId(cid);showToast('📩 ได้รับเคสใหม่'+(cid?' — '+cid:''),'info',4000);}}).subscribe();return()=>{supabase.removeChannel(ch);};},[currentUser.name]);
   useEffect(()=>{if(newCaseId){const t=setTimeout(()=>setNewCaseId(null),5000);return()=>clearTimeout(t);}},[newCaseId]);
@@ -2142,23 +2144,29 @@ function SalesClaimedCases({currentUser,users}){
   function canReturn(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return true;return(now-dt.getTime())>=24*3600*1000;}
   function timeLeft(c){const dt=parseAssignedAt(c.AssignedAt||c['วันที่รับเคส']);if(!dt)return '';const ms=24*3600*1000-(now-dt.getTime());if(ms<=0)return '';const h=Math.floor(ms/3600000);const min=Math.floor((ms%3600000)/60000);return h>0?`${h} ชม. ${min} น.`:`${min} น.`;}
   async function doReturn(caseId){
-    // Optimistic UI: ลบออกจากหน้าจอทันที
-    setCases(prev=>prev.filter(c=>c.caseID!==caseId));
+    // ซ่อนทันทีผ่าน excludedCases — ป้องกัน load()/Realtime เอากลับมา
+    setExcludedCases(prev=>new Set([...prev,caseId]));
     const r=await api('returnCase',{caseId,sales:currentUser.name});
-    // ล้าง cache ทุกกรณีเพื่อ force reload ข้อมูลจาก DB
     cacheClear(['getClaimedCases','getMarket','getMarketIds','getCases']);
     if(!r.success){
+      // error → คืน excludedCases แล้ว reload
+      setExcludedCases(prev=>{const s=new Set(prev);s.delete(caseId);return s;});
       showToast(r.error||'คืนเคสไม่สำเร็จ กรุณาลองใหม่','err');
-      load(); // คืนข้อมูลจาก DB ถ้า error
+      load();
       return;
     }
     showToast('คืนเคสสำเร็จ ✅ เคสกลับเข้าตลาดแล้ว','ok',3000);
-    // delay 800ms ให้ DB อัปเดตก่อน reload
-    setTimeout(()=>load(), 800);
+    // หลัง 2 วิ reload แล้วค่อยเอา excluded ออก (DB เสร็จแน่นอนแล้ว)
+    setTimeout(()=>{
+      cacheClear(['getClaimedCases']);
+      load();
+      // หลัง load เสร็จค่อยเคลียร์ excluded
+      setTimeout(()=>setExcludedCases(prev=>{const s=new Set(prev);s.delete(caseId);return s;}),1500);
+    },2000);
   }
   return <div className="page">
     <div className="page-hd"><div className="page-title">📥 เคสที่รับจากตลาด</div><button className="btn btn-ghost" onClick={load}>🔄</button></div>
-    {loading?<SkeletonCards n={3}/>:cases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:cases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer'}}>
+    {(()=>{const displayCases=cases.filter(c=>!excludedCases.has(c.caseID));return loading?<SkeletonCards n={3}/>:displayCases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:displayCases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer'}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseID}</span><StatusBadge status={c.newstatus||c.status}/></div>
       <div style={{fontWeight:500,marginBottom:4}}>{c.customername}</div>
       <div style={{fontSize:12,color:'var(--text2)',marginBottom:6}}>รับมาจาก: <span style={{color:'var(--orange)'}}>{c.fromsales||'-'}</span>{' · '}รับเมื่อ: {String(c.AssignedAt||'').split(' ')[0]}</div>
@@ -2179,7 +2187,7 @@ function SalesClaimedCases({currentUser,users}){
         })()}
         <button className={ok?'btn btn-danger':'btn btn-ghost'} style={{fontSize:12,padding:'4px 10px',marginLeft:'auto',opacity:ok?1:0.45,cursor:ok?'pointer':'not-allowed'}} disabled={!ok} onClick={e=>{e.stopPropagation();if(ok)setConfirm(c.caseID);}}>{ok?'↩ คืนเคส':'🔒 ยังคืนไม่ได้'}</button>
       </div>
-    </div>;})}
+    </div>;});})()}
     {sel&&<CaseModal caseData={{...sel,caseid:sel.caseID}} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
     {confirm&&<Confirm msg={`คืนเคส ${confirm} กลับตลาด?`} onOk={()=>{doReturn(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>}
     {showScanner&&<QRScanner onClose={()=>setShowScanner(false)} onResult={t=>{setShowScanner(false);setScanResult(t);}}/> }
