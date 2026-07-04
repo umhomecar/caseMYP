@@ -1134,26 +1134,6 @@ function AddBookingModal({currentUser,users,onClose,onAdded}){
     </div>
   </Modal>;
 }
-){
-  const [form,setForm]=useState({caseId:'',sales:currentUser.role==='Admin'?'':currentUser.name,customer:'',facebook:'',ads:'',brand:'',model:'',plate:'',status:'จองแล้ว',note:''});
-  const [loading,setLoading]=useState(false);const set=(k,v)=>setForm(f=>({...f,[k]:v}));const models=form.brand?CAR_MODELS[form.brand]||[]:[];
-  async function submit(){if(!form.caseId||!form.customer)return showToast('กรุณากรอกรหัสเคสและชื่อลูกค้า','warn');setLoading(true);const r=await api('addBooking',{...form});setLoading(false);if(r.success){onAdded();onClose();}else showToast(r.error||'เกิดข้อผิดพลาด','err');}
-  return <Modal title="📋 เพิ่มการจอง" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'บันทึก...':'บันทึก'}</button></>}>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-      <div className="form-group"><label>รหัสเคส *</label><input value={form.caseId} onChange={e=>set('caseId',e.target.value)} placeholder="เช่น 2603001"/></div>
-      {currentUser.role==='Admin'?<div className="form-group"><label>เซลส์</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือก --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>:<div className="form-group"><label>เซลส์</label><input value={form.sales} readOnly/></div>}
-      <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อลูกค้า *</label><input value={form.customer} onChange={e=>set('customer',e.target.value)}/></div>
-      <div className="form-group"><label>Facebook</label><input value={form.facebook} onChange={e=>set('facebook',e.target.value)}/></div>
-      <div className="form-group"><label>Ads ไหน</label><input value={form.ads} onChange={e=>set('ads',e.target.value)}/></div>
-      <div className="form-group"><label>ยี่ห้อ</label><select value={form.brand} onChange={e=>set('brand',e.target.value)}><option value="">-- เลือก --</option>{Object.keys(CAR_MODELS).map(b=><option key={b}>{b}</option>)}</select></div>
-      <div className="form-group"><label>รุ่น</label><select value={form.model} onChange={e=>set('model',e.target.value)} disabled={!form.brand}><option value="">-- เลือก --</option>{models.map(m=><option key={m}>{m}</option>)}</select></div>
-      <div className="form-group"><label>ทะเบียน</label><input value={form.plate} onChange={e=>set('plate',e.target.value)}/></div>
-      <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{BOOK_STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-      <div className="form-group" style={{gridColumn:'1/-1'}}><label>หมายเหตุ</label><textarea rows={2} value={form.note} onChange={e=>set('note',e.target.value)}/></div>
-    </div>
-  </Modal>;
-}
-
 function NotifPanel({user,onClose,onCountChange}){
   const [notifs,setNotifs]=useState([]);const [loading,setLoading]=useState(true);
   useEffect(()=>{api('getNotifications',{sales:user.name}).then(r=>{if(r.success)setNotifs(r.data||[]);setLoading(false);});},[]);
@@ -1708,63 +1688,6 @@ function AdminBookings({currentUser,users}){
     {showAdd&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAdd(false)} onAdded={load}/>}
   </div>;
 }
-){
-  const [bookings,setBookings]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);
-  const load=useCallback(()=>{setLoading(true);api('getBookings',{}).then(r=>{if(r.success)setBookings(r.data||[]);setLoading(false);});},[]);
-  useEffect(()=>{load();},[load]);
-  const OD={bg:'linear-gradient(160deg,#020d18 0%,#041e35 50%,#062840 100%)',neon:'#00d4ff',dim:'rgba(0,212,255,.12)',border:'rgba(0,212,255,.2)',text:'#cce8f4',sub:'rgba(0,212,255,.5)'};
-  return <div className="page" style={{paddingBottom:40}}>
-    {/* OCEAN HEADER */}
-    <div style={{padding:'24px 28px 20px',borderBottom:'1px solid rgba(0,212,255,.12)'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div>
-          <div style={{fontSize:10,color:OD.sub,letterSpacing:3,textTransform:'uppercase',marginBottom:4}}>Booking System</div>
-          <div style={{fontSize:22,fontWeight:900,color:OD.text,display:'flex',alignItems:'center',gap:10}}>
-            🌊 การจอง
-            <span style={{fontSize:13,fontWeight:600,background:OD.dim,border:`1px solid ${OD.border}`,borderRadius:20,padding:'3px 12px',color:OD.neon}}>{bookings.length} รายการ</span>
-          </div>
-        </div>
-        <button onClick={()=>setShowAdd(true)} style={{background:`linear-gradient(135deg,#006699,#00d4ff)`,border:'none',borderRadius:10,color:'#fff',padding:'10px 18px',cursor:'pointer',fontSize:14,fontWeight:700,boxShadow:'0 4px 14px rgba(0,212,255,.3)'}}>+ เพิ่มการจอง</button>
-      </div>
-    </div>
-    {/* TABLE */}
-    <div style={{padding:'20px 28px 80px'}}>
-      <div style={{background:'rgba(0,212,255,.04)',border:'1px solid rgba(0,212,255,.15)',borderRadius:14,overflow:'hidden'}}>
-        <div className="table-wrap">
-          <table style={{borderCollapse:'collapse',width:'100%'}}>
-            <thead>
-              <tr style={{background:'rgba(0,212,255,.08)'}}>
-                {['วันที่','รหัสเคส','ลูกค้า','เซลส์','รถ','รุ่น','ทะเบียน','สถานะ','หมายเหตุ'].map(h=><th key={h} style={{padding:'12px 14px',textAlign:'left',fontSize:11,color:OD.sub,letterSpacing:1.5,textTransform:'uppercase',borderBottom:'1px solid rgba(0,212,255,.1)',fontWeight:700}}>{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {loading?<SkeletonRows n={5} cols={9}/>:bookings.length===0?
-                <tr><td colSpan={9} style={{textAlign:'center',padding:40,color:OD.sub}}>ไม่มีการจอง</td></tr>:
-                bookings.map((b,i)=><tr key={i} style={{borderBottom:'1px solid rgba(0,212,255,.06)',cursor:'pointer',transition:'background .15s'}}
-                  onClick={()=>setSel(b)}
-                  onMouseOver={e=>e.currentTarget.style.background='rgba(0,212,255,.06)'}
-                  onMouseOut={e=>e.currentTarget.style.background='transparent'}>
-                  <td data-label="วันที่" style={{padding:'11px 14px',fontSize:12,color:OD.sub,whiteSpace:'nowrap'}}>{String(b['วันที่']||'').split(' ')[0]}</td>
-                  <td data-label="รหัสเคส" style={{padding:'11px 14px'}}><span style={{color:OD.neon,fontWeight:800,textShadow:`0 0 8px ${OD.neon}60`}}>{b.CaseID}</span></td>
-                  <td data-label="ลูกค้า" style={{padding:'11px 14px',fontWeight:600,color:OD.text}}>{b['ลูกค้า']||'-'}</td>
-                  <td data-label="เซลส์" style={{padding:'11px 14px',color:'#60a5fa'}}>{b['เซลส์']||'-'}</td>
-                  <td data-label="ยี่ห้อ" style={{padding:'11px 14px',color:OD.text}}>{b['รถ']||'-'}</td>
-                  <td data-label="รุ่น" style={{padding:'11px 14px',color:OD.text}}>{b['รุ่น']||'-'}</td>
-                  <td data-label="ทะเบียน" style={{padding:'11px 14px',color:'#7dd3fc',fontWeight:600}}>{b['ทะเบียน']||'-'}</td>
-                  <td data-label="สถานะ" style={{padding:'11px 14px'}}><StatusBadge status={b['สถานะ']}/></td>
-                  <td data-label="หมายเหตุ" style={{padding:'11px 14px',fontSize:12,color:OD.sub}}>{b['หมายเหตุ']||'-'}</td>
-                </tr>)
-              }
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    {sel&&<BookingDetailModal booking={sel} onClose={()=>setSel(null)} onUpdated={load}/>}
-    {showAdd&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAdd(false)} onAdded={load}/>}
-  </div>;
-}
-
 function BookingDetailModal({booking,onClose,onUpdated,users,currentUser}){
   const [status,setStatus]=useState(booking['สถานะ']||'จองแล้ว');
   const [note,setNote]=useState(booking['รายละเอียดเคส']||'');
@@ -1826,16 +1749,6 @@ function BookingDetailModal({booking,onClose,onUpdated,users,currentUser}){
     </div>
   </Modal>;
 }
-){
-  const [status,setStatus]=useState(booking['สถานะ']||'จองแล้ว');const [note,setNote]=useState(booking['หมายเหตุ']||'');const [loading,setLoading]=useState(false);
-  async function save(){setLoading(true);await api('updateBooking',{caseId:booking.CaseID,status,note});setLoading(false);onUpdated();onClose();}
-  return <Modal title={`จอง — ${booking.CaseID}`} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={save} disabled={loading}>{loading?'บันทึก...':'💾 บันทึก'}</button></>}>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>{[['ลูกค้า',booking['ลูกค้า']],['เซลส์',booking['เซลส์']],['ยี่ห้อ',booking['รถ']],['รุ่น',booking['รุ่น']],['ทะเบียน',booking['ทะเบียน']],['Facebook',booking.Facebook]].map(([l,v])=>v?<div key={l}><div style={{fontSize:11,color:'var(--text2)',marginBottom:3}}>{l}</div><div style={{fontWeight:500}}>{v}</div></div>:null)}</div>
-    <div className="form-group"><label>สถานะ</label><select value={status} onChange={e=>setStatus(e.target.value)}>{BOOK_STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-    <div className="form-group"><label>หมายเหตุ</label><textarea rows={2} value={note} onChange={e=>setNote(e.target.value)}/></div>
-  </Modal>;
-}
-
 function AdminUsers({currentUser}){
   const [users,setUsers]=useState([]);const [loading,setLoading]=useState(true);
   const [showAdd,setShowAdd]=useState(false);
