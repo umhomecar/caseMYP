@@ -1079,8 +1079,7 @@ function shortBookDate(s){
 }
 function BookingLogCell({text,neon}){
   if(!text)return <span style={{fontSize:12,color:neon?'rgba(0,212,255,.3)':'var(--text3)'}}>ยังไม่มีบันทึก</span>;
-  const lines=String(text).split('
-');
+  const lines=String(text).split('\n');
   return <div style={{fontSize:12,lineHeight:1.65,color:neon?'#b0c4d8':'var(--text)',maxHeight:130,overflowY:'auto',paddingRight:4}}>
     {lines.map((line,i)=>{
       const isDate=/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(line.trim());
