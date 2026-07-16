@@ -731,15 +731,7 @@ const AUTO_MARKET_HOURS = 60;
 // ถ้าต้องการให้หน้าเว็บช่วย fallback ค่อยเปลี่ยนเป็น true
 const AUTO_MARKET_CLIENT_ENABLED = false;
 const AUTO_MARKET_CLOSED = ['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
-function parseTHDateTime(v){
-  const s=String(v||'').trim();
-  if(!s)return null;
-  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if(m){let y=parseInt(m[3],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[1],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
-  m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if(m){let y=parseInt(m[1],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[3],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
-  const d=new Date(s);return isNaN(d)?null:d;
-}
+// ใช้ parseTHDateTime() ตัวกลางด้านบน เพื่อเลี่ยงการประกาศซ้ำ
 function caseAgeHoursFromNow(c){
   const d=parseTHDateTime(c?.updatedat||c?.createdat);
   if(!d)return 0;
