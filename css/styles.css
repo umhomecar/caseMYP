@@ -544,14 +544,6 @@ html{scroll-behavior:smooth;}
   .toast{min-width:unset;width:100%;}
 }
 
-/* ---------- Extracted style block ---------- */
-{`
-      @keyframes onboardIn{from{opacity:0;transform:scale(.9) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}
-      @keyframes onboardOutLeft{to{opacity:0;transform:scale(.95) translateX(-30px)}}
-      @keyframes onboardOutRight{to{opacity:0;transform:scale(.95) translateX(30px)}}
-      @keyframes iconBounce{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
-    `}
-
 /* App loader */
 #app-loader{
   position:fixed;
@@ -1559,4 +1551,91 @@ body.light .admin-sent-page tbody tr:hover td{
   }
   .admin-sent-page .sent-empty::before{display:none;}
   .admin-sent-page .sent-table-card{border:0 !important;background:transparent;box-shadow:none;}
+}
+
+/* ═══════════════════════════════════════
+   Stability + accessibility hardening
+═══════════════════════════════════════ */
+.loader-retry{
+  min-width:120px;
+  min-height:44px;
+  margin-top:8px;
+  border:1px solid #388bfd;
+  border-radius:10px;
+  background:#1f6feb;
+  color:#fff;
+  font:700 14px 'Sarabun',sans-serif;
+  cursor:pointer;
+}
+.connection-banner{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:10050;
+  padding:9px 16px;
+  background:#7c2d12;
+  color:#fff7ed;
+  border-bottom:1px solid #fdba74;
+  text-align:center;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.45;
+  box-shadow:0 4px 18px rgba(0,0,0,.28);
+}
+:where(button,a,input,select,textarea,[role="button"]):focus-visible{
+  outline:3px solid var(--blue) !important;
+  outline-offset:2px;
+}
+.nav-item:is(button){
+  width:100%;
+  border:0;
+  background:transparent;
+  font-family:inherit;
+  text-align:left;
+}
+.bottom-nav-item:is(button){
+  border:0;
+  background:transparent;
+  font-family:inherit;
+}
+@media(max-width:768px){
+  .btn,
+  .nav-item,
+  .bottom-nav-item,
+  .admin-bottom-nav .bottom-nav-item,
+  .sent-filter-row .sent-icon-btn{
+    min-height:44px;
+  }
+  .sent-filter-row select,
+  .sent-search-wrap input{
+    min-height:44px;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto;}
+  .page,
+  .card,
+  .modal,
+  .overlay,
+  .market-card,
+  .mkc,
+  .mkc-hot,
+  .mkc-pulse,
+  .focus-block,
+  .toast,
+  .toast.out,
+  .skeleton,
+  .onboard-progress-dot,
+  .loader-car{
+    animation:none !important;
+  }
+  .btn,
+  .nav-item,
+  .bottom-nav-item,
+  input,
+  select,
+  textarea{
+    transition-duration:.01ms !important;
+  }
 }
