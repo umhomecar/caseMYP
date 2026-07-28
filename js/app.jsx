@@ -2,24 +2,16 @@
 // CasePool React App — separated from index.html
 // ============================================================
 
-const {useState,useEffect,useCallback,useRef,createContext,useContext} = React;
+import React, {useState,useEffect,useCallback,useRef} from 'react';
+import {createRoot} from 'react-dom/client';
+import {createClient} from '@supabase/supabase-js';
 
 // ============================================================
 // ⚙️ CONFIG
 // ============================================================
 const SUPA_URL = 'https://lhmycnzarbcmweavhnxh.supabase.co';
 
-// ── FCM Push Notification Setup ──
-const FCM_VAPID = 'BDE3zFoypE16kiLHPFXlF5maeVfvwbp7cnRFdIgxcsi1xVuZmRazyl9ZxsVyTXTdTFVrFXTPpaFQrYht0xM6io0';
 const FCM_EDGE_URL = 'https://lhmycnzarbcmweavhnxh.supabase.co/functions/v1/send-fcm';
-const FB_CONFIG = {
-  apiKey: "AIzaSyC1bnlkqxibYxA4T_giYeN7dyZHcSN5Dek",
-  authDomain: "casepool-11685.firebaseapp.com",
-  projectId: "casepool-11685",
-  storageBucket: "casepool-11685.firebasestorage.app",
-  messagingSenderId: "755729743792",
-  appId: "1:755729743792:web:327d192340509e4c036075",
-};
 
 // FCM disabled — not using Firebase, only in-app Web Notification polling
 // (see usePushNotif hook)
@@ -36,11 +28,7 @@ async function pushNotif(salesName,title,body,data={}){
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobXljbnphcmJjbXdlYXZobnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNzk5NTQsImV4cCI6MjA4OTY1NTk1NH0.t7nbVArhxbsTBYXnAPwNQKfu6xxid2G4bDdAVVZHB9s';
 const API_URL  = SUPA_URL;
 let supabase=null;
-try{if(window.supabase)supabase=window.supabase.createClient(SUPA_URL,SUPA_KEY,{realtime:{params:{eventsPerSecond:10}}});}catch(e){console.warn('Supabase init failed',e);}
-
-// ── ✅ FIX: Anthropic Key helpers ──
-function getAnthropicKey(){ try{ return localStorage.getItem('cp_ant_key')||''; }catch(e){ return ''; } }
-function saveAnthropicKey(k){ try{ localStorage.setItem('cp_ant_key', k.trim()); }catch(e){} }
+try{supabase=createClient(SUPA_URL,SUPA_KEY,{realtime:{params:{eventsPerSecond:10}}});}catch(e){console.warn('Supabase init failed',e);}
 
 (function(){
   try{ if(localStorage.getItem('cp_theme')==='light') document.body.classList.add('light'); }catch(e){}
@@ -51,8 +39,26 @@ function toggleTheme(){
 }
 
 let _copyToastTimer=null;
-function copyText(text){
-  try{ navigator.clipboard.writeText(text||''); }catch(e){}
+async function copyText(text){
+  const value=String(text||'');
+  let copied=false;
+  try{
+    if(navigator.clipboard&&window.isSecureContext){
+      await navigator.clipboard.writeText(value);
+      copied=true;
+    }else{
+      const input=document.createElement('textarea');
+      input.value=value;
+      input.setAttribute('readonly','');
+      input.style.position='fixed';
+      input.style.opacity='0';
+      document.body.appendChild(input);
+      input.select();
+      copied=document.execCommand('copy');
+      input.remove();
+    }
+  }catch(e){copied=false;}
+  if(!copied){showToast('คัดลอกไม่สำเร็จ กรุณาลองอีกครั้ง','err');return false;}
   if(_copyToastTimer) clearTimeout(_copyToastTimer);
   let el=document.getElementById('cp-copy-toast');
   if(!el){
@@ -60,8 +66,9 @@ function copyText(text){
     Object.assign(el.style,{position:'fixed',bottom:'80px',left:'50%',transform:'translateX(-50%) translateY(20px)',background:'rgba(63,185,80,.95)',color:'#fff',padding:'9px 22px',borderRadius:'30px',fontSize:'13px',fontWeight:'700',boxShadow:'0 6px 24px rgba(0,0,0,.4)',zIndex:'9999',transition:'opacity .25s, transform .25s',opacity:'0',pointerEvents:'none',whiteSpace:'nowrap',letterSpacing:'.3px',display:'flex',alignItems:'center',gap:'6px'});
     document.body.appendChild(el);
   }
-  el.innerHTML='✅&nbsp; คัดลอกแล้ว!';el.style.opacity='1';el.style.transform='translateX(-50%) translateY(0)';
+  el.textContent='✅ คัดลอกแล้ว!';el.style.opacity='1';el.style.transform='translateX(-50%) translateY(0)';
   _copyToastTimer=setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(-50%) translateY(10px)';},1800);
+  return true;
 }
 
 // ============================================================
@@ -81,7 +88,16 @@ function showToast(msg,type='ok',duration=3000){
   const el=document.createElement('div');
   const icons={ok:'✅',err:'❌',info:'ℹ️',warn:'⚠️'};
   el.className=`toast toast-${type}`;
-  el.innerHTML=`<span style="font-size:16px;flex-shrink:0">${icons[type]||'📢'}</span><span>${msg}</span>`;
+  el.setAttribute('role',type==='err'?'alert':'status');
+  el.setAttribute('aria-live',type==='err'?'assertive':'polite');
+  const icon=document.createElement('span');
+  icon.style.fontSize='16px';
+  icon.style.flexShrink='0';
+  icon.setAttribute('aria-hidden','true');
+  icon.textContent=icons[type]||'📢';
+  const text=document.createElement('span');
+  text.textContent=String(msg??'');
+  el.append(icon,text);
   container.appendChild(el);
   setTimeout(()=>{
     el.classList.add('out');
@@ -97,12 +113,17 @@ const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V'
 
 function getStatusClass(s){const m={'รอข้อมูล':'s-wait','ไปต่อได้':'s-go','กำลังติดต่อ':'s-calling','เคสเลี้ยง':'s-nurse','เคสวัด 50/50':'s-half','ติดต่อไม่ได้':'s-cant','ยังไม่สะดวก':'s-later','จอง':'s-book','รอเซ็นต์':'s-sign','รอผล':'s-wait2','อนุมัติ':'s-approve','ปิดเคส':'s-close','รีเจค':'s-reject','ปล่อยแล้ว':'s-release','ได้รถจากที่อื่น':'s-other','โยนเคส':'s-throw','จองแล้ว':'s-book'};return m[s]||'s-wait';}
 function safeArray(x){return Array.isArray(x)?x:[];}
+function activateOnKey(e,action){if(e.key==='Enter'||e.key===' '){e.preventDefault();action();}}
 function displayContact(contact){if(!contact&&contact!==0)return '-';const s=String(contact).trim();if(s.startsWith('data:image')||s.startsWith('https://drive.google.com'))return '📷 QR Code';return formatContact(s)||'-';}
 function formatContact(contact){if(!contact&&contact!==0)return '';const s=String(contact).trim();if(s.startsWith('http')||s.startsWith('data:'))return s;if(/^\d{9}$/.test(s))return '0'+s;if(/^\d{8}$/.test(s))return '0'+s;return s;}
 
-const _cache={};const CACHE_TTL=10000; // 10s — สั้นลงเพื่อจับการเพิ่มจาก Supabase โดยตรง
+const _cache={};
+const _inflight={};
+const CACHE_TTL=10000; // 10s — สั้นลงเพื่อจับการเพิ่มจาก Supabase โดยตรง
+const REQUEST_TIMEOUT_MS=18000;
 function cacheKey(action,data){return action+':'+JSON.stringify(data||{});}
 function cacheGet(action,data){const k=cacheKey(action,data);const c=_cache[k];if(c&&(Date.now()-c.ts)<CACHE_TTL)return c.data;return null;}
+function cacheGetStale(action,data){return _cache[cacheKey(action,data)]?.data||null;}
 function cacheSet(action,data,result){_cache[cacheKey(action,data)]={data:result,ts:Date.now()};}
 function cacheClear(patterns){(patterns||[]).forEach(p=>{Object.keys(_cache).forEach(k=>{if(k.startsWith(p))delete _cache[k];});});}
 
@@ -181,8 +202,32 @@ const CACHEABLE=['getCases','getMarket','getMarketIds','getUsers','getBookings',
 const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard'],sendToMarket:['getCases','getMarket','getDashboard','getMarketIds'],claimCase:['getMarket','getMarketIds','getClaimedCases','getDashboard'],returnCase:['getMarket','getMarketIds','getClaimedCases','getCases'],updateClaimed:['getClaimedCases'],closeMarketCase:['getMarket','getCases'],adminChangeSales:['getCases','getClaimedCases'],adminPullCase:['getCases','getClaimedCases'],deleteCase:['getCases','getMarket','getDashboard'],addBooking:['getBookings'],updateBooking:['getBookings'],deleteBooking:['getBookings'],addStandaloneCase:['getStandaloneCases'],updateStandaloneCase:['getStandaloneCases'],deleteStandaloneCase:['getStandaloneCases']};
 
 async function api(action,data={}){
-  if(CACHEABLE.includes(action)){const cached=cacheGet(action,data);if(cached)return cached;}
-  try{const result=await sbApi(action,data);if(CACHEABLE.includes(action)&&result.success)cacheSet(action,data,result);if(INVALIDATE_MAP[action])cacheClear(INVALIDATE_MAP[action]);return result;}catch(e){return{success:false,error:e.toString()};}
+  const cacheable=CACHEABLE.includes(action);
+  const key=cacheKey(action,data);
+  if(cacheable){
+    const cached=cacheGet(action,data);
+    if(cached)return cached;
+    if(_inflight[key])return _inflight[key];
+  }
+  const task=(async()=>{
+    try{
+      const result=await sbApi(action,data);
+      if(!result||typeof result!=='object')return{success:false,error:'ระบบตอบกลับไม่ถูกต้อง กรุณาลองใหม่'};
+      if(result.success&&isSbError(result.data))return{success:false,error:formatSbError(result.data)};
+      if(cacheable&&result.success)cacheSet(action,data,result);
+      if(result.success&&INVALIDATE_MAP[action])cacheClear(INVALIDATE_MAP[action]);
+      return result;
+    }catch(e){
+      const stale=cacheable?cacheGetStale(action,data):null;
+      const message=e?.message||String(e||'เชื่อมต่อระบบไม่สำเร็จ');
+      if(stale)return{...stale,stale:true,warning:message};
+      return{success:false,error:message};
+    }finally{
+      if(cacheable)delete _inflight[key];
+    }
+  })();
+  if(cacheable)_inflight[key]=task;
+  return task;
 }
 
 function formatDate(dateStr){
@@ -247,17 +292,12 @@ async function sbQ(method,table,q={},body=null){
     
     while (offset < limit) {
       const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Range':`${offset}-${offset+pageSize-1}`};
-      const opts={method:'GET',headers:h};
-      const r=await fetch(finalUrl,opts);
-      if(r.status===204)break;
-      const t=await r.text();
-      try{
-        const pageData=JSON.parse(t);
-        if(!Array.isArray(pageData) || pageData.length===0)break;
-        allData.push(...pageData);
-        if(pageData.length<pageSize)break; // ไม่มีข้อมูลเพิ่มแล้ว
-        offset+=pageSize;
-      }catch(e){break;}
+      const pageData=await sbFetch(finalUrl,{method:'GET',headers:h});
+      if(isSbError(pageData))return pageData;
+      if(!Array.isArray(pageData)||pageData.length===0)break;
+      allData.push(...pageData);
+      if(pageData.length<pageSize)break; // ไม่มีข้อมูลเพิ่มแล้ว
+      offset+=pageSize;
     }
     return allData;
   }
@@ -266,8 +306,41 @@ async function sbQ(method,table,q={},body=null){
   const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Range':'0-4999'};
   if(method!=='GET')h['Prefer']='return=representation';
   const opts={method,headers:h};if(body!==null)opts.body=JSON.stringify(body);
-  const r=await fetch(finalUrl,opts);
-  if(r.status===204)return[];const t=await r.text();try{return JSON.parse(t);}catch(e){return[];}
+  return sbFetch(finalUrl,opts);
+}
+
+async function sbFetch(url,opts){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),REQUEST_TIMEOUT_MS);
+  try{
+    const response=await fetch(url,{...opts,signal:controller.signal});
+    if(response.status===204)return[];
+    const text=await response.text();
+    let parsed=null;
+    if(text){
+      try{parsed=JSON.parse(text);}
+      catch(e){parsed=null;}
+    }
+    if(!response.ok){
+      const detail=parsed?.message||parsed?.error_description||parsed?.details||text||`HTTP ${response.status}`;
+      return{error:detail,message:detail,status:response.status,code:parsed?.code||''};
+    }
+    if(parsed===null&&text)return{error:'ระบบตอบกลับเป็นข้อมูลที่อ่านไม่ได้',message:'ระบบตอบกลับเป็นข้อมูลที่อ่านไม่ได้',status:response.status};
+    return parsed??[];
+  }catch(e){
+    const message=e?.name==='AbortError'
+      ?'การเชื่อมต่อนานเกิน 18 วินาที กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่'
+      :(navigator.onLine===false?'ไม่มีการเชื่อมต่ออินเทอร์เน็ต':'เชื่อมต่อฐานข้อมูลไม่สำเร็จ กรุณาลองใหม่');
+    return{error:message,message,status:0,details:e?.message||''};
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+async function sbMutate(method,table,q={},body=null){
+  const result=await sbQ(method,table,q,body);
+  if(isSbError(result))throw new Error(formatSbError(result));
+  return result;
 }
 
 function mapMarket(r){return{ID:r.id,name:r.name,contact:r.contact,report:r.report,status:r.status,old_sales:r.old_sales,ExpiredSales:r.expiredsales||'',PoolStatus:r.poolstatus};}
@@ -316,10 +389,10 @@ async function getSmartAssignSales(){
 async function sbApi(action,data){
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   switch(action){
-    case 'login':{const rows=await sbQ('GET','users',{username:`eq.${data.username}`,password:`eq.${data.password}`,status:'eq.active'});if(!rows?.length)return{success:false,error:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'};const u=rows[0];return{success:true,user:{userId:u.userid,username:u.username,name:u.name,role:u.role,avatar:u.avatar||'',startdate:u.startdate||''}};}
+    case 'login':{const rows=await sbQ('GET','users',{username:`eq.${data.username}`,password:`eq.${data.password}`,status:'eq.active'});if(isSbError(rows))return{success:false,error:formatSbError(rows)};if(!rows?.length)return{success:false,error:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'};const u=rows[0];return{success:true,user:{userId:u.userid,username:u.username,name:u.name,role:u.role,avatar:u.avatar||'',startdate:u.startdate||''}};}
     case 'getUsers':{const rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate',order:'userid.asc'});return{success:true,data:(rows||[]).map(u=>({userId:u.userid,username:u.username,name:u.name,role:u.role,status:u.status,avatar:u.avatar||'',startdate:u.startdate||''}))};}
-    case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbQ('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
-    case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
+    case 'addUser':{const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbMutate('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};}
+    case 'updateUser':{const upd={};['name','password','status','avatar','role','startdate'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbMutate('PATCH','users',{userid:`eq.${data.userId}`},upd);return{success:true};}
     case 'getStandaloneCases':{
       const q={select:'*',order:'created_at.desc'};
       if(data.caseType)q.case_type=`eq.${data.caseType}`;
@@ -370,7 +443,7 @@ async function sbApi(action,data){
       }
       return{success:false,error:'รหัสเคสซ้ำหลายครั้ง กรุณากดเพิ่มเคสใหม่อีกครั้ง'};
     }
-    case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbQ('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);
+    case 'updateCase':{const upd={updatedat:nowTH()};['status','report','sales','customername','contact','sent','attachment'].forEach(k=>{if(data[k]!==undefined)upd[k]=data[k];});await sbMutate('PATCH','cases',{caseid:`eq.${data.caseid}`},upd);sbHist(data.caseid,data.changedBy||'ระบบ','แก้ไข',data.detail||'เปลี่ยนสถานะเป็น '+data.status);
       // Push notification ถ้าเปลี่ยน sales (assign)
       if(data.sales&&data.sales!==data.changedBy){
         sbNotif(data.sales,data.caseid,'📋 ได้รับมอบหมายเคส '+data.caseid+' ('+(data.customername||'')+')');
@@ -413,6 +486,7 @@ async function sbApi(action,data){
     case 'getMarket':{
       // ✅ ดึงข้อมูลทั้งหมดโดยไม่จำกัด (ใช้ pagination อัตโนมัติ)
       const rows=await sbQ('GET','market',{poolstatus:'eq.เปิด',limit:'10000'});
+      if(isSbError(rows))return{success:false,error:formatSbError(rows)};
       let filtered=safeArray(rows);
       if(data.sales)filtered=filtered.filter(r=>!r.expiredsales||!String(r.expiredsales).split(',').includes(data.sales));
       // แยกเคสปีนี้กับเคสเก่า
@@ -430,29 +504,33 @@ async function sbApi(action,data){
     }
     case 'sendToMarket':{
   const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
+  if(isSbError(cr))throw new Error(formatSbError(cr));
   if(!cr?.length)return{success:false,error:'ไม่พบเคส '+data.caseId};
   const c=cr[0];
   const ex=await sbQ('GET','market',{id:`eq.${data.caseId}`});
+  if(isSbError(ex))throw new Error(formatSbError(ex));
   if(ex?.length){
     const expList=ex[0].expiredsales?ex[0].expiredsales.split(',').filter(Boolean):[];
     if(data.sales&&!expList.includes(data.sales))expList.push(data.sales);
-    await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(','),name:c.customername,contact:c.contact,report:c.report,status:c.status});
+    await sbMutate('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:expList.join(','),name:c.customername,contact:c.contact,report:c.report,status:c.status});
   }else{
-    await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales||'',poolstatus:'เปิด'});
+    await sbMutate('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:data.sales||c.sales,expiredsales:data.sales||c.sales||'',poolstatus:'เปิด'});
   }
   // ✅ ลบจาก claimedcases ด้วย ถ้ามี (ป้องกันเซลส์เก่ายังเห็นในหน้า "รับตลาด")
-  await sbQ('DELETE','claimedcases',{caseid:`eq.${data.caseId}`});
-  await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{market:true,updatedat:nowTH()});
+  await sbMutate('DELETE','claimedcases',{caseid:`eq.${data.caseId}`});
+  await sbMutate('PATCH','cases',{caseid:`eq.${data.caseId}`},{market:true,updatedat:nowTH()});
   sbHist(data.caseId,data.sales||'ระบบ','ส่งตลาด','ส่งเคสขึ้นตลาด');
   return{success:true};
 }
     case 'getMarketIds':{
       const rows=await sbQ('GET','market',{poolstatus:'eq.เปิด',select:'id'});
+      if(isSbError(rows))return{success:false,error:formatSbError(rows)};
       return{success:true,data:safeArray(rows).map(r=>String(r.id))};
     }
-    case 'closeMarketCase':{await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'ปิด'});await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,data.closedBy||'แอดมิน','ปิดเคส','ปิดเคสออกจากตลาด');return{success:true};}
+    case 'closeMarketCase':{await sbMutate('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'ปิด'});await sbMutate('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,data.closedBy||'แอดมิน','ปิดเคส','ปิดเคสออกจากตลาด');return{success:true};}
     case 'claimCase':{
       const mk=await sbQ('GET','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'});
+      if(isSbError(mk))return{success:false,error:formatSbError(mk)};
       if(!mk?.length)return{success:false,error:'เคสนี้ถูกรับไปแล้ว'};
       const m=mk[0],ts=nowTH();
       const expList=m.expiredsales?String(m.expiredsales).split(',').filter(Boolean):[];
@@ -461,11 +539,12 @@ async function sbApi(action,data){
 
       // ล็อกเคสแบบมีเงื่อนไขก่อนบันทึก เพื่อกัน 2 คนกดรับเคสเดียวกันพร้อมกัน
       const locked=await sbQ('PATCH','market',{id:`eq.${data.caseId}`,poolstatus:'eq.เปิด'},{poolstatus:'ปิด',expiredsales:exp});
+      if(isSbError(locked))return{success:false,error:formatSbError(locked)};
       if(!Array.isArray(locked)||!locked.length)return{success:false,error:'เคสนี้ถูกรับไปแล้ว'};
 
       const inserted=await sbQ('POST','claimedcases',{},{caseid:data.caseId,customername:m.name,contact:m.contact,report:m.report,status:m.status,fromsales:m.old_sales,sale:data.sales,newstatus:m.status,assignedat:ts,notes:''});
       if(isSbError(inserted)){
-        await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:m.expiredsales||''});
+        await sbMutate('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:'เปิด',expiredsales:m.expiredsales||''});
         return{success:false,error:formatSbError(inserted)};
       }
       sbHist(data.caseId,data.sales,'รับเคส','รับเคสจากตลาด');
@@ -473,14 +552,55 @@ async function sbApi(action,data){
       return{success:true};
     }
     case 'getClaimedCases':{const q={order:'assignedat.desc'};if(data.sales)q.sale=`eq.${data.sales}`;const rows=await sbQ('GET','claimedcases',q);return{success:true,data:(rows||[]).map(mapClaimed)};}
-    case 'updateClaimed':{const upd={};if(data.newstatus!==undefined)upd.newstatus=data.newstatus;if(data.Notes!==undefined)upd.notes=data.Notes;const q={caseid:`eq.${data.caseId}`};if(data.sales)q.sale=`eq.${data.sales}`;await sbQ('PATCH','claimedcases',q,upd);sbHist(data.caseId,data.sales||'ระบบ','แก้ไข','เปลี่ยนสถานะเป็น '+data.newstatus);return{success:true};}
-    case 'returnCase':{const isSkip=String(data.sales||'').startsWith('_skip_');const realSales=isSkip?data.sales.replace('_skip_',''):data.sales;if(!isSkip){const cl=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});if(cl?.length&&cl[0].assignedat){const t=parseTHDateTime(cl[0].assignedat);if(t){const hrs=(Date.now()-t.getTime())/3600000;if(hrs<24){const rem=Math.ceil(24-hrs);return{success:false,error:'ต้องรออย่างน้อย 24 ชั่วโมงหลังรับเคส ก่อนคืนตลาด (เหลือ '+rem+' ชม.)'};}}}}await sbQ('DELETE','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});const[mk,uRows]=await Promise.all([sbQ('GET','market',{id:`eq.${data.caseId}`}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'name'})]);const allSales=(uRows||[]).map(u=>u.name);if(mk?.length){const exp=mk[0].expiredsales?String(mk[0].expiredsales).split(',').filter(Boolean):[];if(!exp.includes(realSales))exp.push(realSales);const done=allSales.every(n=>exp.includes(n));await sbQ('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:done?'ปิด':'เปิด',expiredsales:exp.join(',')});if(done)await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');return{success:true,allClosed:done};}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(cr?.length){const c=cr[0];await sbQ('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:realSales,expiredsales:realSales,poolstatus:'เปิด'});}sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');return{success:true,allClosed:false};}}
+    case 'updateClaimed':{const upd={};if(data.newstatus!==undefined)upd.newstatus=data.newstatus;if(data.Notes!==undefined)upd.notes=data.Notes;const q={caseid:`eq.${data.caseId}`};if(data.sales)q.sale=`eq.${data.sales}`;await sbMutate('PATCH','claimedcases',q,upd);sbHist(data.caseId,data.sales||'ระบบ','แก้ไข','เปลี่ยนสถานะเป็น '+data.newstatus);return{success:true};}
+    case 'returnCase':{
+      const isSkip=String(data.sales||'').startsWith('_skip_');
+      const realSales=isSkip?data.sales.replace('_skip_',''):data.sales;
+      if(!isSkip){
+        const cl=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});
+        if(isSbError(cl))return{success:false,error:formatSbError(cl)};
+        if(cl?.length&&cl[0].assignedat){
+          const t=parseTHDateTime(cl[0].assignedat);
+          if(t){
+            const hrs=(Date.now()-t.getTime())/3600000;
+            if(hrs<24){
+              const rem=Math.ceil(24-hrs);
+              return{success:false,error:'ต้องรออย่างน้อย 24 ชั่วโมงหลังรับเคส ก่อนคืนตลาด (เหลือ '+rem+' ชม.)'};
+            }
+          }
+        }
+      }
+      await sbMutate('DELETE','claimedcases',{caseid:`eq.${data.caseId}`,sale:`eq.${realSales}`});
+      const[mk,uRows]=await Promise.all([
+        sbQ('GET','market',{id:`eq.${data.caseId}`}),
+        sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'name'})
+      ]);
+      if(isSbError(mk)||isSbError(uRows))throw new Error(formatSbError(isSbError(mk)?mk:uRows));
+      const allSales=safeArray(uRows).map(u=>u.name);
+      if(mk?.length){
+        const exp=mk[0].expiredsales?String(mk[0].expiredsales).split(',').filter(Boolean):[];
+        if(!exp.includes(realSales))exp.push(realSales);
+        const done=allSales.every(n=>exp.includes(n));
+        await sbMutate('PATCH','market',{id:`eq.${data.caseId}`},{poolstatus:done?'ปิด':'เปิด',expiredsales:exp.join(',')});
+        if(done)await sbMutate('PATCH','cases',{caseid:`eq.${data.caseId}`},{status:'ปิดเคส',updatedat:nowTH()});
+        sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');
+        return{success:true,allClosed:done};
+      }
+      const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
+      if(isSbError(cr))throw new Error(formatSbError(cr));
+      if(cr?.length){
+        const c=cr[0];
+        await sbMutate('POST','market',{},{id:data.caseId,name:c.customername,contact:c.contact,report:c.report,status:c.status,old_sales:realSales,expiredsales:realSales,poolstatus:'เปิด'});
+      }
+      sbHist(data.caseId,realSales,'คืนเคส','ส่งเคสคืนตลาด');
+      return{success:true,allClosed:false};
+    }
     case 'getBookings':{const q={order:'createdat.desc'};if(data.sales)q.sales=`eq.${data.sales}`;const rows=await sbQ('GET','bookings',q);return{success:true,data:(rows||[]).map(mapBooking)};}
-    case 'addBooking':{await sbQ('POST','bookings',{},{createdat:nowTH(),caseid:data.caseId,sales:data.sales,customer:data.customer,facebook:data.facebook||'',ads:data.ads||'',brand:data.brand||'',model:data.model||'',plate:data.plate||'',status:data.status||'จองแล้ว',note:data.note||''});sbHist(data.caseId,data.sales,'จอง','เพิ่มการจอง '+(data.brand||'')+' '+(data.model||''));return{success:true};}
-    case 'updateBooking':{const upd={};if(data.status!==undefined)upd.status=data.status;if(data.note!==undefined)upd.note=data.note;await sbQ('PATCH','bookings',{caseid:`eq.${data.caseId}`},upd);return{success:true};}
-    case 'deleteBooking':{const q={caseid:`eq.${data.caseId}`};if(data.createdat)q.createdat=`eq.${data.createdat}`;await sbQ('DELETE','bookings',q);try{sbHist(data.caseId,data.deletedBy||'ระบบ','ลบการจอง','ลบการจอง '+(data.customer||''));}catch(e){}return{success:true};}
+    case 'addBooking':{await sbMutate('POST','bookings',{},{createdat:nowTH(),caseid:data.caseId,sales:data.sales,customer:data.customer,facebook:data.facebook||'',ads:data.ads||'',brand:data.brand||'',model:data.model||'',plate:data.plate||'',status:data.status||'จองแล้ว',note:data.note||''});sbHist(data.caseId,data.sales,'จอง','เพิ่มการจอง '+(data.brand||'')+' '+(data.model||''));return{success:true};}
+    case 'updateBooking':{const upd={};if(data.status!==undefined)upd.status=data.status;if(data.note!==undefined)upd.note=data.note;await sbMutate('PATCH','bookings',{caseid:`eq.${data.caseId}`},upd);return{success:true};}
+    case 'deleteBooking':{const q={caseid:`eq.${data.caseId}`};if(data.createdat)q.createdat=`eq.${data.createdat}`;await sbMutate('DELETE','bookings',q);try{sbHist(data.caseId,data.deletedBy||'ระบบ','ลบการจอง','ลบการจอง '+(data.customer||''));}catch(e){}return{success:true};}
     case 'getDashboard':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const[cs,cl,users]=await Promise.all([sbQ('GET','cases',{caseid:`like.${pre}*`}),sbQ('GET','claimedcases',{}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'userid,name,avatar,startdate'})]);const cases=cs||[],claimed=cl||[],salesList=users||[];if(data.role==='Admin'){return{success:true,data:{sales:salesList.map(u=>{const my=cases.filter(c=>c.sales===u.name);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});return{name:u.name,avatar:u.avatar||'',currentCases:my.length,claimedCases:claimed.filter(c=>c.sale===u.name).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st};}),total:{cases:cases.length}}};}const my=cases.filter(c=>c.sales===data.sales);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});const me=salesList.find(u=>u.name===data.sales);return{success:true,data:{currentCases:my.length,claimedCases:claimed.filter(c=>c.sale===data.sales).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st,startdate:me?.startdate||''}};}
-    case 'getHistory':{const q={order:'createdat.desc'};if(data.caseId)q.caseid=`eq.${data.caseId}`;const rows=await sbQ('GET','history',q);return{success:true,data:(rows||[]).map(mapHistory)};}
+    case 'getHistory':{const q={order:'createdat.desc',limit:data.limit||'500'};if(data.caseId)q.caseid=`eq.${data.caseId}`;const rows=await sbQ('GET','history',q);return{success:true,data:(rows||[]).map(mapHistory)};}
     case 'getCaseNotes':{
       const rows=await sbQ('GET','case_notes',{caseid:`eq.${data.caseId||data.caseid}`,deletedat:'is.null',order:'id.desc',limit:'500'});
       if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};
@@ -493,7 +613,7 @@ async function sbApi(action,data){
       sbHist(row.caseid,row.sales,'📝 Note','📝 Note: '+row.note);
       return{success:true,data:safeArray(inserted).map(mapCaseNote)[0]||mapCaseNote(row)};
     }
-    case 'deleteCaseNote':{await sbQ('PATCH','case_notes',{id:`eq.${data.id}`},{deletedat:nowTH()});return{success:true};}
+    case 'deleteCaseNote':{await sbMutate('PATCH','case_notes',{id:`eq.${data.id}`},{deletedat:nowTH()});return{success:true};}
     case 'getCaseFollowups':{
       const rows=await sbQ('GET','case_followups',{caseid:`eq.${data.caseId||data.caseid}`,deletedat:'is.null',order:'due_date.asc,id.asc',limit:'500'});
       if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};
@@ -507,8 +627,8 @@ async function sbApi(action,data){
       sbHist(row.caseid,row.sales,'นัด Follow-up','ลงนัด '+formatTextDateToTHBE(row.createdat)+' → นัดวันที่ '+formatYMDToTHBE(row.due_date)+(row.note?' — '+row.note:''));
       return{success:true,data:f};
     }
-    case 'updateFollowupStatus':{const upd={status:data.status||'pending'};if(data.status==='done')upd.doneat=nowTH();if(data.status==='pending')upd.doneat='';await sbQ('PATCH','case_followups',{id:`eq.${data.id}`},upd);return{success:true};}
-    case 'deleteFollowup':{await sbQ('PATCH','case_followups',{id:`eq.${data.id}`},{status:'cancelled',deletedat:nowTH()});return{success:true};}
+    case 'updateFollowupStatus':{const upd={status:data.status||'pending'};if(data.status==='done')upd.doneat=nowTH();if(data.status==='pending')upd.doneat='';await sbMutate('PATCH','case_followups',{id:`eq.${data.id}`},upd);return{success:true};}
+    case 'deleteFollowup':{await sbMutate('PATCH','case_followups',{id:`eq.${data.id}`},{status:'cancelled',deletedat:nowTH()});return{success:true};}
     case 'getSalesFollowups':{const q={sales:`eq.${data.sales}`,deletedat:'is.null',order:'due_date.asc,id.asc',limit:data.limit||'500'};if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','case_followups',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows).map(mapCaseFollowup)};}
     case 'getSalesNotes':{const q={sales:`eq.${data.sales}`,deletedat:'is.null',order:'id.desc',limit:data.limit||'500'};const rows=await sbQ('GET','case_notes',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows).map(mapCaseNote)};}
     case 'checkDueFollowups':{
@@ -520,25 +640,46 @@ async function sbApi(action,data){
       for(const f of safeArray(rows)){
         if(String(f.notified_on||'')===today)continue;
         const msg='📅 ถึงวันนัด Follow-up เคส '+f.caseid+(f.customername?' ('+f.customername+')':'')+' นัดวันที่ '+formatYMDToTHBE(f.due_date)+(f.note?' — '+f.note:'');
-        await sbQ('POST','notifications',{},{sales:f.sales||sales,caseid:f.caseid,message:msg,createdat:nowTH(),status:'unread'});
-        await sbQ('PATCH','case_followups',{id:`eq.${f.id}`},{notified_on:today});count++;
+        await sbMutate('POST','notifications',{},{sales:f.sales||sales,caseid:f.caseid,message:msg,createdat:nowTH(),status:'unread'});
+        await sbMutate('PATCH','case_followups',{id:`eq.${f.id}`},{notified_on:today});count++;
       }
       if(count>0){cacheClear(['getNotifications']);try{if(window.cpTriggerPushPoll)window.cpTriggerPushPoll(500);}catch(e){}}
       return{success:true,count};
     }
-    case 'getNotifications':{const q={order:'id.desc'};if(data.sales)q.sales=`eq.${data.sales}`;const rows=await sbQ('GET','notifications',q);return{success:true,data:(rows||[]).map(mapNotif)};}
-    case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');await sbQ('PATCH','notifications',{id:`eq.${id}`},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
-    case 'markAllNotifRead':{if(data.sales)await sbQ('PATCH','notifications',{sales:`eq.${data.sales}`,status:'eq.unread'},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
-    case 'deleteCase':{const cid=data.caseId||data.caseid;await Promise.all([sbQ('DELETE','cases',{caseid:`eq.${cid}`}),sbQ('DELETE','market',{id:`eq.${cid}`}),sbQ('DELETE','claimedcases',{caseid:`eq.${cid}`})]);sbHist(cid,data.deletedBy||'แอดมิน','ลบเคส','ลบเคสออกจากระบบ');return{success:true};}
-    case 'adminPullCase':case 'adminChangeSales':{const ts=nowTH();await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`},{sales:data.newSales,updatedat:ts});const existing=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`});if(existing&&existing.length){await sbQ('PATCH','claimedcases',{caseid:`eq.${data.caseId}`},{sale:data.newSales,assignedat:ts});}else{const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});if(cr&&cr.length){const c=cr[0];await sbQ('POST','claimedcases',{},{caseid:data.caseId,customername:c.customername,contact:c.contact,report:c.report,status:c.status,fromsales:data.changedBy||'แอดมิน',sale:data.newSales,newstatus:c.status,assignedat:ts,notes:''});}}cacheClear(['getClaimedCases']);sbHist(data.caseId,data.changedBy||'แอดมิน',action==='adminPullCase'?'ดึงเคส':'โอนเคส','โอนเคสไปให้ '+data.newSales);return{success:true};}
+    case 'getNotifications':{const q={order:'id.desc',limit:data.limit||'100'};if(data.sales)q.sales=`eq.${data.sales}`;if(data.unreadOnly)q.status='eq.unread';const rows=await sbQ('GET','notifications',q);return{success:true,data:(rows||[]).map(mapNotif)};}
+    case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');await sbMutate('PATCH','notifications',{id:`eq.${id}`},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
+    case 'markAllNotifRead':{if(data.sales)await sbMutate('PATCH','notifications',{sales:`eq.${data.sales}`,status:'eq.unread'},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
+    case 'deleteCase':{const cid=data.caseId||data.caseid;await Promise.all([sbMutate('DELETE','cases',{caseid:`eq.${cid}`}),sbMutate('DELETE','market',{id:`eq.${cid}`}),sbMutate('DELETE','claimedcases',{caseid:`eq.${cid}`})]);sbHist(cid,data.deletedBy||'แอดมิน','ลบเคส','ลบเคสออกจากระบบ');return{success:true};}
+    case 'adminPullCase':case 'adminChangeSales':{
+      const ts=nowTH();
+      await sbMutate('PATCH','cases',{caseid:`eq.${data.caseId}`},{sales:data.newSales,updatedat:ts});
+      const existing=await sbQ('GET','claimedcases',{caseid:`eq.${data.caseId}`});
+      if(isSbError(existing))throw new Error(formatSbError(existing));
+      if(existing?.length){
+        await sbMutate('PATCH','claimedcases',{caseid:`eq.${data.caseId}`},{sale:data.newSales,assignedat:ts});
+      }else{
+        const cr=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`});
+        if(isSbError(cr))throw new Error(formatSbError(cr));
+        if(cr?.length){
+          const c=cr[0];
+          await sbMutate('POST','claimedcases',{},{caseid:data.caseId,customername:c.customername,contact:c.contact,report:c.report,status:c.status,fromsales:data.changedBy||'แอดมิน',sale:data.newSales,newstatus:c.status,assignedat:ts,notes:''});
+        }
+      }
+      cacheClear(['getClaimedCases']);
+      sbHist(data.caseId,data.changedBy||'แอดมิน',action==='adminPullCase'?'ดึงเคส':'โอนเคส','โอนเคสไปให้ '+data.newSales);
+      return{success:true};
+    }
     case 'getSmartAssign':{const sales=await getSmartAssignSales();return{success:true,sales};}
 
     case 'broadcast':{
-      const targets=data.sales==='all'
-        ?(await sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'name'})||[]).map(u=>u.name)
-        :[data.sales];
+      let targets=[data.sales];
+      if(data.sales==='all'){
+        const rows=await sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'name'});
+        if(isSbError(rows))throw new Error(formatSbError(rows));
+        targets=safeArray(rows).map(u=>u.name);
+      }
       for(const s of targets){
-        await sbQ('POST','notifications',{},{sales:s,caseid:'',message:'📢 '+data.message,createdat:nowTH(),status:'unread'});
+        await sbMutate('POST','notifications',{},{sales:s,caseid:'',message:'📢 '+data.message,createdat:nowTH(),status:'unread'});
       }
       cacheClear(['getNotifications']);
       // Push FCM notification ทุก target
@@ -552,8 +693,6 @@ async function sbApi(action,data){
     default:return{success:true,message:'Supabase API Ready'};
   }
 }
-
-const AppCtx = createContext(null);
 
 const Ico = {
   home:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>,
@@ -586,9 +725,15 @@ const Ico = {
 function StatusBadge({status}){return <span className={`badge ${getStatusClass(status)}`}>{status||'-'}</span>;}
 
 function Modal({title,onClose,children,footer}){
+  const titleId=useRef('modal-title-'+Math.random().toString(36).slice(2)).current;
+  useEffect(()=>{
+    const onKeyDown=e=>{if(e.key==='Escape')onClose();};
+    document.addEventListener('keydown',onKeyDown);
+    return()=>document.removeEventListener('keydown',onKeyDown);
+  },[onClose]);
   return <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-    <div className="modal">
-      <div className="modal-hd"><span style={{fontWeight:700,fontSize:16}}>{title}</span><button className="btn btn-ghost" style={{padding:'6px 10px',borderRadius:8,display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={onClose}><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
+    <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div className="modal-hd"><span id={titleId} style={{fontWeight:700,fontSize:16}}>{title}</span><button type="button" className="btn btn-ghost" style={{padding:'6px 10px',borderRadius:8,display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={onClose} aria-label="ปิดหน้าต่าง"><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
       <div className="modal-bd">{children}</div>
       {footer&&<div className="modal-ft">{footer}</div>}
     </div>
@@ -602,7 +747,7 @@ function SkeletonCards({n=3}){return <div>{Array.from({length:n}).map((_,i)=><di
 function SkeletonRows({n=5,cols=6}){return <>{Array.from({length:n}).map((_,i)=><tr key={i}>{Array.from({length:cols}).map((__,j)=><td key={j}><div className="skeleton" style={{height:14,width:j===0?80:j===cols-1?60:'70%'}}/></td>)}</tr>)}</>;}
 
 function Confirm({msg,onOk,onCancel}){
-  return <div className="overlay"><div className="modal" style={{maxWidth:340}}><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}}>⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button className="btn btn-ghost" onClick={onCancel}>ยกเลิก</button><button className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
+  return <div className="overlay"><div className="modal" style={{maxWidth:340}} role="alertdialog" aria-modal="true" aria-label="ยืนยันการทำรายการ"><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}} aria-hidden="true">⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button type="button" className="btn btn-ghost" onClick={onCancel}>ยกเลิก</button><button type="button" className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
 }
 
 // ============================================================
@@ -853,7 +998,7 @@ function AdminAnalytics({currentUser}){
             <span style={{fontSize:12,color:'var(--text2)'}}>{val} คน {i>0&&<span style={{color:convPct>=50?'var(--green)':'var(--yellow)'}}>({convPct}%)</span>}</span>
           </div>
           <div style={{height:8,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}>
-            <div style={{height:'100%',borderRadius:4,background:i===4?'var(--green)':i===3?'var(--blue)':i===2?'var(--purple)':'rgba(88,166,255,.5)',width:pct+'%',transition:'width .5s'}}/>
+            <div style={{height:'100%',borderRadius:4,background:i===4?'var(--green)':i===3?'var(--blue)':i===2?'var(--purple)':'rgba(88,166,255,.5)',width:pct+'%'}}/>
           </div>
         </div>;})}
       </div>
@@ -885,6 +1030,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const [addingNote,setAddingNote]=useState(false);
   const [newNote,setNewNote]=useState('');
   const [confirmDel,setConfirmDel]=useState(false);
+  const [saving,setSaving]=useState(false);
   const isAdmin=currentUser.role==='Admin';
   const isClaimed=!!caseData.fromsales;
   const isMarketLocked=isInMarket&&!isAdmin; // Sales ดูได้แต่แก้ไขไม่ได้
@@ -931,8 +1077,8 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     if(r.success){setFollowups(f=>f.map(x=>x.id===temp.id?r.data:x));showToast('บันทึกนัดแล้ว','ok');}
     else{setFollowups(f=>f.filter(x=>x.id!==temp.id));showToast('บันทึกนัดไม่สำเร็จ: '+(r.error||''),'err');}
   }
-  async function doneFollowup(i){const f=followups[i];const upd=followups.map((x,idx)=>idx===i?{...x,status:'done',doneat:nowTH()}:x);setFollowups(upd);if(f?.id&&!String(f.id).startsWith('tmp_'))await api('updateFollowupStatus',{id:f.id,status:'done'});}
-  async function delFollowup(i){const f=followups[i];const upd=followups.filter((_,idx)=>idx!==i);setFollowups(upd);if(f?.id&&!String(f.id).startsWith('tmp_'))await api('deleteFollowup',{id:f.id});}
+  async function doneFollowup(i){const before=followups;const f=before[i];const upd=before.map((x,idx)=>idx===i?{...x,status:'done',doneat:nowTH()}:x);setFollowups(upd);if(f?.id&&!String(f.id).startsWith('tmp_')){const r=await api('updateFollowupStatus',{id:f.id,status:'done'});if(!r.success){setFollowups(before);showToast('อัปเดตนัดไม่สำเร็จ: '+(r.error||''),'err');}}}
+  async function delFollowup(i){const before=followups;const f=before[i];setFollowups(before.filter((_,idx)=>idx!==i));if(f?.id&&!String(f.id).startsWith('tmp_')){const r=await api('deleteFollowup',{id:f.id});if(!r.success){setFollowups(before);showToast('ลบนัดไม่สำเร็จ: '+(r.error||''),'err');}}}
   async function saveNote(){if(!newNote.trim())return;
     const text=newNote.trim();const temp={id:'tmp_'+Date.now(),note:text,text,createdat:nowTH(),createdDisplay:formatTextDateToTHBE(nowTH()),sales:currentUser.name,by:currentUser.name};
     setNotes(n=>[temp,...n]);setNewNote('');setAddingNote(false);
@@ -940,17 +1086,30 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     if(r.success){setNotes(n=>n.map(x=>x.id===temp.id?r.data:x));showToast('บันทึก Note แล้ว','ok');}
     else{setNotes(n=>n.filter(x=>x.id!==temp.id));showToast('บันทึก Note ไม่สำเร็จ: '+(r.error||''),'err');}
   }
-  async function deleteNote(i){const n=notes[i];setNotes(notes.filter((_,idx)=>idx!==i));if(n?.id&&!String(n.id).startsWith('tmp_'))await api('deleteCaseNote',{id:n.id});}
+  async function deleteNote(i){const before=notes;const n=before[i];setNotes(before.filter((_,idx)=>idx!==i));if(n?.id&&!String(n.id).startsWith('tmp_')){const r=await api('deleteCaseNote',{id:n.id});if(!r.success){setNotes(before);showToast('ลบ Note ไม่สำเร็จ: '+(r.error||''),'err');}}}
   const contactRaw=caseData.contact||'';
   const contactVal=formatContact(contactRaw);
   const isQR=contactRaw.startsWith('http')||contactRaw.startsWith('data:image');
   async function save(){
+    if(saving)return;
+    setSaving(true);
     const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:editReport?report:caseData.report,sales:(isAdmin&&newSales)?newSales:caseData.sales};
-    onUpdated(optimisticData);onClose();
-    const finalReport=report;    try{if(isClaimed){await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});}else{const upd={caseid:caseId,status,sent:sentType,report:finalReport,changedBy:currentUser.name,detail:'เปลี่ยนสถานะเป็น '+status};await api('updateCase',upd);if(isAdmin&&newSales&&newSales!==caseData.sales)await api('adminChangeSales',{caseId,newSales,changedBy:currentUser.name});}}catch(e){}
+    let r;
+    if(isClaimed){
+      r=await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});
+    }else{
+      const upd={caseid:caseId,status,sent:sentType,report,changedBy:currentUser.name,detail:'เปลี่ยนสถานะเป็น '+status};
+      r=await api('updateCase',upd);
+      if(r.success&&isAdmin&&newSales&&newSales!==caseData.sales)r=await api('adminChangeSales',{caseId,newSales,changedBy:currentUser.name});
+    }
+    setSaving(false);
+    if(!r?.success){showToast('บันทึกไม่สำเร็จ: '+(r?.error||'กรุณาลองใหม่'),'err',5000);return;}
+    onUpdated(optimisticData);
+    showToast('บันทึกข้อมูลแล้ว','ok',2200);
+    onClose();
   }
-  async function saveReport(){if(!report.trim())return;setEditReport(false);onUpdated({...caseData,report});onClose();try{await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});}catch(e){}}
-  async function doDelete(){onClose();const r=await api('deleteCase',{caseId,caseid:caseId,deletedBy:currentUser.name});cacheClear(['getCases','getMarket','getDashboard','getClaimedCases','getHistory','getNotifications']);if(r.success){onUpdated();}else{showToast('เกิดข้อผิดพลาด: '+(r.error||'ไม่สามารถลบได้'),'err');}}
+  async function saveReport(){if(!report.trim()||saving)return;setSaving(true);const r=await api('updateCase',{caseid:caseId,report,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});setSaving(false);if(!r.success){showToast('บันทึกรีพอร์ตไม่สำเร็จ: '+(r.error||'กรุณาลองใหม่'),'err',5000);return;}setEditReport(false);onUpdated({...caseData,report});showToast('บันทึกรีพอร์ตแล้ว','ok',2200);}
+  async function doDelete(){if(saving)return;setSaving(true);const r=await api('deleteCase',{caseId,caseid:caseId,deletedBy:currentUser.name});setSaving(false);if(r.success){cacheClear(['getCases','getMarket','getDashboard','getClaimedCases','getHistory','getNotifications']);onUpdated();onClose();showToast('ลบเคสแล้ว','ok');}else{showToast('เกิดข้อผิดพลาด: '+(r.error||'ไม่สามารถลบได้'),'err');}}
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
     <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
@@ -1020,11 +1179,11 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
               <div style={{fontSize:12,color:'var(--text2)'}}>ไม่สามารถแก้ไขหรือติดต่อลูกค้าได้</div>
             </div>:
             <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              {!isClaimed&&<button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={editReport?saveReport:()=>setEditReport(true)}>✏️ {editReport?'บันทึกรีพอร์ต':'แก้ไขรีพอร์ต'}</button>}
+              {!isClaimed&&<button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={editReport?saveReport:()=>setEditReport(true)} disabled={saving}>✏️ {saving&&editReport?'กำลังบันทึก...':editReport?'บันทึกรีพอร์ต':'แก้ไขรีพอร์ต'}</button>}
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
               {!isClaimed&&<button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>}
             </div>}
-          {!isMarketLocked&&<button style={{width:'100%',background:'#e53935',color:'#fff',border:'none',borderRadius:8,padding:'11px',fontSize:14,fontWeight:700,cursor:'pointer'}} onClick={save}>บันทึก &amp; ปิด</button>}
+          {!isMarketLocked&&<button style={{width:'100%',background:'#e53935',color:'#fff',border:'none',borderRadius:8,padding:'11px',fontSize:14,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}} onClick={save} disabled={saving}>{saving?'กำลังบันทึก...':'บันทึก & ปิด'}</button>}
           {isMarketLocked&&<button style={{width:'100%',background:'var(--bg3)',color:'var(--text2)',border:'1px solid var(--border)',borderRadius:8,padding:'11px',fontSize:14,cursor:'pointer'}} onClick={onClose}>ปิด</button>}
         </div>
       </div>
@@ -1280,7 +1439,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
           <tbody>
             {loading?<SkeletonRows n={6} cols={7}/>:filtered.length===0?
               <tr><td colSpan={7} className="sent-empty"><span>{icon}</span>ไม่พบข้อมูลใน {title}</td></tr>:
-              filtered.map(r=><tr key={r.id} className="clickable" onClick={()=>openEdit(r)}>
+              filtered.map(r=><tr key={r.id} className="clickable" role="button" tabIndex={0} onClick={()=>openEdit(r)} onKeyDown={e=>activateOnKey(e,()=>openEdit(r))}>
                 <td data-label="สร้างเมื่อ" className="sent-created">{formatTextDateToTHBE(r.created_at)}</td>
                 <td data-label="ชื่อ" className="sent-name">{r.name||'-'}</td>
                 <td data-label="รีพอร์ต" className="sent-report-cell"><div className="sent-report-preview">{r.report||'ยังไม่มีรีพอร์ต'}</div></td>
@@ -1330,18 +1489,21 @@ function AdminCurrentCases({currentUser,users}){
   const [sending,setSending]=useState(null);
   const [confirmMarket,setConfirmMarket]=useState(null); // {caseId, salesName}
   const load=useCallback(()=>{setLoading(true);cacheClear(['getCases','getMarketIds']);Promise.all([api('getCases',{all:'true'}),api('getMarketIds',{})]).then(([r,mr])=>{
-    const casesData = safeArray(r.data);
-    const marketData = safeArray(mr.data);
-    setCases(casesData);
-    setMarketIds(new Set(marketData));
-    // ✅ บันทึกลง localStorage
-    try {
-      localStorage.setItem('cases', JSON.stringify(casesData));
-      localStorage.setItem('marketIds', JSON.stringify(Array.from(marketData)));
-    } catch(e) {
+    if(r.success&&mr.success){
+      const casesData=safeArray(r.data);
+      const marketData=safeArray(mr.data);
+      setCases(casesData);
+      setMarketIds(new Set(marketData));
+      try{
+        localStorage.setItem('cases',JSON.stringify(casesData));
+        localStorage.setItem('marketIds',JSON.stringify(Array.from(marketData)));
+      }catch(e){}
+      if(r.stale||mr.stale)showToast('กำลังแสดงข้อมูลสำรองล่าสุด','warn',3500);
+    }else{
+      showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);
     }
     setLoading(false);
-  }).catch(()=>{setCases([]);setLoading(false);});},[]);
+  }).catch(()=>{setLoading(false);showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);});},[]);
   async function sendToMarketDirect(caseId,salesName){
     setSending(null);
     setConfirmMarket({caseId,salesName});
@@ -1475,7 +1637,7 @@ function AdminCurrentCases({currentUser,users}){
       <input type="date" value={filter.dateTo||''} onChange={e=>setFilter(f=>({...f,dateTo:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
       {(filter.dateFrom||filter.dateTo)&&<button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>setFilter(f=>({...f,dateFrom:'',dateTo:''}))}>✕ ล้างวันที่</button>}
     </div>
-    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th><th>ตลาด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:filtered.length===0?<tr><td colSpan={6} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const cv=formatContact(c.contact||'');const isPhone=cv&&/^\d{9,10}$/.test(cv.replace(/\D/g,''));return<tr key={i} className="clickable" onClick={()=>setSel(c)}><td data-label="รหัสเคส"><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td data-label="ชื่อลูกค้า" style={{fontWeight:500}}>{c.customername}</td><td data-label="ติดต่อ" style={{fontSize:13}}><div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>{displayContact(c.contact)}</span>{isPhone&&<a href={`tel:${cv}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none',fontSize:11,padding:'2px 8px'}}><Ico.phone/>โทร</a>}{isPhone&&<a href={`https://line.me/ti/p/~${cv}`} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none',fontSize:11,padding:'2px 8px'}}>Line</a>}</div></td><td data-label="สถานะ"><div style={{display:'flex',gap:4,alignItems:'center'}}><StatusBadge status={c.status}/><ScoreBadge score={calculateCaseScore(c)}/></div></td><td data-label="เซลส์"><span style={{color:'var(--purple)'}}>{c.sales}</span></td><td data-label="อัปเดต" style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td>
+    <div className="card" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th><th>ตลาด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={6}/>:filtered.length===0?<tr><td colSpan={6} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const cv=formatContact(c.contact||'');const isPhone=cv&&/^\d{9,10}$/.test(cv.replace(/\D/g,''));return<tr key={i} className="clickable" role="button" tabIndex={0} onClick={()=>setSel(c)} onKeyDown={e=>activateOnKey(e,()=>setSel(c))}><td data-label="รหัสเคส"><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td data-label="ชื่อลูกค้า" style={{fontWeight:500}}>{c.customername}</td><td data-label="ติดต่อ" style={{fontSize:13}}><div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>{displayContact(c.contact)}</span>{isPhone&&<a href={`tel:${cv}`} onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none',fontSize:11,padding:'2px 8px'}}><Ico.phone/>โทร</a>}{isPhone&&<a href={`https://line.me/ti/p/~${cv}`} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none',fontSize:11,padding:'2px 8px'}}>Line</a>}</div></td><td data-label="สถานะ"><div style={{display:'flex',gap:4,alignItems:'center'}}><StatusBadge status={c.status}/><ScoreBadge score={calculateCaseScore(c)}/></div></td><td data-label="เซลส์"><span style={{color:'var(--purple)'}}>{c.sales}</span></td><td data-label="อัปเดต" style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td>
           <td onClick={e=>e.stopPropagation()}>
             {marketIds.has(String(c.caseid))?
               <span style={{fontSize:11,fontWeight:700,color:'var(--purple)',background:'rgba(188,140,255,.15)',border:'1px solid rgba(188,140,255,.4)',borderRadius:20,padding:'2px 8px',whiteSpace:'nowrap'}}>🏪 ในตลาด</span>:
@@ -1581,7 +1743,7 @@ function AdminMarket({currentUser,users}){
     setLoading(false);
   });},[]);
   useEffect(()=>{load();},[load]);
-  async function closeCase(caseId){await api('closeMarketCase',{caseId,closedBy:currentUser.name});load();}
+  async function closeCase(caseId){const r=await api('closeMarketCase',{caseId,closedBy:currentUser.name});if(r.success){showToast('ปิดเคสแล้ว','ok');load();}else showToast('ปิดเคสไม่สำเร็จ: '+(r.error||''),'err');}
   const filtered=(filterSales==='all'?cases:cases.filter(c=>c.old_sales===filterSales)).filter(c=>{
     if(!searchQ)return true;
     return caseMatchesSearch({...c,caseid:c.ID,customername:c.name,sales:c.old_sales},searchQ);
@@ -1660,8 +1822,8 @@ function AdminDashboard({currentUser}){
     })()}
     <div style={{display:'flex',gap:6,marginBottom:18,borderBottom:'1px solid rgba(79,142,247,.15)',paddingBottom:10,padding:'0 28px 10px'}}>{tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'7px 20px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,background:tab===t.k?'linear-gradient(135deg,#4f8ef7,#7c3aed)':'rgba(255,255,255,.05)',color:tab===t.k?'#fff':'#64748b',boxShadow:tab===t.k?'0 4px 14px rgba(79,142,247,.35)':'none',transition:'all .2s'}}>{t.l}</button>)}</div>
     {tab==='overview'&&<div style={{display:'grid',gap:16}}><div className="card"><div style={{fontWeight:700,marginBottom:16,fontSize:14}}>📋 เคสต่อเซลส์ (เดือนนี้)</div><div style={{height:220}}><BarChart id="salesBar" labels={salesList.map(s=>s.name)} datasets={[{label:'เคสปัจจุบัน',data:salesList.map(s=>s.currentCases||0),backgroundColor:'rgba(88,166,255,.8)'},{label:'รับตลาด',data:salesList.map(s=>s.claimedCases||0),backgroundColor:'rgba(188,140,255,.8)'},{label:'ปล่อยแล้ว',data:salesList.map(s=>s.sold||0),backgroundColor:'rgba(63,185,80,.85)'}]}/></div></div>{statusEntries.length>0&&<div className="card"><div style={{fontWeight:700,marginBottom:16,fontSize:14}}>🏷 สัดส่วนสถานะ</div><div style={{height:240}}><DonutChart id="statusDonut" labels={statusEntries.map(([k])=>k)} values={statusEntries.map(([,v])=>v)} colors={statusEntries.map(([k],i)=>STATUS_COLORS[k]||PALETTE[i%PALETTE.length])}/></div></div>}</div>}
-    {tab==='sales'&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>{salesList.map((s,i)=>{const stEntries=Object.entries(s.statuses||{}).sort((a,b)=>b[1]-a[1]);const maxSt=stEntries.reduce((m,[,v])=>v>m?v:m,1);return <div key={i} className="card"><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}><div style={{width:46,height:46,borderRadius:'50%',background:'var(--bg3)',border:'2px solid var(--border)',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{s.avatar?<img src={s.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:<Ico.user/>}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:15}}>{s.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Sales</div></div></div><div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>{[['เคส',s.currentCases||0,'var(--blue)'],['ตลาด',s.claimedCases||0,'var(--purple)'],['ปล่อย',s.sold||0,'var(--green)']].map(([l,v,c])=><div key={l} style={{textAlign:'center',background:'var(--bg3)',borderRadius:8,padding:'10px 4px'}}><div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:11,color:'var(--text2)'}}>{l}</div></div>)}</div></div>;})}  </div>}
-    {tab==='status'&&<div style={{display:'grid',gap:14,padding:'0 28px 28px'}}><div style={{background:'rgba(79,142,247,.05)',border:'1px solid rgba(79,142,247,.15)',borderRadius:14,padding:16}}><div style={{fontWeight:700,marginBottom:14,fontSize:14,color:'#e2e8f0'}}>📊 สรุปสถานะ</div>{statusEntries.map(([st,cnt],i)=>{const pct=Math.round(cnt/(totalCases||1)*100);return <div key={st} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{width:8,height:8,borderRadius:'50%',background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],flexShrink:0,boxShadow:`0 0 6px ${STATUS_COLORS[st]||PALETTE[i%PALETTE.length]}`}}/><div style={{flex:1,fontSize:13}}><StatusBadge status={st}/></div><div style={{flex:2,height:5,background:'rgba(255,255,255,.06)',borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',borderRadius:3,background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],width:`${pct}%`,transition:'width .5s'}}/></div><div style={{fontSize:13,fontWeight:700,minWidth:28,textAlign:'right',color:'#e2e8f0'}}>{cnt}</div><div style={{fontSize:11,color:'#475569',minWidth:36,textAlign:'right'}}>{pct}%</div></div>;})} </div></div>}
+    {tab==='sales'&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>{salesList.map((s,i)=>{const stEntries=Object.entries(s.statuses||{}).sort((a,b)=>b[1]-a[1]);const maxSt=stEntries.reduce((m,[,v])=>v>m?v:m,1);return <div key={i} className="card"><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}><div style={{width:46,height:46,borderRadius:'50%',background:'var(--bg3)',border:'2px solid var(--border)',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{s.avatar?<img src={s.avatar} alt={`รูปโปรไฟล์ ${s.name}`} loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:<Ico.user/>}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:15}}>{s.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Sales</div></div></div><div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>{[['เคส',s.currentCases||0,'var(--blue)'],['ตลาด',s.claimedCases||0,'var(--purple)'],['ปล่อย',s.sold||0,'var(--green)']].map(([l,v,c])=><div key={l} style={{textAlign:'center',background:'var(--bg3)',borderRadius:8,padding:'10px 4px'}}><div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:11,color:'var(--text2)'}}>{l}</div></div>)}</div></div>;})}  </div>}
+    {tab==='status'&&<div style={{display:'grid',gap:14,padding:'0 28px 28px'}}><div style={{background:'rgba(79,142,247,.05)',border:'1px solid rgba(79,142,247,.15)',borderRadius:14,padding:16}}><div style={{fontWeight:700,marginBottom:14,fontSize:14,color:'#e2e8f0'}}>📊 สรุปสถานะ</div>{statusEntries.map(([st,cnt],i)=>{const pct=Math.round(cnt/(totalCases||1)*100);return <div key={st} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{width:8,height:8,borderRadius:'50%',background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],flexShrink:0,boxShadow:`0 0 6px ${STATUS_COLORS[st]||PALETTE[i%PALETTE.length]}`}}/><div style={{flex:1,fontSize:13}}><StatusBadge status={st}/></div><div style={{flex:2,height:5,background:'rgba(255,255,255,.06)',borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',borderRadius:3,background:STATUS_COLORS[st]||PALETTE[i%PALETTE.length],width:`${pct}%`}}/></div><div style={{fontSize:13,fontWeight:700,minWidth:28,textAlign:'right',color:'#e2e8f0'}}>{cnt}</div><div style={{fontSize:11,color:'#475569',minWidth:36,textAlign:'right'}}>{pct}%</div></div>;})} </div></div>}
   </div>;
 }
 
@@ -1724,7 +1886,7 @@ function AdminBookings({currentUser,users}){
 
 function BookingDetailModal({booking,onClose,onUpdated}){
   const [status,setStatus]=useState(booking['สถานะ']||'จองแล้ว');const [note,setNote]=useState(booking['หมายเหตุ']||'');const [loading,setLoading]=useState(false);const [deleting,setDeleting]=useState(false);
-  async function save(){setLoading(true);await api('updateBooking',{caseId:booking.CaseID,status,note});setLoading(false);onUpdated();onClose();}
+  async function save(){setLoading(true);const r=await api('updateBooking',{caseId:booking.CaseID,status,note});setLoading(false);if(r.success){showToast('บันทึกการจองแล้ว','ok');onUpdated();onClose();}else showToast('บันทึกไม่สำเร็จ: '+(r.error||''),'err');}
   async function deleteBooking(){
     if(!confirm(`ยืนยันลบการจองของ ${booking['ลูกค้า']||booking.CaseID} ใช่ไหม?\n\nการลบนี้จะลบเฉพาะข้อมูลในหน้า "การจอง" ไม่ลบเคสหลักในหน้าเคสปัจจุบัน`))return;
     setDeleting(true);
@@ -1750,7 +1912,7 @@ function AdminUsers({currentUser}){
   const setE=(k,v)=>setEditForm(f=>({...f,[k]:v}));
   const load=()=>{setLoading(true);api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);setLoading(false);});};
   useEffect(()=>{load();},[]);
-  async function addUser(){if(!form.username||!form.name)return showToast('กรุณากรอกชื่อและ username','warn');await api('addUser',form);load();setShowAdd(false);setForm({username:'',password:'1234',name:'',role:'Sales'});}
+  async function addUser(){if(!form.username||!form.name)return showToast('กรุณากรอกชื่อและ username','warn');setSaving(true);const r=await api('addUser',form);setSaving(false);if(!r.success)return showToast('เพิ่มผู้ใช้ไม่สำเร็จ: '+(r.error||''),'err');load();setShowAdd(false);setForm({username:'',password:'1234',name:'',role:'Sales'});showToast('เพิ่มผู้ใช้แล้ว','ok');}
   function openEdit(u){setEditUser(u);setEditForm({name:u.name||'',password:'',status:u.status||'active',role:u.role||'Sales',avatar:u.avatar||'',startdate:u.startdate||''});}
   async function saveEdit(){
     if(!editForm.name)return showToast('กรุณากรอกชื่อ','warn');
@@ -1758,13 +1920,15 @@ function AdminUsers({currentUser}){
     const upd={name:editForm.name,status:editForm.status,role:editForm.role,avatar:editForm.avatar||''};
     if(editForm.password.trim())upd.password=editForm.password.trim();
     if(editForm.startdate)upd.startdate=editForm.startdate;
-    await api('updateUser',{userId:editUser.userId,...upd});
-    setSaving(false);setEditUser(null);load();
+    const r=await api('updateUser',{userId:editUser.userId,...upd});
+    setSaving(false);
+    if(!r.success)return showToast('บันทึกผู้ใช้ไม่สำเร็จ: '+(r.error||''),'err');
+    setEditUser(null);load();showToast('บันทึกผู้ใช้แล้ว','ok');
   }
   async function toggleStatus(u){
     const newStatus=u.status==='active'?'inactive':'active';
-    await api('updateUser',{userId:u.userId,status:newStatus});
-    load();
+    const r=await api('updateUser',{userId:u.userId,status:newStatus});
+    if(r.success)load();else showToast('เปลี่ยนสถานะผู้ใช้ไม่สำเร็จ: '+(r.error||''),'err');
   }
   const AU={bg:'linear-gradient(160deg,#080818 0%,#100828 50%,#0d1830 100%)',p:'#a78bfa',b:'#60a5fa',g:'#34d399',dim:'rgba(139,92,246,.1)',border:'rgba(139,92,246,.2)',text:'#e2e8f0',sub:'#6b7280'};
   return <div className="page" style={{paddingBottom:40}}>
@@ -1791,7 +1955,7 @@ function AdminUsers({currentUser}){
             onMouseOut={e=>{e.currentTarget.style.borderColor=cardColor+'30';e.currentTarget.style.boxShadow='none';}}>
             <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
               <div style={{width:52,height:52,borderRadius:'50%',background:`${cardColor}15`,border:`2px solid ${cardColor}50`,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,boxShadow:`0 0 12px ${cardColor}30`}}>
-                {u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:<span style={{fontSize:20}}>👤</span>}
+                {u.avatar?<img src={u.avatar} alt={`รูปโปรไฟล์ ${u.name}`} loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:<span style={{fontSize:20}}>👤</span>}
               </div>
               <div style={{flex:1}}>
                 <div style={{fontWeight:800,fontSize:16,color:AU.text}}>{u.name}</div>
@@ -1829,7 +1993,7 @@ function AdminUsers({currentUser}){
       <div style={{display:'grid',gap:12}}>
         <div style={{display:'flex',alignItems:'center',gap:16,background:'var(--bg3)',borderRadius:10,padding:'12px 14px'}}>
           <div style={{width:64,height:64,borderRadius:'50%',background:'var(--bg2)',border:'2px solid var(--border)',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>
-            {editForm.avatar?<img src={editForm.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:'👤'}
+            {editForm.avatar?<img src={editForm.avatar} alt={`รูปโปรไฟล์ ${editForm.name||editUser?.name||''}`} decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:'👤'}
           </div>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:700}}>{editUser.name}</div>
@@ -2105,7 +2269,7 @@ function DailyFocusPage({currentUser,onNavigate}){
           <span style={{fontWeight:800,fontSize:15,color:tColor}}>{tPct}%</span>
         </div>
         <div style={{height:8,background:'var(--bg3)',borderRadius:6,overflow:'hidden',marginBottom:6}}>
-          <div style={{height:'100%',borderRadius:6,width:tPct+'%',background:tColor,transition:'width .5s'}}/>
+          <div style={{height:'100%',borderRadius:6,width:tPct+'%',background:tColor}}/>
         </div>
         <div style={{fontSize:12,color:'var(--text2)',display:'flex',justifyContent:'space-between'}}>
           <span>ปล่อยแล้ว <strong style={{color:'var(--green)'}}>{soldThisMonth}</strong> / {myTarget} คัน</span>
@@ -2161,7 +2325,9 @@ function usePushNotif(apiUrl,salesName){
         });
         if(fresh.length>0){
           fresh.forEach(n=>seenRef.current.add(String(n.id||n.notifId||n.createdat||n.message||'')));
-          try{localStorage.setItem('cp_seen_notifs',JSON.stringify([...seenRef.current]));}catch(e){}
+          const recentKeys=[...seenRef.current].slice(-500);
+          seenRef.current=new Set(recentKeys);
+          try{localStorage.setItem('cp_seen_notifs',JSON.stringify(recentKeys));}catch(e){}
           const body=fresh.length===1?fresh[0].message:fresh.length+' การแจ้งเตือนใหม่';
           try{new Notification('🚗 CasePool',{body,icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png',tag:'casepool',renotify:true});}catch(e){}
         }
@@ -2183,13 +2349,13 @@ function PushNotifBanner({currentUser}){
 }
 
 function GlobalSearch({currentUser,onClose,onNavigate}){
-  const [q,setQ]=useState('');const [results,setResults]=useState([]);const [loading,setLoading]=useState(false);const inputRef=useRef();
+  const [q,setQ]=useState('');const [results,setResults]=useState([]);const [loading,setLoading]=useState(false);const inputRef=useRef();const searchSeq=useRef(0);
   useEffect(()=>{setTimeout(()=>inputRef.current?.focus(),80);},[]);
-  useEffect(()=>{if(q.trim().length<2){setResults([]);return;}setLoading(true);const t=setTimeout(async()=>{const[cr,ccr]=await Promise.all([api('searchCases',{q:q.trim()}),api('getClaimedCases',{sales:currentUser.name})]);const myCases=(cr.success?(cr.data||[]):[]).filter(c=>c.sales===currentUser.name).map(c=>({...c,_type:'cases'}));const claimed=(ccr.success?(ccr.data||[]):[]).filter(c=>caseMatchesSearch({...c,caseid:c.caseID,status:c.newstatus||c.status},q)).map(c=>({...c,caseid:c.caseID,status:c.newstatus||c.status,_type:'claimed'}));const seen=new Set();const merged=[...myCases,...claimed].filter(c=>{if(seen.has(c.caseid))return false;seen.add(c.caseid);return true;}).sort((a,b)=>getCaseSearchScore(b,q)-getCaseSearchScore(a,q));setResults(merged);setLoading(false);},380);return()=>clearTimeout(t);},[q,currentUser.name]);
+  useEffect(()=>{const seq=++searchSeq.current;if(q.trim().length<2){setResults([]);setLoading(false);return;}setLoading(true);const t=setTimeout(async()=>{const term=q.trim();const[cr,ccr]=await Promise.all([api('searchCases',{q:term}),api('getClaimedCases',{sales:currentUser.name})]);if(seq!==searchSeq.current)return;const myCases=(cr.success?safeArray(cr.data):[]).filter(c=>c.sales===currentUser.name).map(c=>({...c,_type:'cases'}));const claimed=(ccr.success?safeArray(ccr.data):[]).filter(c=>caseMatchesSearch({...c,caseid:c.caseID,status:c.newstatus||c.status},term)).map(c=>({...c,caseid:c.caseID,status:c.newstatus||c.status,_type:'claimed'}));const seen=new Set();const merged=[...myCases,...claimed].filter(c=>{if(seen.has(c.caseid))return false;seen.add(c.caseid);return true;}).sort((a,b)=>getCaseSearchScore(b,term)-getCaseSearchScore(a,term));setResults(merged);setLoading(false);},380);return()=>clearTimeout(t);},[q,currentUser.name]);
   return <div className="overlay" style={{alignItems:'flex-start',paddingTop:56,zIndex:200}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,width:'100%',maxWidth:540,boxShadow:'0 20px 60px rgba(0,0,0,.55)',overflow:'hidden'}}>
       <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',borderBottom:'1px solid var(--border)'}}><Ico.gsearch/><input ref={inputRef} value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหาชื่อลูกค้า เบอร์ หรือรหัสเคส..." style={{flex:1,background:'none',border:'none',outline:'none',fontSize:15,color:'var(--text)'}}/><button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onClose}><Ico.x/></button></div>
-      <div style={{maxHeight:420,overflowY:'auto'}}>{loading?<div style={{padding:28,textAlign:'center',color:'var(--text2)'}}><span className="spin" style={{display:'inline-block',width:18,height:18}}/></div>:q.length<2?<div style={{padding:'22px 20px',textAlign:'center',color:'var(--text3)',fontSize:13}}>🔍 พิมพ์อย่างน้อย 2 ตัวอักษร</div>:results.length===0?<div style={{padding:'28px',textAlign:'center',color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🤷</div><div style={{fontSize:14}}>ไม่พบผลลัพธ์</div></div>:<>{<div style={{padding:'8px 16px 0',fontSize:11,color:'var(--text3)'}}>พบ {results.length} รายการ</div>}{results.map((c,i)=><div key={i} className="gs-result" onClick={()=>{onNavigate(c._type);onClose();}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:13}}>{c.caseid}</span><StatusBadge status={c.status}/></div><div style={{fontWeight:600,fontSize:14}}>{c.customername||c.name||'-'}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{displayContact(c.contact)||'-'}</div></div>)}</>}</div>
+      <div style={{maxHeight:420,overflowY:'auto'}}>{loading?<div style={{padding:28,textAlign:'center',color:'var(--text2)'}}><span className="spin" style={{display:'inline-block',width:18,height:18}}/></div>:q.length<2?<div style={{padding:'22px 20px',textAlign:'center',color:'var(--text3)',fontSize:13}}>🔍 พิมพ์อย่างน้อย 2 ตัวอักษร</div>:results.length===0?<div style={{padding:'28px',textAlign:'center',color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🤷</div><div style={{fontSize:14}}>ไม่พบผลลัพธ์</div></div>:<>{<div style={{padding:'8px 16px 0',fontSize:11,color:'var(--text3)'}}>พบ {results.length} รายการ</div>}{results.map((c,i)=>{const open=()=>{onNavigate(c._type);onClose();};return <div key={i} className="gs-result" role="button" tabIndex={0} onClick={open} onKeyDown={e=>activateOnKey(e,open)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:13}}>{c.caseid}</span><StatusBadge status={c.status}/></div><div style={{fontWeight:600,fontSize:14}}>{c.customername||c.name||'-'}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{displayContact(c.contact)||'-'}</div></div>;})}</>}</div>
     </div>
   </div>;
 }
@@ -2412,7 +2578,7 @@ function SalesCurrentCases({currentUser,users}){
       const alert=getCaseAlert(c);
       const suggestion=getCaseSuggestion(c);
       const isClosed=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'].includes(c.status);
-      return<div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer',opacity:isClosed?0.55:1,borderLeft:score>=80?'3px solid var(--red)':score>=50?'3px solid var(--yellow)':'1px solid var(--border)'}}>
+      return<div key={i} className="market-card" role="button" tabIndex={0} onClick={()=>setSel(c)} onKeyDown={e=>activateOnKey(e,()=>setSel(c))} style={{cursor:'pointer',opacity:isClosed?0.55:1,borderLeft:score>=80?'3px solid var(--red)':score>=50?'3px solid var(--yellow)':'1px solid var(--border)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
           <span style={{color:'var(--blue)',fontWeight:700,fontSize:15}}>{c.caseid}</span>
           <div style={{display:'flex',gap:6,alignItems:'center'}}>
@@ -2447,7 +2613,7 @@ function SalesClaimedCases({currentUser,users}){
   async function doReturn(caseId){const r=await api('returnCase',{caseId,sales:currentUser.name});if(!r.success){showToast(r.error||'ไม่สามารถคืนเคสได้','err');return;}load();}
   return <div className="page">
     <div className="page-hd"><div className="page-title">📥 เคสที่รับจากตลาด</div><button className="btn btn-ghost" onClick={load}>🔄</button></div>
-    {loading?<SkeletonCards n={3}/>:cases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:cases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);return <div key={i} className="market-card" onClick={()=>setSel(c)} style={{cursor:'pointer'}}>
+    {loading?<SkeletonCards n={3}/>:cases.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}>ยังไม่มีเคสที่รับจากตลาด</div>:cases.map((c,i)=>{const ok=canReturn(c);const left=timeLeft(c);return <div key={i} className="market-card" role="button" tabIndex={0} onClick={()=>setSel(c)} onKeyDown={e=>activateOnKey(e,()=>setSel(c))} style={{cursor:'pointer'}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseID}</span><StatusBadge status={c.newstatus||c.status}/></div>
       <div style={{fontWeight:500,marginBottom:4}}>{c.customername}</div>
       <div style={{fontSize:12,color:'var(--text2)',marginBottom:6}}>รับมาจาก: <span style={{color:'var(--orange)'}}>{c.fromsales||'-'}</span>{' · '}รับเมื่อ: {String(c.AssignedAt||'').split(' ')[0]}</div>
@@ -2494,9 +2660,9 @@ function SalesDashboard({currentUser}){
   const earned=BADGES.filter(b=>soldNow>=b.req);const latest=earned[earned.length-1]||null;const nextB=BADGES.find(b=>soldNow<b.req)||null;
   return <div className="page">
     <div className="page-hd"><div className="page-title">📊 แดชบอร์ดของฉัน</div><button className="btn btn-ghost" style={{fontSize:13}} onClick={load}>🔄</button></div>
-    <div style={{display:'flex',gap:12,marginBottom:18,alignItems:'center'}}><div style={{width:64,height:64,borderRadius:'50%',background:'var(--bg3)',border:'2px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>{currentUser.avatar?<img src={currentUser.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:18,display:'flex',alignItems:'center',gap:8}}>{currentUser.name}{latest&&<span title={latest.label} style={{fontSize:22}}>{latest.icon}</span>}</div><div style={{fontSize:13,color:'var(--text2)'}}>Sales · ประจำเดือนนี้</div>{startdate&&<div style={{marginTop:5,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}><span style={{fontSize:12,color:'var(--text3)'}}>📅 เริ่ม {fmtStart(startdate)}</span>{yearsMonths&&<span style={{fontSize:12,fontWeight:700,background:'rgba(88,166,255,.12)',color:'var(--blue)',border:'1px solid rgba(88,166,255,.25)',borderRadius:20,padding:'2px 10px'}}>⏱ {yearsMonths}</span>}</div>}</div></div>
+    <div style={{display:'flex',gap:12,marginBottom:18,alignItems:'center'}}><div style={{width:64,height:64,borderRadius:'50%',background:'var(--bg3)',border:'2px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>{currentUser.avatar?<img src={currentUser.avatar} alt={`รูปโปรไฟล์ ${currentUser.name}`} decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:18,display:'flex',alignItems:'center',gap:8}}>{currentUser.name}{latest&&<span title={latest.label} style={{fontSize:22}}>{latest.icon}</span>}</div><div style={{fontSize:13,color:'var(--text2)'}}>Sales · ประจำเดือนนี้</div>{startdate&&<div style={{marginTop:5,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}><span style={{fontSize:12,color:'var(--text3)'}}>📅 เริ่ม {fmtStart(startdate)}</span>{yearsMonths&&<span style={{fontSize:12,fontWeight:700,background:'rgba(88,166,255,.12)',color:'var(--blue)',border:'1px solid rgba(88,166,255,.25)',borderRadius:20,padding:'2px 10px'}}>⏱ {yearsMonths}</span>}</div>}</div></div>
     <div className="stat-grid" style={{marginBottom:14}}>{[['เคสของฉัน',data.currentCases||0,'var(--blue)'],['รับตลาด',data.claimedCases||0,'var(--purple)'],['ปล่อยแล้ว',data.sold||0,'var(--green)']].map(([l,v,c])=><div key={l} className="stat-card"><div className="stat-num" style={{color:c}}>{v}</div><div className="stat-lbl">{l}</div></div>)}</div>
-    <div className="card" style={{marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontWeight:700,fontSize:14}}>🎯 เป้าหมายเดือนนี้</div><span style={{fontSize:12,color:'var(--text3)'}}>ตั้งโดย Admin</span></div>{target>0?<><div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span style={{fontSize:13,color:'var(--text2)'}}>ปล่อยแล้ว {soldNow} / {target} เคส</span><span style={{fontSize:14,fontWeight:700,color:pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--yellow)'}}>{pct}%</span></div><div style={{height:10,background:'var(--bg3)',borderRadius:6,overflow:'hidden',marginBottom:8}}><div style={{height:'100%',borderRadius:6,transition:'width .5s',background:pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--yellow)',width:`${pct}%`}}/></div>{pct>=100?<div style={{fontSize:12,color:'var(--green)',fontWeight:700}}>🎉 บรรลุเป้าหมาย!</div>:<div style={{fontSize:12,color:'var(--text2)'}}>เหลืออีก <strong style={{color:'var(--blue)'}}>{target-soldNow}</strong> เคส</div>}</>:<div style={{fontSize:13,color:'var(--text3)',textAlign:'center',padding:'6px 0'}}>กดตั้งเป้าหมายเพื่อติดตาม</div>}</div>
+    <div className="card" style={{marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontWeight:700,fontSize:14}}>🎯 เป้าหมายเดือนนี้</div><span style={{fontSize:12,color:'var(--text3)'}}>ตั้งโดย Admin</span></div>{target>0?<><div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span style={{fontSize:13,color:'var(--text2)'}}>ปล่อยแล้ว {soldNow} / {target} เคส</span><span style={{fontSize:14,fontWeight:700,color:pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--yellow)'}}>{pct}%</span></div><div style={{height:10,background:'var(--bg3)',borderRadius:6,overflow:'hidden',marginBottom:8}}><div style={{height:'100%',borderRadius:6,background:pct>=100?'var(--green)':pct>=70?'var(--blue)':'var(--yellow)',width:`${pct}%`}}/></div>{pct>=100?<div style={{fontSize:12,color:'var(--green)',fontWeight:700}}>🎉 บรรลุเป้าหมาย!</div>:<div style={{fontSize:12,color:'var(--text2)'}}>เหลืออีก <strong style={{color:'var(--blue)'}}>{target-soldNow}</strong> เคส</div>}</>:<div style={{fontSize:13,color:'var(--text3)',textAlign:'center',padding:'6px 0'}}>กดตั้งเป้าหมายเพื่อติดตาม</div>}</div>
     <div className="card" style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:14,marginBottom:12}}>🏆 Achievement เดือนนี้</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{BADGES.map(b=>{const ok=soldNow>=b.req;return<div key={b.id} className="ach-badge" title={`${b.label}: ${b.req} เคส`} style={{background:ok?'rgba(88,166,255,.08)':'var(--bg3)',border:`1px solid ${ok?'rgba(88,166,255,.3)':'var(--border)'}`,opacity:ok?1:.38,filter:ok?'none':'grayscale(1)'}}><span style={{fontSize:24}}>{b.icon}</span><span style={{fontSize:11,fontWeight:700,color:ok?'var(--text)':'var(--text3)'}}>{b.label}</span><span style={{fontSize:10,color:'var(--text3)'}}>{b.req} เคส</span></div>;})}</div>{nextB&&<div style={{fontSize:12,color:'var(--text2)',marginTop:10,background:'var(--bg3)',padding:'8px 12px',borderRadius:8}}>🎯 ปิดอีก <strong style={{color:'var(--blue)'}}>{nextB.req-soldNow}</strong> เคส รับ {nextB.icon} <strong>{nextB.label}</strong></div>}</div>
     <div className="card" style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:14,marginBottom:14}}>📈 ผลงาน 6 เดือนล่าสุด</div><div style={{height:180}}><BarChart id="perfBar6" labels={months.map(m=>m.label)} datasets={[{label:'เคสทั้งหมด',data:months.map(m=>m.total),backgroundColor:'rgba(88,166,255,.5)'},{label:'ปล่อยแล้ว',data:months.map(m=>m.won),backgroundColor:'rgba(63,185,80,.8)'}]}/></div></div>
     {/* Smart Summary */}
@@ -2517,7 +2683,6 @@ function OnboardingTour({currentUser,onDone}){
     {icon:'🏪',title:'ตลาดเคส',desc:'เคสจากลูกค้าที่รอคนดูแล ใครไวได้ก่อน',tip:'⚡ กดรับเคสได้เลยทันที!',color:'#a855f7'},
     {icon:'📋',title:'เคสของฉัน',desc:'เคสที่ได้รับมอบหมาย อัปเดตสถานะทุกวัน',tip:'⚠️ ไม่อัปเดต 3 วัน ระบบส่งตลาดอัตโนมัติ!',color:'#ff2d78'},
     {icon:'📥',title:'รับจากตลาด',desc:'เคสที่คุณรับมาเอง มีเวลา 24 ชั่วโมงก่อนคืน',tip:'🔒 ต้องรอ 24 ชม. หลังรับเคสถึงจะคืนได้',color:'#34d399'},
-    {icon:'🧠',title:'AI แนะนำ',desc:'ใช้ AI วิเคราะห์เคสและให้คำแนะนำส่วนตัว',tip:'🔑 ต้องมี Anthropic API Key',color:'#60a5fa'},
   ];
   function finish(){try{localStorage.setItem('cp_onboarded_'+currentUser.userId,'1');}catch(e){}onDone();}
   function goNext(){setAnimDir('out-left');setTimeout(()=>{setStep(s=>s+1);setAnimDir('in');},180);}
@@ -2535,7 +2700,7 @@ function OnboardingTour({currentUser,onDone}){
         {/* Corner accents */}
         <div style={{position:'absolute',top:12,left:12,width:14,height:14,borderTop:`2px solid ${s.color}`,borderLeft:`2px solid ${s.color}`,borderRadius:'14px 0 0 0'}}/>
         <div style={{position:'absolute',top:12,right:12,width:14,height:14,borderTop:`2px solid ${s.color}`,borderRight:`2px solid ${s.color}`,borderRadius:'0 14px 0 0'}}/>
-        <div style={{fontSize:60,marginBottom:16,display:'block',animation:'iconBounce 2s ease-in-out infinite'}}>{s.icon}</div>
+        <div style={{fontSize:60,marginBottom:16,display:'block'}}>{s.icon}</div>
         <div style={{fontSize:11,color:`${s.color}80`,letterSpacing:2,textTransform:'uppercase',marginBottom:8}}>ขั้นตอน {step+1} / {steps.length}</div>
         <div style={{fontWeight:900,fontSize:20,marginBottom:12,color:'#fff',letterSpacing:.3}}>{s.title}</div>
         <div style={{fontSize:14,color:'rgba(255,255,255,.6)',lineHeight:1.8,marginBottom:s.tip?16:20}}>{s.desc}</div>
@@ -2575,17 +2740,17 @@ function LoginPage({onLogin}){
           <div style={{fontSize:13,color:'var(--text2)',marginTop:5}}>เข้าสู่ระบบเพื่อจัดการเคส</div>
         </div>
         <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:18,padding:'28px 28px 24px',boxShadow:'0 8px 32px rgba(0,0,0,.18)'}}>
-          {error&&<div style={{background:'rgba(248,81,73,.08)',border:'1px solid rgba(248,81,73,.28)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'var(--red)',display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:16}}>⚠️</span>{error}</div>}
+          {error&&<div role="alert" style={{background:'rgba(248,81,73,.08)',border:'1px solid rgba(248,81,73,.28)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'var(--red)',display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:16}} aria-hidden="true">⚠️</span>{error}</div>}
           <div className="form-group" style={{marginBottom:16}}>
-            <label style={{fontSize:12,fontWeight:600,color:'var(--text2)',letterSpacing:.6,textTransform:'uppercase',display:'block',marginBottom:7}}>Username</label>
-            <input value={username} onChange={e=>{setUsername(e.target.value);setError('');}} onKeyDown={e=>{if(e.key==='Enter'){const p=document.getElementById('cp-pass-in');if(p)p.focus();}}} onFocus={()=>setFocused('user')} onBlur={()=>setFocused('')} placeholder="กรอก username" autoComplete="username" style={{borderColor:focused==='user'?'var(--blue)':error?'rgba(248,81,73,.45)':'var(--border)',transition:'border-color .15s'}}/>
+            <label htmlFor="cp-user-in" style={{fontSize:12,fontWeight:600,color:'var(--text2)',letterSpacing:.6,textTransform:'uppercase',display:'block',marginBottom:7}}>Username</label>
+            <input id="cp-user-in" value={username} onChange={e=>{setUsername(e.target.value);setError('');}} onKeyDown={e=>{if(e.key==='Enter'){const p=document.getElementById('cp-pass-in');if(p)p.focus();}}} onFocus={()=>setFocused('user')} onBlur={()=>setFocused('')} placeholder="กรอก username" autoComplete="username" style={{borderColor:focused==='user'?'var(--blue)':error?'rgba(248,81,73,.45)':'var(--border)',transition:'border-color .15s'}}/>
           </div>
           <div className="form-group" style={{marginBottom:24,position:'relative'}}>
-            <label style={{fontSize:12,fontWeight:600,color:'var(--text2)',letterSpacing:.6,textTransform:'uppercase',display:'block',marginBottom:7}}>รหัสผ่าน</label>
+            <label htmlFor="cp-pass-in" style={{fontSize:12,fontWeight:600,color:'var(--text2)',letterSpacing:.6,textTransform:'uppercase',display:'block',marginBottom:7}}>รหัสผ่าน</label>
             <input id="cp-pass-in" type={showPass?'text':'password'} value={password} onChange={e=>{setPassword(e.target.value);setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} onFocus={()=>setFocused('pass')} onBlur={()=>setFocused('')} placeholder="••••••••" autoComplete="current-password" style={{paddingRight:44,borderColor:focused==='pass'?'var(--blue)':error?'rgba(248,81,73,.45)':'var(--border)',transition:'border-color .15s'}}/>
-            <button onClick={()=>setShowPass(!showPass)} style={{position:'absolute',right:12,bottom:9,background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:18,padding:4,lineHeight:1}}>{showPass?'🙈':'👁'}</button>
+            <button type="button" onClick={()=>setShowPass(!showPass)} aria-label={showPass?'ซ่อนรหัสผ่าน':'แสดงรหัสผ่าน'} style={{position:'absolute',right:12,bottom:9,background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:18,padding:4,lineHeight:1}}>{showPass?'🙈':'👁'}</button>
           </div>
-          <button onClick={submit} disabled={loading} style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,border:'none',borderRadius:12,cursor:loading?'wait':'pointer',background:loading?'var(--bg3)':'linear-gradient(135deg,#1f6feb,#388bfd)',color:loading?'var(--text3)':'#fff',boxShadow:loading?'none':'0 4px 18px rgba(31,111,235,.4)',transition:'all .2s'}}>
+          <button type="button" onClick={submit} disabled={loading} style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,border:'none',borderRadius:12,cursor:loading?'wait':'pointer',background:loading?'var(--bg3)':'linear-gradient(135deg,#1f6feb,#388bfd)',color:loading?'var(--text3)':'#fff',boxShadow:loading?'none':'0 4px 18px rgba(31,111,235,.4)',transition:'all .2s'}}>
             {loading?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}><span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/>กำลังเข้าสู่ระบบ...</span>:'เข้าสู่ระบบ →'}
           </button>
         </div>
@@ -2704,9 +2869,9 @@ function AdminTargetContent({users,neon='#ff2d78'}){
     // sync ขึ้น Supabase — ลอง PATCH ก่อน ถ้าไม่มีค่อย POST
     const existing=await sbQ('GET','targets',{sales_name:'eq.'+name,month_key:'eq.'+monthKey});
     if(existing&&existing.length>0){
-      await sbQ('PATCH','targets',{sales_name:'eq.'+name,month_key:'eq.'+monthKey},{target_value:v,updated_at:new Date().toISOString()});
+      await sbMutate('PATCH','targets',{sales_name:'eq.'+name,month_key:'eq.'+monthKey},{target_value:v,updated_at:new Date().toISOString()});
     }else{
-      await sbQ('POST','targets',{},{sales_name:name,month_key:monthKey,target_value:v,updated_at:new Date().toISOString()});
+      await sbMutate('POST','targets',{},{sales_name:name,month_key:monthKey,target_value:v,updated_at:new Date().toISOString()});
     }
   }
   function getTarget(name){return targets[monthKey+'_'+name]||0;}
@@ -2727,14 +2892,14 @@ function AdminTargetContent({users,neon='#ff2d78'}){
         const barC=pct>=100?'#00ff88':pct>=70?neon:'#ffd700';
         return<div key={u.userId} className="card">
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:tg>0?10:0}}>
-            <div style={{width:40,height:40,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>{u.avatar?<img src={u.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
+            <div style={{width:40,height:40,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>{u.avatar?<img src={u.avatar} alt={`รูปโปรไฟล์ ${u.name}`} loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
             <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{u.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>ปล่อยแล้ว {sold} คัน</div></div>
             <div style={{display:'flex',alignItems:'center',gap:6}}>
               <input type="number" value={tg||''} onChange={e=>setTgt(u.name,e.target.value)} min={0} placeholder="เป้า" style={{width:60,textAlign:'center',fontSize:14,fontWeight:700,padding:'4px 8px'}}/>
               <span style={{fontSize:11,color:'var(--text2)'}}>คัน</span>
             </div>
           </div>
-          {tg>0&&<><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:11,color:'var(--text2)'}}>{sold}/{tg}</span><span style={{fontSize:13,fontWeight:700,color:barC}}>{pct}%</span></div><div style={{height:5,background:'var(--bg3)',borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',borderRadius:3,width:pct+'%',background:barC,transition:'width .4s'}}/></div>{pct>=100&&<div style={{fontSize:11,color:'#00ff88',marginTop:4,fontWeight:700}}>🎉 บรรลุเป้าแล้ว!</div>}</>}
+          {tg>0&&<><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:11,color:'var(--text2)'}}>{sold}/{tg}</span><span style={{fontSize:13,fontWeight:700,color:barC}}>{pct}%</span></div><div style={{height:5,background:'var(--bg3)',borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',borderRadius:3,width:pct+'%',background:barC}}/></div>{pct>=100&&<div style={{fontSize:11,color:'#00ff88',marginTop:4,fontWeight:700}}>🎉 บรรลุเป้าแล้ว!</div>}</>}
         </div>;
       })}
     </div>}
@@ -2801,11 +2966,8 @@ function AdminApp({currentUser,onLogout}){
     market:<AdminMarket currentUser={currentUser} users={users}/>,
     dashboard:<AdminDashboard currentUser={currentUser}/>,
     bookings:<AdminBookings currentUser={currentUser} users={users}/>,
-    followups:<AdminTeam users={users} currentUser={currentUser}/>,
     users:<AdminUsers currentUser={currentUser}/>,
     team:<AdminTeam users={users} currentUser={currentUser}/>,
-    ai:<AdminAIPage currentUser={currentUser}/>,
-    analytics:<AdminAnalytics currentUser={currentUser}/>,
   };
 
   const allNavItems=[
@@ -2834,31 +2996,31 @@ function AdminApp({currentUser,onLogout}){
       <div className="sidebar-logo"><div style={{fontWeight:800,fontSize:18,color:'var(--blue)'}}>🚗 CasePool</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Admin Panel</div></div>
       <nav className="sidebar-nav">{allNavItems.map(n=>n.href?
         <a key={n.key} className="nav-item nav-link-external" href={n.href} target="_blank" rel="noopener noreferrer" title="เปิดหน้าสรุปยอด UM Home Car">{n.icon}<span>{n.label}</span><span style={{marginLeft:'auto',fontSize:11,opacity:.65}}>↗</span></a>:
-        <div key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)}>{n.icon}<span>{n.label}</span></div>
+        <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-          <div style={{width:36,height:36,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{currentUser.avatar?<img src={currentUser.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
+          <div style={{width:36,height:36,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{currentUser.avatar?<img src={currentUser.avatar} alt={`รูปโปรไฟล์ ${currentUser.name}`} decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
           <div><div style={{fontWeight:600,fontSize:13}}>{currentUser.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Admin</div></div>
         </div>
         <div style={{display:'flex',gap:6}}>
-          <button className="btn btn-ghost" style={{flex:1,fontSize:12,position:'relative'}} onClick={()=>setShowNotif(!showNotif)}><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:2,right:4,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
-          <button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={toggleTheme}>🌓</button>
-          <button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={onLogout}><Ico.logout/></button>
+          <button className="btn btn-ghost" style={{flex:1,fontSize:12,position:'relative'}} onClick={()=>setShowNotif(!showNotif)} aria-label="การแจ้งเตือน"><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:2,right:4,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
+          <button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={toggleTheme} aria-label="สลับธีม">🌓</button>
+          <button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={onLogout} aria-label="ออกจากระบบ"><Ico.logout/></button>
         </div>
       </div>
     </div>
     <div className="admin-topbar">
       <div style={{fontWeight:800,color:'var(--blue)',display:'flex',alignItems:'center',gap:8}}>🚗 CasePool <span style={{fontSize:11,color:'var(--text3)',fontWeight:400,background:'var(--bg3)',padding:'2px 8px',borderRadius:20}}>Admin</span></div>
       <div style={{display:'flex',alignItems:'center',gap:6}}>
-        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={toggleTheme}>🌓</button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)}><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onLogout}><Ico.logout/></button>
+        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={toggleTheme} aria-label="สลับธีม">🌓</button>
+        <button className="btn btn-ghost" style={{padding:'4px 8px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)} aria-label="การแจ้งเตือน"><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
+        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onLogout} aria-label="ออกจากระบบ"><Ico.logout/></button>
       </div>
     </div>
     <div className="admin-mobile-content"><ErrorBoundary>{pages[page]||pages.cases}</ErrorBoundary></div>
     <div className="admin-bottom-nav">
-      {bottomNavItems.map(n=><div key={n.key} className={`bottom-nav-item ${page===n.key?'active':''}`} onClick={()=>{if(page!==n.key)setPage(n.key);}}>{n.icon}<span>{n.label}</span></div>)}
+      {bottomNavItems.map(n=><button type="button" key={n.key} className={`bottom-nav-item ${page===n.key?'active':''}`} onClick={()=>{if(page!==n.key)setPage(n.key);}} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>)}
     </div>
     {showNotif&&<NotifPanel user={currentUser} onClose={()=>setShowNotif(false)} onCountChange={setNotifCount}/>}
   </div>;
@@ -2881,7 +3043,7 @@ function SalesFollowups({currentUser}){
   const pending=activeFU.filter(f=>f.status!=='done');
   const done=activeFU.filter(f=>f.status==='done');
   const overdue=pending.filter(f=>(f.due_date||f.date)<today);const todayFU=pending.filter(f=>(f.due_date||f.date)===today);const upcoming=pending.filter(f=>(f.due_date||f.date)>today);
-  async function markDone(f){setFollowups(xs=>xs.map(x=>x.id===f.id?{...x,status:'done',doneat:nowTH()}:x));await api('updateFollowupStatus',{id:f.id,status:'done'});}
+  async function markDone(f){const before=followups;setFollowups(xs=>xs.map(x=>x.id===f.id?{...x,status:'done',doneat:nowTH()}:x));const r=await api('updateFollowupStatus',{id:f.id,status:'done'});if(!r.success){setFollowups(before);showToast('อัปเดตนัดไม่สำเร็จ: '+(r.error||''),'err');}}
   function FUCard({f,color,showDone=false}){const done=f.status==='done';return<div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:'3px solid '+color,borderRadius:12,padding:'12px 14px',marginBottom:8,opacity:done?0.75:1}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5,gap:8}}><span style={{color:'var(--blue)',fontWeight:700,fontSize:13}}>{f.caseid}</span><span style={{fontSize:12,fontWeight:700,color,background:color+'22',padding:'2px 10px',borderRadius:20}}>นัด {f.dueDisplay||formatYMDToTHBE(f.due_date||f.date)}</span></div>
     <div style={{fontSize:11,color:'var(--text3)',marginBottom:4}}>ลงนัด {f.createdDisplay||formatTextDateToTHBE(f.createdat)}</div>
@@ -2919,14 +3081,14 @@ function SalesApp({currentUser,onLogout}){
     async function refreshNotif(){
       // สร้างแจ้งเตือน Follow-up ที่ถึงวันนัดลงในระฆังก่อน แล้วค่อยนับ unread
       await api('checkDueFollowups',{sales:currentUser.name});
-      api('getNotifications',{sales:currentUser.name}).then(r=>{if(r.success){const u=r.data.filter(n=>(n.status||n['สถานะ'])==='unread');setNotifCount(u.length);}});
+      api('getNotifications',{sales:currentUser.name,unreadOnly:true,limit:'100'}).then(r=>{if(r.success)setNotifCount(safeArray(r.data).length);});
     }
     refreshNotif();
-    const t=setInterval(refreshNotif,30000);
+    const t=setInterval(refreshNotif,60000);
     try{if(!localStorage.getItem('cp_onboarded_'+currentUser.userId))setShowOnboarding(true);}catch(e){}
     return()=>clearInterval(t);
   },[currentUser.name,currentUser.userId]);
-  const pages={focus:<><PushNotifBanner currentUser={currentUser}/><DailyFocusPage currentUser={currentUser} onNavigate={k=>setPage(k)}/></>,market:<SalesMarket currentUser={currentUser}/>,cases:<SalesCurrentCases currentUser={currentUser} users={users}/>,claimed:<SalesClaimedCases currentUser={currentUser} users={users}/>,ai:<AIAdvisorPage currentUser={currentUser}/>,dashboard:<SalesDashboard currentUser={currentUser}/>,followup:<SalesFollowups currentUser={currentUser}/>};
+  const pages={focus:<><PushNotifBanner currentUser={currentUser}/><DailyFocusPage currentUser={currentUser} onNavigate={k=>setPage(k)}/></>,market:<SalesMarket currentUser={currentUser}/>,cases:<SalesCurrentCases currentUser={currentUser} users={users}/>,claimed:<SalesClaimedCases currentUser={currentUser} users={users}/>,dashboard:<SalesDashboard currentUser={currentUser}/>,followup:<SalesFollowups currentUser={currentUser}/>};
   // ซ่อนเมนู AI ไว้ก่อน เพราะยังไม่พร้อมใช้งานจริง
   const navItems=[
     {key:'focus',icon:<Ico.focus/>,label:'วันนี้'},
@@ -2953,25 +3115,25 @@ function SalesApp({currentUser,onLogout}){
     {showOnboarding&&<OnboardingTour currentUser={currentUser} onDone={()=>setShowOnboarding(false)}/>}
     {showSearch&&<GlobalSearch currentUser={currentUser} onClose={()=>setShowSearch(false)} onNavigate={k=>{setPage(k);setShowSearch(false);}}/>}
     <div className="sales-sidebar">
-      <div className="sales-sidebar-logo"><div style={{fontWeight:800,color:'var(--blue)',fontSize:16}}>🚗 CasePool</div><div style={{display:'flex',gap:4}}><button className="btn btn-ghost" style={{padding:'4px 6px'}} onClick={toggleTheme}>🌓</button><button className="btn btn-ghost" style={{padding:'4px 6px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)}><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:14,height:14,borderRadius:'50%',fontSize:9,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button></div></div>
-      <div className="sales-sidebar-nav">{navItems.map(n=><div key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)}>{n.icon}<span>{n.label}</span>{n.key==='claimed'&&notifCount>0&&<span style={{marginLeft:'auto',background:'var(--red)',color:'#fff',borderRadius:20,fontSize:10,fontWeight:700,padding:'1px 7px'}}>{notifCount}</span>}</div>)}</div>
+      <div className="sales-sidebar-logo"><div style={{fontWeight:800,color:'var(--blue)',fontSize:16}}>🚗 CasePool</div><div style={{display:'flex',gap:4}}><button className="btn btn-ghost" style={{padding:'4px 6px'}} onClick={toggleTheme} aria-label="สลับธีม">🌓</button><button className="btn btn-ghost" style={{padding:'4px 6px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)} aria-label="การแจ้งเตือน"><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:14,height:14,borderRadius:'50%',fontSize:9,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button></div></div>
+      <nav className="sales-sidebar-nav">{navItems.map(n=><button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span>{n.key==='claimed'&&notifCount>0&&<span style={{marginLeft:'auto',background:'var(--red)',color:'#fff',borderRadius:20,fontSize:10,fontWeight:700,padding:'1px 7px'}}>{notifCount}</span>}</button>)}</nav>
       <div className="sales-sidebar-footer">
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{width:32,height:32,borderRadius:'50%',background:'rgba(88,166,255,.15)',border:'1px solid rgba(88,166,255,.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0,overflow:'hidden'}}>{currentUser.avatar?<img src={currentUser.avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:'👤'}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Sales</div></div></div>
-        <div style={{display:'flex',gap:6}}><button className="btn btn-ghost" style={{flex:1,fontSize:12,padding:'6px 8px',display:'flex',alignItems:'center',justifyContent:'center',gap:4}} onClick={()=>setShowSearch(true)}><Ico.gsearch/><span>ค้นหา</span></button><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 8px',color:'var(--red)'}} onClick={onLogout}><Ico.logout/></button></div>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><div style={{width:32,height:32,borderRadius:'50%',background:'rgba(88,166,255,.15)',border:'1px solid rgba(88,166,255,.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0,overflow:'hidden'}}>{currentUser.avatar?<img src={currentUser.avatar} alt={`รูปโปรไฟล์ ${currentUser.name}`} decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:'👤'}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Sales</div></div></div>
+        <div style={{display:'flex',gap:6}}><button className="btn btn-ghost" style={{flex:1,fontSize:12,padding:'6px 8px',display:'flex',alignItems:'center',justifyContent:'center',gap:4}} onClick={()=>setShowSearch(true)}><Ico.gsearch/><span>ค้นหา</span></button><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 8px',color:'var(--red)'}} onClick={onLogout} aria-label="ออกจากระบบ"><Ico.logout/></button></div>
       </div>
     </div>
     <div className="sales-topbar" style={{position:'fixed',top:0,left:0,right:0,height:56,background:'var(--bg2)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',zIndex:9999}}>
       <div style={{fontWeight:800,color:'var(--blue)',display:'flex',alignItems:'center',gap:8}}>🚗 CasePool</div>
       <div style={{display:'flex',alignItems:'center',gap:8}}>
-        <button className="btn btn-ghost" style={{padding:'5px 8px'}} onClick={()=>setShowSearch(true)}><Ico.gsearch/></button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={toggleTheme}>🌓</button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)}><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
-        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onLogout}><Ico.logout/></button>
+        <button className="btn btn-ghost" style={{padding:'5px 8px'}} onClick={()=>setShowSearch(true)} aria-label="ค้นหา"><Ico.gsearch/></button>
+        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={toggleTheme} aria-label="สลับธีม">🌓</button>
+        <button className="btn btn-ghost" style={{padding:'4px 8px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)} aria-label="การแจ้งเตือน"><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
+        <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onLogout} aria-label="ออกจากระบบ"><Ico.logout/></button>
       </div>
     </div>
     <div className="sales-content sales-desktop-content" style={{paddingTop:56}}><ErrorBoundary>{pages[page]||pages.focus}</ErrorBoundary></div>
     <div className="bottom-nav">
-      {mobileMainNav.map(n=>{const active=n.key==='more'?moreActive:page===n.key;return <div key={n.key} className={`bottom-nav-item ${active?'active':''}`} onClick={()=>{if(n.key==='more')setShowMobileMore(v=>!v);else if(page!==n.key)goSalesPage(n.key);}}>{n.icon}<span>{n.label}</span>{n.key==='claimed'&&notifCount>0&&<em className="mobile-nav-badge">{notifCount}</em>}</div>;})}
+      {mobileMainNav.map(n=>{const active=n.key==='more'?moreActive:page===n.key;return <button type="button" key={n.key} className={`bottom-nav-item ${active?'active':''}`} onClick={()=>{if(n.key==='more')setShowMobileMore(v=>!v);else if(page!==n.key)goSalesPage(n.key);}} aria-current={active?'page':undefined} aria-expanded={n.key==='more'?showMobileMore:undefined}>{n.icon}<span>{n.label}</span>{n.key==='claimed'&&notifCount>0&&<em className="mobile-nav-badge">{notifCount}</em>}</button>;})}
     </div>
     {showMobileMore&&<div className="mobile-more-overlay" onClick={()=>setShowMobileMore(false)}>
       <div className="mobile-more-sheet" onClick={e=>e.stopPropagation()}>
@@ -3037,6 +3199,19 @@ function clearPersistedSession(){
   try{sessionStorage.removeItem('casepool_user');}catch(e){}
 }
 
+function ConnectionBanner(){
+  const [online,setOnline]=useState(()=>navigator.onLine!==false);
+  useEffect(()=>{
+    const goOnline=()=>{setOnline(true);showToast('กลับมาออนไลน์แล้ว','ok',2200);};
+    const goOffline=()=>setOnline(false);
+    window.addEventListener('online',goOnline);
+    window.addEventListener('offline',goOffline);
+    return()=>{window.removeEventListener('online',goOnline);window.removeEventListener('offline',goOffline);};
+  },[]);
+  if(online)return null;
+  return <div className="connection-banner" role="alert">ไม่มีอินเทอร์เน็ต — ระบบจะยังแสดงข้อมูลเดิม แต่จะไม่บันทึกจนกว่าจะเชื่อมต่ออีกครั้ง</div>;
+}
+
 function App(){
   const [user,setUser]=useState(()=>readPersistedSession());
   const [showLogoutConfirm,setShowLogoutConfirm]=useState(false);
@@ -3065,10 +3240,9 @@ function App(){
     touchPersistedSession(user);
     activityEvents.forEach(ev=>window.addEventListener(ev,onActivity,{passive:true}));
     const timer=setInterval(checkExpired,60*60*1000);
-    const fcmTimer=setTimeout(()=>initFCM(),2000);
-    return()=>{activityEvents.forEach(ev=>window.removeEventListener(ev,onActivity));clearInterval(timer);clearTimeout(fcmTimer);};
+    return()=>{activityEvents.forEach(ev=>window.removeEventListener(ev,onActivity));clearInterval(timer);};
   },[user?.userId]);
-  function handleLogin(u){savePersistedSession(u);setUser(u);setTimeout(()=>initFCM(),2000);}
+  function handleLogin(u){savePersistedSession(u);setUser(u);}
   function handleLogout(){
     // ปิด realtime channels ทั้งหมดก่อน logout
     try{if(supabase)supabase.removeAllChannels();}catch(e){}
@@ -3077,14 +3251,23 @@ function App(){
     setUser(null);
     setShowLogoutConfirm(false);
   }
-  if(!user)return <LoginPage onLogin={handleLogin}/>;
+  if(!user)return <><ConnectionBanner/><LoginPage onLogin={handleLogin}/></>;
   const logoutConfirmModal=showLogoutConfirm&&<div className="overlay" style={{zIndex:9999}}><div className="modal" style={{maxWidth:320}}><div className="modal-bd" style={{textAlign:'center',padding:'32px 24px'}}><div style={{fontSize:40,marginBottom:12}}>👋</div><div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ออกจากระบบ?</div><div style={{fontSize:13,color:'var(--text2)',marginBottom:24}}>{user.name} · {user.role}</div><div style={{display:'flex',gap:10}}><button className="btn btn-ghost" style={{flex:1,padding:'10px'}} onClick={()=>setShowLogoutConfirm(false)}>ยกเลิก</button><button className="btn btn-danger" style={{flex:1,padding:'10px'}} onClick={handleLogout}>ออกจากระบบ</button></div></div></div></div>;
-  if(user.role==='Admin')return <>{logoutConfirmModal}<AdminApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
-  return <>{logoutConfirmModal}<SalesApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
+  if(user.role==='Admin')return <><ConnectionBanner/>{logoutConfirmModal}<AdminApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
+  return <><ConnectionBanner/>{logoutConfirmModal}<SalesApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
 }
 
 try{
-  ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App/></ErrorBoundary>);
+  createRoot(document.getElementById('root')).render(<ErrorBoundary><App/></ErrorBoundary>);
 }catch(e){
-  document.getElementById('root').innerHTML='<div style="padding:32px;text-align:center;color:#fff;background:#0d1117;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px"><div style="font-size:48px">⚠️</div><div style="font-weight:700;font-size:18px">โหลดแอปไม่ได้</div><div style="font-size:13px;color:#8b949e;margin-top:8px">'+e.message+'</div><button onclick="location.reload()" style="background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px 24px;cursor:pointer;font-size:14px;margin-top:8px">🔄 โหลดใหม่</button></div>';
+  const root=document.getElementById('root');
+  root.textContent='';
+  const box=document.createElement('div');
+  Object.assign(box.style,{padding:'32px',textAlign:'center',color:'#fff',background:'#0d1117',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'12px'});
+  const icon=document.createElement('div');icon.style.fontSize='48px';icon.textContent='⚠️';
+  const title=document.createElement('div');title.style.fontWeight='700';title.style.fontSize='18px';title.textContent='โหลดแอปไม่ได้';
+  const detail=document.createElement('div');detail.style.fontSize='13px';detail.style.color='#8b949e';detail.style.marginTop='8px';detail.textContent=String(e?.message||'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ');
+  const retry=document.createElement('button');retry.type='button';retry.textContent='🔄 โหลดใหม่';Object.assign(retry.style,{background:'#1f6feb',color:'#fff',border:'none',borderRadius:'8px',padding:'10px 24px',cursor:'pointer',fontSize:'14px',marginTop:'8px'});retry.addEventListener('click',()=>location.reload());
+  box.append(icon,title,detail,retry);
+  root.appendChild(box);
 }
