@@ -1191,14 +1191,23 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const [q,setQ]=useState('');
   const [salesFilter,setSalesFilter]=useState('all');
   const [statusFilter,setStatusFilter]=useState('');
+  const [dateFrom,setDateFrom]=useState('');
+  const [dateTo,setDateTo]=useState('');
+  const [sortDir,setSortDir]=useState('desc');
   const [modalItem,setModalItem]=useState(null);
   const [showModal,setShowModal]=useState(false);
-  const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
+  const theme=caseType==='private'
+    ?{accent:'#ec4899',rgb:'236,72,153'}
+    :{accent:'#22c55e',rgb:'34,197,94'};
   const load=useCallback(()=>{setLoading(true);cacheClear(['getStandaloneCases']);api('getStandaloneCases',{caseType}).then(r=>{
     if(r.success)setRows(safeArray(r.data));else{setRows([]);showToast('โหลดข้อมูล '+title+' ไม่สำเร็จ: '+(r.error||'กรุณารัน SQL สร้างตาราง standalone_cases ก่อน'),'err',6000);}
     setLoading(false);
   }).catch(e=>{setRows([]);setLoading(false);showToast('โหลดข้อมูลไม่สำเร็จ','err');});},[caseType,title]);
   useEffect(()=>{load();},[load]);
+  function rowDate(v){
+    const d=new Date(v||'');
+    return isNaN(d)?null:d;
+  }
   function matchRow(r){
     if(!q.trim())return true;
     const term=normalizeSearchText(q), loose=normalizeLoose(q);
@@ -1208,56 +1217,85 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const filtered=safeArray(rows).filter(r=>{
     if(salesFilter!=='all'&&r.sales!==salesFilter)return false;
     if(statusFilter&&r.status!==statusFilter)return false;
+    const created=rowDate(r.created_at);
+    if(dateFrom&&(!created||created<new Date(dateFrom)))return false;
+    if(dateTo){
+      const to=new Date(dateTo);to.setHours(23,59,59,999);
+      if(!created||created>to)return false;
+    }
     return matchRow(r);
+  }).sort((a,b)=>{
+    const av=rowDate(a.created_at)?.getTime()||0,bv=rowDate(b.created_at)?.getTime()||0;
+    return sortDir==='desc'?bv-av:av-bv;
   });
-  const statTotal=filtered.length;
-  const statActive=filtered.filter(r=>!CLOSED.includes(r.status)).length;
-  const statClosed=filtered.filter(r=>CLOSED.includes(r.status)).length;
   function openAdd(){setModalItem(null);setShowModal(true);}
   function openEdit(r){setModalItem(r);setShowModal(true);}
-  return <div className="page admin-sent-page">
+  return <div className={`page admin-sent-page admin-sent-${caseType}`} style={{'--sent-accent':theme.accent,'--sent-accent-rgb':theme.rgb}}>
     <div className="page-hd">
       <div>
-        <div className="page-title" style={{display:'flex',alignItems:'center',gap:10}}><span>{icon}</span>{title}</div>
-        <div style={{fontSize:13,color:'var(--text2)',marginTop:4}}>ข้อมูลแยกอิสระ ไม่เกี่ยวกับเคสปัจจุบัน และไม่มีรหัสเคส</div>
+        <div className="page-title sent-page-title" style={{display:'flex',alignItems:'center',gap:10}}><span>{icon}</span>{title}</div>
+        <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · ข้อมูลแยกจากเคสปัจจุบันและไม่มีรหัสเคส</div>
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-        <button className="btn btn-primary" onClick={openAdd}>➕ เพิ่ม{title}</button>
-        <button className="btn btn-ghost" onClick={load}>รีเฟรช</button>
+        <button className="btn btn-primary sent-primary" onClick={openAdd}><Ico.plus/> เพิ่ม{title}</button>
       </div>
     </div>
 
-    <div className="stat-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))'}}>
-      <div className="stat-card"><div className="stat-num" style={{color:'var(--blue)'}}>{statTotal}</div><div className="stat-lbl">ทั้งหมด</div></div>
-      <div className="stat-card"><div className="stat-num" style={{color:'var(--green)'}}>{statActive}</div><div className="stat-lbl">กำลังดูแล</div></div>
-      <div className="stat-card"><div className="stat-num" style={{color:'var(--red)'}}>{statClosed}</div><div className="stat-lbl">ปิด/จบ</div></div>
+    <div className="sent-filter-row">
+      <div className="sent-search-wrap">
+        <span>🔍</span>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ชื่อ เซลส์ สถานะ หรือรีพอร์ต"/>
+      </div>
+      <select value={salesFilter} onChange={e=>setSalesFilter(e.target.value)}>
+        <option value="all">ทุกเซลส์</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
+      </select>
+      <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
+        <option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
+      </select>
+      <button className="btn btn-ghost sent-icon-btn" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงตามวันที่สร้าง">{sortDir==='desc'?'↓':'↑'}</button>
+      <button className="btn btn-ghost sent-icon-btn" onClick={load} title="โหลดข้อมูลใหม่">🔄</button>
+      <span className="sent-result-count">{filtered.length} เคส</span>
     </div>
 
-    <div className="card" style={{marginBottom:14}}>
-      <div className="search-bar">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ชื่อ / เซลส์ / สถานะ / รีพอร์ต" style={{minWidth:220,flex:1}}/>
-        <select value={salesFilter} onChange={e=>setSalesFilter(e.target.value)} style={{width:170}}><option value="all">ทุกเซลส์</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>
-        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{width:170}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
+    <div className="sent-date-row">
+      <span>📅 สร้างระหว่าง:</span>
+      <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/>
+      <span>—</span>
+      <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}/>
+      {(dateFrom||dateTo)&&<button className="btn btn-ghost" onClick={()=>{setDateFrom('');setDateTo('');}}>✕ ล้างวันที่</button>}
+    </div>
+
+    <div className="card sent-table-card" style={{padding:0}}>
+      <div className="table-wrap">
+        <table>
+          <thead><tr>
+            <th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>สร้างเมื่อ {sortDir==='desc'?'↓':'↑'}</th>
+            <th>ชื่อ</th>
+            <th>รีพอร์ต</th>
+            <th>สถานะ</th>
+            <th>เซลส์</th>
+            <th>อัปเดตล่าสุด</th>
+            <th>จัดการ</th>
+          </tr></thead>
+          <tbody>
+            {loading?<SkeletonRows n={6} cols={7}/>:filtered.length===0?
+              <tr><td colSpan={7} className="sent-empty"><span>{icon}</span>ไม่พบข้อมูลใน {title}</td></tr>:
+              filtered.map(r=><tr key={r.id} className="clickable" onClick={()=>openEdit(r)}>
+                <td data-label="สร้างเมื่อ" className="sent-created">{formatTextDateToTHBE(r.created_at)}</td>
+                <td data-label="ชื่อ" className="sent-name">{r.name||'-'}</td>
+                <td data-label="รีพอร์ต" className="sent-report-cell"><div className="sent-report-preview">{r.report||'ยังไม่มีรีพอร์ต'}</div></td>
+                <td data-label="สถานะ"><StatusBadge status={r.status}/></td>
+                <td data-label="เซลส์"><span className="sent-sales">{r.sales||'-'}</span></td>
+                <td data-label="อัปเดตล่าสุด" className="sent-updated">{formatTextDateToTHBE(r.updated_at)}</td>
+                <td data-label="จัดการ" onClick={e=>e.stopPropagation()}><button className="btn btn-ghost sent-edit-btn" onClick={()=>openEdit(r)}>✏️ แก้ไข</button></td>
+              </tr>)}
+          </tbody>
+        </table>
       </div>
     </div>
-
-    {loading?<Loading/>:filtered.length===0?<div className="card" style={{textAlign:'center',padding:34,color:'var(--text2)'}}><div style={{fontSize:36,marginBottom:8}}>{icon}</div>ยังไม่มีข้อมูลใน {title}</div>:
-      <div className="sent-case-grid">
-        {filtered.map(r=><div key={r.id} className="sent-case-card" onClick={()=>openEdit(r)}>
-          <div className="sent-case-card-top">
-            <div>
-              <div className="sent-case-id">สร้างเมื่อ {formatTextDateToTHBE(r.created_at)}</div>
-              <div className="sent-case-name">{r.name||'-'}</div>
-            </div>
-            <span className={`badge ${getStatusClass(r.status)}`}>{r.status||'-'}</span>
-          </div>
-          <div className="sent-case-meta"><span>👤 เซลส์ดูแล</span><b>{r.sales||'-'}</b></div>
-          <div className="sent-case-report"><div style={{fontSize:11,color:'var(--text3)',marginBottom:4}}>รีพอร์ต</div>{r.report||'ยังไม่มีรีพอร์ต'}</div>
-          <div className="sent-case-actions"><button className="btn btn-primary" onClick={e=>{e.stopPropagation();openEdit(r);}}>แก้ไขข้อมูล</button></div>
-        </div>)}
-      </div>}
 
     {showModal&&<StandaloneCaseModal item={modalItem} users={users} currentUser={currentUser} caseType={caseType} title={title} onClose={()=>setShowModal(false)} onSaved={load}/>}    
+    <button className="fab sent-fab" onClick={openAdd} title={`เพิ่ม${title}`}>＋</button>
   </div>;
 }
 
