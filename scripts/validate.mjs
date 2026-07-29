@@ -43,6 +43,9 @@ for(const action of ['ลบ Note','ทำ Follow-up เสร็จ','ลบน
 }
 if(!source.includes('allSales.length>0&&allSales.every'))fail('การคืนเคสยังเสี่ยงปิดตลาดเมื่อไม่พบรายชื่อเซลส์');
 if(!source.includes('marketWritten=false,claimedDeleted=false'))fail('การคืนเคสยังไม่มีสถานะสำหรับ rollback เมื่อบันทึกได้เพียงบางส่วน');
+if(source.includes("s.includes('T')?' '+s.slice(11,16):''"))fail('ยังตัดเวลา UTC จาก ISO มาแสดงโดยไม่แปลง timezone');
+if(!source.includes('formatLocalDateTimeToTHBE'))fail('ยังไม่มีตัวแปลง timestamp เป็นเวลาท้องถิ่น');
+if(!source.includes("T.*(?:Z|[+-]"))fail('parseTHDateTime ยังไม่รองรับ timezone ใน ISO timestamp');
 for(const file of publicFiles){
   const sourcePath=path.join(root,file);
   const deployPath=path.join(root,'public',file);
