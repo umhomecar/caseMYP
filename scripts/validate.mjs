@@ -60,6 +60,7 @@ if(source.includes('autoSendStaleCasesToMarket('))fail('ยังมีระบ
 if(!source.includes("const UNASSIGNED_SALES = 'รอมอบหมาย'"))fail('ยังไม่มีสถานะคิวรอมอบหมาย');
 if(!source.includes('retiredMarketActions')||!source.includes('ตลาดเคสถูกยกเลิกแล้ว'))fail('ยังปิด endpoint เก่าของตลาดเคสไม่ครบ');
 if(!source.includes("case 'bulkAssignCases'"))fail('ยังไม่มีการมอบหมายเคสแบบหลายรายการ');
+if(adminApp.includes("key:'assignment'")||adminApp.includes('assignment:<AdminCurrentCases'))fail('เมนูคิวรอมอบหมายยังไม่ถูกถอดออก');
 if(!source.includes("case 'checkCaseDuplicates'"))fail('ยังไม่มีตัวตรวจเคสซ้ำ');
 if(!source.includes('expectedVersion'))fail('ยังไม่มี optimistic concurrency');
 if(!source.includes("case 'getTrashCases'")||!source.includes('function AdminTrash'))fail('ยังไม่มีถังขยะและการกู้คืน');
