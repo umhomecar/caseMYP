@@ -270,10 +270,13 @@ function nowTH(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${p(d
 function todayYMD(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
 function toBEYear(y){y=parseInt(y,10)||0;return y&&y<2400?y+543:y;}
 function formatYMDToTHBE(ymd){const s=String(ymd||'').trim();const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return s||'-';return `${m[3]}/${m[2]}/${toBEYear(m[1])}`;}
-function formatTextDateToTHBE(v){const s=String(v||'').trim();if(!s)return '-';const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(iso)return formatYMDToTHBE(s)+(s.includes('T')?' '+s.slice(11,16):'');const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(.*)$/);if(m){const dd=String(m[1]).padStart(2,'0'),mm=String(m[2]).padStart(2,'0'),yy=toBEYear(m[3]);return `${dd}/${mm}/${yy}${m[4]||''}`;}const d=new Date(s);if(!isNaN(d)){const pad=n=>String(n).padStart(2,'0');return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${toBEYear(d.getFullYear())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;}return s;}
+function formatLocalDateTimeToTHBE(d){if(!(d instanceof Date)||isNaN(d))return '-';const pad=n=>String(n).padStart(2,'0');return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${toBEYear(d.getFullYear())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;}
+function formatTextDateToTHBE(v){const s=String(v||'').trim();if(!s)return '-';const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(iso){if(/^\d{4}-\d{2}-\d{2}[T\s]\d/.test(s)){const d=new Date(s);if(!isNaN(d))return formatLocalDateTimeToTHBE(d);}return formatYMDToTHBE(s);}const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(.*)$/);if(m){const dd=String(m[1]).padStart(2,'0'),mm=String(m[2]).padStart(2,'0'),yy=toBEYear(m[3]);return `${dd}/${mm}/${yy}${m[4]||''}`;}const d=new Date(s);if(!isNaN(d))return formatLocalDateTimeToTHBE(d);return s;}
 function parseTHDateTime(v){
   const s=String(v||'').trim();
   if(!s)return null;
+  // ISO ที่มี timezone ต้องให้ Date แปลงเป็นเวลาท้องถิ่นก่อน ห้ามสร้างเป็น local ซ้ำ
+  if(/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(s)){const d=new Date(s);return isNaN(d)?null:d;}
   // รองรับ dd/mm/yyyy HH:mm[:ss] ทั้ง ค.ศ. และ พ.ศ.
   let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if(m){let y=parseInt(m[3],10);if(y>2400)y-=543;const d=new Date(y,parseInt(m[2],10)-1,parseInt(m[1],10),parseInt(m[4]||'0',10),parseInt(m[5]||'0',10),parseInt(m[6]||'0',10));return isNaN(d)?null:d;}
