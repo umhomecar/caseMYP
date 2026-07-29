@@ -8,6 +8,7 @@ const copyFiles=['index.html','manifest.json','css/styles.css','js/preload.js'];
 const supabaseUrl=String(process.env.CASEMYP_SUPABASE_URL||'').trim();
 const supabaseAnonKey=String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
 const deployEnvironment=String(process.env.VERCEL_ENV||process.env.NODE_ENV||'local').trim();
+const authMode=String(process.env.CASEMYP_AUTH_MODE||'legacy').trim().toLowerCase()==='supabase'?'supabase':'legacy';
 
 fs.rmSync(publicDir,{recursive:true,force:true});
 
@@ -32,6 +33,7 @@ const runtimeConfig={
   supabaseUrl,
   supabaseAnonKey,
   deployEnvironment,
+  authMode,
 };
 fs.writeFileSync(
   runtimeConfigPath,
