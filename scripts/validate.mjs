@@ -55,6 +55,7 @@ if(!bookingSection.includes('confirmDelete&&<Confirm'))fail('หน้ากา�
 if(!source.includes('bookingId:r.id'))fail('รายการจองยังไม่เก็บ primary key สำหรับแก้ไขหรือลบเฉพาะแถว');
 if(!bookingSection.includes('bookingId:booking.bookingId'))fail('หน้าการจองยังแก้ไขหรือลบด้วยรหัสเคสแทน primary key');
 if(!source.includes("กรุณากรอกรหัสเคส ชื่อลูกค้า และเลือกเซลส์"))fail('การจองยังไม่บังคับเลือกเซลส์ผู้รับผิดชอบ');
+if(!source.includes("!CLOSED_STATUSES.includes(c.status)&&!marketIds.has(String(c.caseid))&&c.market!==true"))fail('ตัวนับเคสของฉันยังรวมเคสที่ถูกส่งเข้าตลาดและซ่อนจากรายการ');
 for(const file of publicFiles){
   const sourcePath=path.join(root,file);
   const deployPath=path.join(root,'public',file);
