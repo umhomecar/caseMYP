@@ -231,7 +231,7 @@ const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases'
 async function api(action,data={}){
   const retiredMarketActions=new Set(['getMarket','sendToMarket','getMarketIds','closeMarketCase','claimCase','getClaimedCases','updateClaimed','returnCase','getSmartAssign']);
   if(retiredMarketActions.has(action)){
-    return{success:false,retired:true,error:'ตลาดเคสถูกยกเลิกแล้ว กรุณาใช้คิวรอมอบหมาย'};
+    return{success:false,retired:true,error:'ตลาดเคสถูกยกเลิกแล้ว กรุณาใช้หน้าเคสทั่วไปและกรองรอมอบหมาย'};
   }
   const cacheable=CACHEABLE.includes(action);
   const key=cacheKey(action,data);
@@ -1684,7 +1684,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   </div>;
 }
 
-function AdminCurrentCases({currentUser,users,assignmentOnly=false}){
+function AdminCurrentCases({currentUser,users}){
   // ✅ โหลดข้อมูลจาก localStorage ตอนเริ่มต้น
   const [cases,setCases]=useState(()=>{
     try {
@@ -1695,7 +1695,7 @@ function AdminCurrentCases({currentUser,users,assignmentOnly=false}){
     }
   });
   const [loading,setLoading]=useState(true);
-  const [filter,setFilter]=useState({sales:assignmentOnly?UNASSIGNED_SALES:'all',status:'',q:'',dateFrom:'',dateTo:''});
+  const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
   const [sortDir,setSortDir]=useState('desc');
   const [sel,setSel]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
@@ -1703,7 +1703,7 @@ function AdminCurrentCases({currentUser,users,assignmentOnly=false}){
   const [showAddBook,setShowAddBook]=useState(false);
   const [showExportModal,setShowExportModal]=useState(false);
   const [showExport,setShowExport]=useState(false);
-  const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:assignmentOnly?UNASSIGNED_SALES:'all',statusFilter:''});
+  const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [bulkSales,setBulkSales]=useState('');
   const [bulkSaving,setBulkSaving]=useState(false);
@@ -1800,7 +1800,7 @@ function AdminCurrentCases({currentUser,users,assignmentOnly=false}){
     return rows;
   }
   return <div className="page">
-    <div className="page-hd"><div><div className="page-title">{assignmentOnly?'📥 คิวรอมอบหมาย':'📋 เคสทั่วไป'}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    <div className="page-hd"><div><div className="page-title">📋 เคสทั่วไป</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
@@ -1971,7 +1971,7 @@ function AdminDashboard({currentUser}){
         <button onClick={load} style={{background:'rgba(79,142,247,.1)',border:'1px solid rgba(79,142,247,.3)',borderRadius:10,color:MP.accent,padding:'8px 16px',cursor:'pointer',fontSize:13,fontWeight:600}}>🔄 รีเฟรช</button>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12,marginBottom:24}}>
-        {[['เคสเดือนนี้',totalCases,'#4f8ef7','rgba(79,142,247,.12)'],['คิวรอมอบหมาย',totalUnassigned,'#fb923c','rgba(251,146,60,.12)'],['นัดติดตาม',totalPending,'#a78bfa','rgba(167,139,250,.12)'],['ปล่อยแล้ว',totalSold,'#34d399','rgba(52,211,153,.12)']].map(([l,v,c,bg])=>
+        {[['เคสเดือนนี้',totalCases,'#4f8ef7','rgba(79,142,247,.12)'],['รอมอบหมาย',totalUnassigned,'#fb923c','rgba(251,146,60,.12)'],['นัดติดตาม',totalPending,'#a78bfa','rgba(167,139,250,.12)'],['ปล่อยแล้ว',totalSold,'#34d399','rgba(52,211,153,.12)']].map(([l,v,c,bg])=>
           <div key={l} style={{background:bg,border:`1px solid ${c}30`,borderRadius:12,padding:'16px 14px',textAlign:'center'}}>
             <div style={{fontSize:28,fontWeight:900,color:c}}>{v}</div>
             <div style={{fontSize:11,color:`${c}70`,marginTop:4,letterSpacing:.5}}>{l}</div>
@@ -3151,7 +3151,6 @@ function AdminApp({currentUser,onLogout}){
 
   const pages={
     cases:<AdminCurrentCases currentUser={currentUser} users={users}/>,
-    assignment:<AdminCurrentCases currentUser={currentUser} users={users} assignmentOnly={true}/>,
     private_cases:<AdminSentCasesPage currentUser={currentUser} users={users} caseType="private" title="เคสส่วนตัว" icon="🔒"/>,
     line_oa:<AdminSentCasesPage currentUser={currentUser} users={users} caseType="line_oa" title="Line OA" icon="💬"/>,
     dashboard:<AdminDashboard currentUser={currentUser}/>,
@@ -3164,21 +3163,19 @@ function AdminApp({currentUser,onLogout}){
 
   const allNavItems=[
     {key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},
-    {key:'assignment',icon:<Ico.inbox/>,label:'คิวรอมอบหมาย'},
     {key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},
     {key:'analytics',icon:<Ico.trophy/>,label:'รายงาน'},
     {key:'summary',icon:<span style={{fontSize:18,lineHeight:1}}>📈</span>,label:'สรุปยอด',href:'https://umhome-summary-web.vercel.app/'},
     {key:'bookings',icon:<Ico.book/>,label:'การจอง'},
-    {key:'trash',icon:<span style={{fontSize:18,lineHeight:1}}>🗑️</span>,label:'ถังขยะ'},
     {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
     {key:'team',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/> <circle cx="9" cy="7" r="4"/> <path d="M23 21v-2a4 4 0 0 0-3-3.87"/> <path d="M16 3.13a4 4 0 0 1 0 7.75"/> </svg>,label:'ทีม'},
     {key:'private_cases',icon:<span style={{fontSize:18,lineHeight:1}}>🔒</span>,label:'เคสส่วนตัว'},
     {key:'line_oa',icon:<span style={{fontSize:18,lineHeight:1}}>💬</span>,label:'Line OA'},
+    {key:'trash',icon:<span style={{fontSize:18,lineHeight:1}}>🗑️</span>,label:'ถังขยะ'},
   ];
 
   const bottomNavItems=[
     {key:'cases',icon:<Ico.home/>,label:'เคส'},
-    {key:'assignment',icon:<Ico.inbox/>,label:'มอบหมาย'},
     {key:'dashboard',icon:<Ico.dash/>,label:'Dash'},
     {key:'private_cases',icon:<span style={{fontSize:18,lineHeight:1}}>🔒</span>,label:'ส่วนตัว'},
     {key:'line_oa',icon:<span style={{fontSize:18,lineHeight:1}}>💬</span>,label:'Line OA'},
