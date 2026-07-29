@@ -9,8 +9,11 @@ for the isolated `umMYP-staging` Supabase project only.
    `umMYP-staging`.
 2. Run `01_compatibility_schema.sql`.
 3. Confirm the result reports `expected_table_count = 14`.
-4. Do not copy production rows into staging.
-5. Add only synthetic test users and test cases after the schema check passes.
+4. In `02_seed_synthetic_data.sql`, replace
+   `CHANGE_TO_A_NEW_TEST_ONLY_PASSWORD` with a new password used nowhere else.
+5. Run `02_seed_synthetic_data.sql`.
+6. Confirm the result reports three synthetic users and three synthetic cases.
+7. Do not copy production rows into staging.
 
 ## Security boundary
 
