@@ -35,6 +35,14 @@ if(/api\.anthropic\.com|firebase-messaging-sw|\binitFCM\b/.test(bundle))fail('pr
 if(!source.includes('window.__CASEMYP_CONFIG__'))fail('แอปยังไม่อ่าน Supabase runtime config');
 if(/https:\/\/[a-z]{20}\.supabase\.co/i.test(source))fail('พบ Supabase project URL ฝังใน source');
 if(/eyJhbGciOi[A-Za-z0-9_-]*\./.test(source)||/eyJhbGciOi[A-Za-z0-9_-]*\./.test(bundle))fail('พบ JWT/anon key ฝังใน source หรือ bundle');
+if(source.includes("n.key==='claimed'&&notifCount"))fail('ยังนำจำนวนแจ้งเตือนไปแสดงผิดความหมายที่เมนูรับตลาด');
+if(/>Copy<\/button>/.test(source))fail('ยังมีปุ่ม Copy ภาษาอังกฤษในหน้าข้อมูลลูกค้า');
+if(source.includes("background:'#e53935'")&&source.includes("'บันทึก & ปิด'"))fail('ปุ่มบันทึกยังใช้สีเดียวกับการลบ');
+for(const action of ['ลบ Note','ทำ Follow-up เสร็จ','ลบนัด Follow-up']){
+  if(!source.includes(`action:'${action}'`)&&!source.includes(`?'${action}'`))fail(`ยังไม่มี audit trail สำหรับ ${action}`);
+}
+if(!source.includes('allSales.length>0&&allSales.every'))fail('การคืนเคสยังเสี่ยงปิดตลาดเมื่อไม่พบรายชื่อเซลส์');
+if(!source.includes('marketWritten=false,claimedDeleted=false'))fail('การคืนเคสยังไม่มีสถานะสำหรับ rollback เมื่อบันทึกได้เพียงบางส่วน');
 for(const file of publicFiles){
   const sourcePath=path.join(root,file);
   const deployPath=path.join(root,'public',file);
