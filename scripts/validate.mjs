@@ -61,6 +61,16 @@ if(!source.includes("const UNASSIGNED_SALES = 'รอมอบหมาย'"))fa
 if(!source.includes('retiredMarketActions')||!source.includes('ตลาดเคสถูกยกเลิกแล้ว'))fail('ยังปิด endpoint เก่าของตลาดเคสไม่ครบ');
 if(!source.includes("case 'bulkAssignCases'"))fail('ยังไม่มีการมอบหมายเคสแบบหลายรายการ');
 if(adminApp.includes("key:'assignment'")||adminApp.includes('assignment:<AdminCurrentCases'))fail('เมนูคิวรอมอบหมายยังไม่ถูกถอดออก');
+const searchSection=source.slice(source.indexOf("case 'searchCases'"),source.indexOf("case 'getMarket'"));
+if(!searchSection.includes("deleted_at:'is.null'"))fail('การค้นหาเคสยังไม่ตัดรายการในถังขยะ');
+if(!searchSection.includes("query.sales=`eq.${sales}`")||!source.includes("api('searchCases',{q:term,sales:currentUser.name})"))fail('การค้นหาของเซลส์ยังไม่จำกัดข้อมูลที่ฝั่งฐานข้อมูล');
+if(!source.includes("const _searchCasesCache=new Map()")||!source.includes('clearSearchCasesCache()'))fail('search cache ยังไม่แยก scope หรือไม่ถูกล้างหลังแก้ข้อมูล');
+if(source.includes("localStorage.getItem('cases')")||source.includes("localStorage.setItem('cases'"))fail('ยังเก็บสำเนาข้อมูลลูกค้าแบบถาวรใน localStorage');
+if(source.includes("localStorage.getItem('cnotes_")||source.includes("localStorage.getItem(FU_KEY"))fail('Note/Follow-up ยังอ่าน fallback เก่าจาก localStorage');
+if(source.includes("localStorage.getItem('cp_seen_notifs')")||source.includes("localStorage.getItem('cp_pn_dismissed')"))fail('notification cache ยังใช้ key ร่วมกันทุกบัญชี');
+if(/\bFCM_EDGE_URL\b|\bpushNotif\s*\(/.test(source))fail('ยังมีการเรียก Edge Function แจ้งเตือนที่ไม่ได้ใช้งาน');
+const broadcastSection=source.slice(source.indexOf("case 'broadcast'"),source.indexOf("case 'uploadImage'"));
+if(broadcastSection.includes('sbNotif('))fail('Broadcast ยังบันทึก notification ซ้ำ');
 if(!source.includes("case 'checkCaseDuplicates'"))fail('ยังไม่มีตัวตรวจเคสซ้ำ');
 if(!source.includes('expectedVersion'))fail('ยังไม่มี optimistic concurrency');
 if(!source.includes("case 'getTrashCases'")||!source.includes('function AdminTrash'))fail('ยังไม่มีถังขยะและการกู้คืน');
