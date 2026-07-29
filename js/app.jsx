@@ -371,7 +371,7 @@ async function sbMutate(method,table,q={},body=null){
 
 function mapMarket(r){return{ID:r.id,name:r.name,contact:r.contact,report:r.report,status:r.status,old_sales:r.old_sales,ExpiredSales:r.expiredsales||'',PoolStatus:r.poolstatus};}
 function mapClaimed(r){return{caseID:r.caseid,customername:r.customername,contact:r.contact,report:r.report,status:r.status,fromsales:r.fromsales,sale:r.sale,newstatus:r.newstatus,AssignedAt:r.assignedat,Notes:r.notes||'',date:r.assignedat};}
-function mapBooking(r){return{'วันที่':r.createdat,CaseID:r.caseid,'เซลส์':r.sales,'ลูกค้า':r.customer,Facebook:r.facebook||'',Ads:r.ads||'','รถ':r.brand||'','รุ่น':r.model||'','ทะเบียน':r.plate||'','สถานะ':r.status,'หมายเหตุ':r.note||''};}
+function mapBooking(r){return{bookingId:r.id,'วันที่':r.createdat,CaseID:r.caseid,'เซลส์':r.sales,'ลูกค้า':r.customer,Facebook:r.facebook||'',Ads:r.ads||'','รถ':r.brand||'','รุ่น':r.model||'','ทะเบียน':r.plate||'','สถานะ':r.status,'หมายเหตุ':r.note||''};}
 function mapHistory(r){return{historyId:'H'+r.id,'รหัสเคส':r.caseid,'เซลส์':r.sales,action:r.action,detail:r.detail||'','วันที่':r.createdat};}
 function mapNotif(r){return{notifId:'N'+r.id,id:r.id,sales:r.sales,caseid:r.caseid,'เซลส์':r.sales,'รหัสเคส':r.caseid,message:r.message,'วันที่':r.createdat,status:r.status,'สถานะ':r.status};}
 
@@ -662,10 +662,41 @@ async function sbApi(action,data){
       const hist=await sbQ('POST','history',{},{caseid:data.caseId,sales:realSales||'ระบบ',action:isSkip?'ข้ามเคส':'คืนเคส',detail:isSkip?'ข้ามเคสในตลาด':'ส่งเคสคืนตลาด',createdat:nowTH()});
       return{success:true,allClosed:done,historySaved:!isSbError(hist)};
     }
-    case 'getBookings':{const q={order:'createdat.desc'};if(data.sales)q.sales=`eq.${data.sales}`;const rows=await sbQ('GET','bookings',q);return{success:true,data:(rows||[]).map(mapBooking)};}
-    case 'addBooking':{await sbMutate('POST','bookings',{},{createdat:nowTH(),caseid:data.caseId,sales:data.sales,customer:data.customer,facebook:data.facebook||'',ads:data.ads||'',brand:data.brand||'',model:data.model||'',plate:data.plate||'',status:data.status||'จองแล้ว',note:data.note||''});sbHist(data.caseId,data.sales,'จอง','เพิ่มการจอง '+(data.brand||'')+' '+(data.model||''));return{success:true};}
-    case 'updateBooking':{const upd={};if(data.status!==undefined)upd.status=data.status;if(data.note!==undefined)upd.note=data.note;await sbMutate('PATCH','bookings',{caseid:`eq.${data.caseId}`},upd);return{success:true};}
-    case 'deleteBooking':{const q={caseid:`eq.${data.caseId}`};if(data.createdat)q.createdat=`eq.${data.createdat}`;await sbMutate('DELETE','bookings',q);try{sbHist(data.caseId,data.deletedBy||'ระบบ','ลบการจอง','ลบการจอง '+(data.customer||''));}catch(e){}return{success:true};}
+    case 'getBookings':{
+      const q={order:'createdat.desc'};if(data.sales)q.sales=`eq.${data.sales}`;
+      const rows=await sbQ('GET','bookings',q);
+      if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};
+      return{success:true,data:safeArray(rows).map(mapBooking)};
+    }
+    case 'addBooking':{
+      const caseId=String(data.caseId||'').trim(),sales=String(data.sales||'').trim(),customer=String(data.customer||'').trim();
+      if(!caseId||!sales||!customer)return{success:false,error:'กรุณากรอกรหัสเคส ชื่อลูกค้า และเลือกเซลส์'};
+      const row={createdat:nowTH(),caseid:caseId,sales,customer,facebook:String(data.facebook||'').trim(),ads:String(data.ads||'').trim(),brand:data.brand||'',model:data.model||'',plate:String(data.plate||'').trim(),status:data.status||'จองแล้ว',note:String(data.note||'').trim()};
+      const inserted=await sbQ('POST','bookings',{},row);
+      if(isSbError(inserted))return{success:false,error:formatSbError(inserted)};
+      if(!safeArray(inserted).length)return{success:false,error:'เพิ่มการจองไม่สำเร็จ กรุณาลองใหม่'};
+      const hist=await sbQ('POST','history',{},{caseid:caseId,sales,action:'จอง',detail:'เพิ่มการจอง '+(row.brand||'')+' '+(row.model||''),createdat:nowTH()});
+      return{success:true,data:mapBooking(safeArray(inserted)[0]),historySaved:!isSbError(hist)};
+    }
+    case 'updateBooking':{
+      const upd={};if(data.status!==undefined)upd.status=data.status;if(data.note!==undefined)upd.note=data.note;
+      const q=data.bookingId?{id:`eq.${data.bookingId}`}:{caseid:`eq.${data.caseId}`};
+      if(!data.bookingId&&data.createdat)q.createdat=`eq.${data.createdat}`;
+      const updated=await sbQ('PATCH','bookings',q,upd);
+      if(isSbError(updated))return{success:false,error:formatSbError(updated)};
+      if(!safeArray(updated).length)return{success:false,error:'ไม่พบรายการจอง หรือรายการถูกเปลี่ยนจากอุปกรณ์อื่น'};
+      const hist=await sbQ('POST','history',{},{caseid:data.caseId,sales:data.updatedBy||'ระบบ',action:'แก้ไขการจอง',detail:'เปลี่ยนสถานะการจองเป็น '+(data.status||'-'),createdat:nowTH()});
+      return{success:true,historySaved:!isSbError(hist)};
+    }
+    case 'deleteBooking':{
+      const q=data.bookingId?{id:`eq.${data.bookingId}`}:{caseid:`eq.${data.caseId}`};
+      if(!data.bookingId&&data.createdat)q.createdat=`eq.${data.createdat}`;
+      const deleted=await sbQ('DELETE','bookings',q);
+      if(isSbError(deleted))return{success:false,error:formatSbError(deleted)};
+      if(!safeArray(deleted).length)return{success:false,error:'ไม่พบรายการจอง หรือรายการถูกลบไปแล้ว'};
+      const hist=await sbQ('POST','history',{},{caseid:data.caseId,sales:data.deletedBy||'ระบบ',action:'ลบการจอง',detail:'ลบการจอง '+(data.customer||''),createdat:nowTH()});
+      return{success:true,historySaved:!isSbError(hist)};
+    }
     case 'getDashboard':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const[cs,cl,users]=await Promise.all([sbQ('GET','cases',{caseid:`like.${pre}*`}),sbQ('GET','claimedcases',{}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'userid,name,avatar,startdate'})]);const cases=cs||[],claimed=cl||[],salesList=users||[];if(data.role==='Admin'){return{success:true,data:{sales:salesList.map(u=>{const my=cases.filter(c=>c.sales===u.name);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});return{name:u.name,avatar:u.avatar||'',currentCases:my.length,claimedCases:claimed.filter(c=>c.sale===u.name).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st};}),total:{cases:cases.length}}};}const my=cases.filter(c=>c.sales===data.sales);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});const me=salesList.find(u=>u.name===data.sales);return{success:true,data:{currentCases:my.length,claimedCases:claimed.filter(c=>c.sale===data.sales).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st,startdate:me?.startdate||''}};}
     case 'getHistory':{const q={order:'createdat.desc',limit:data.limit||'500'};if(data.caseId)q.caseid=`eq.${data.caseId}`;const rows=await sbQ('GET','history',q);return{success:true,data:(rows||[]).map(mapHistory)};}
     case 'getCaseNotes':{
@@ -1377,11 +1408,11 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
 function AddBookingModal({currentUser,users,onClose,onAdded}){
   const [form,setForm]=useState({caseId:'',sales:currentUser.role==='Admin'?'':currentUser.name,customer:'',facebook:'',ads:'',brand:'',model:'',plate:'',status:'จองแล้ว',note:''});
   const [loading,setLoading]=useState(false);const set=(k,v)=>setForm(f=>({...f,[k]:v}));const models=form.brand?CAR_MODELS[form.brand]||[]:[];
-  async function submit(){if(!form.caseId||!form.customer)return showToast('กรุณากรอกรหัสเคสและชื่อลูกค้า','warn');setLoading(true);const r=await api('addBooking',{...form});setLoading(false);if(r.success){onAdded();onClose();}else showToast(r.error||'เกิดข้อผิดพลาด','err');}
+  async function submit(){if(!form.caseId.trim()||!form.customer.trim()||!form.sales.trim())return showToast('กรุณากรอกรหัสเคส ชื่อลูกค้า และเลือกเซลส์','warn');setLoading(true);const r=await api('addBooking',{...form});setLoading(false);if(r.success){showToast('เพิ่มการจองแล้ว','ok');onAdded();onClose();}else showToast(r.error||'เกิดข้อผิดพลาด','err');}
   return <Modal title="📋 เพิ่มการจอง" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'บันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group"><label>รหัสเคส *</label><input value={form.caseId} onChange={e=>set('caseId',e.target.value)} placeholder="เช่น 2603001"/></div>
-      {currentUser.role==='Admin'?<div className="form-group"><label>เซลส์</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือก --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>:<div className="form-group"><label>เซลส์</label><input value={form.sales} readOnly/></div>}
+      {currentUser.role==='Admin'?<div className="form-group"><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือก --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>:<div className="form-group"><label>เซลส์ *</label><input value={form.sales} readOnly/></div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อลูกค้า *</label><input value={form.customer} onChange={e=>set('customer',e.target.value)}/></div>
       <div className="form-group"><label>Facebook</label><input value={form.facebook} onChange={e=>set('facebook',e.target.value)}/></div>
       <div className="form-group"><label>Ads ไหน</label><input value={form.ads} onChange={e=>set('ads',e.target.value)}/></div>
@@ -1447,7 +1478,7 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
       </div>}
     </div>
   </Modal>
-    {confirmDelete&&<Confirm msg={`ลบ “${String(item?.name||'ข้อมูลนี้').slice(0,80)}” ออกจาก${title}หรือไม่?`} onOk={()=>{setConfirmDelete(false);doDelete();}} onCancel={()=>setConfirmDelete(false)}/>} 
+    {confirmDelete&&<Confirm msg={`ลบ “${String(item?.name||'ข้อมูลนี้').slice(0,80)}” ออกจาก${title}หรือไม่?`} onOk={()=>{setConfirmDelete(false);doDelete();}} onCancel={()=>setConfirmDelete(false)}/>}
   </>;
 }
 
@@ -1986,26 +2017,28 @@ function AdminBookings({currentUser,users}){
         </div>
       </div>
     </div>
-    {sel&&<BookingDetailModal booking={sel} onClose={()=>setSel(null)} onUpdated={load}/>}
+    {sel&&<BookingDetailModal booking={sel} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
     {showAdd&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAdd(false)} onAdded={load}/>}
   </div>;
 }
 
-function BookingDetailModal({booking,onClose,onUpdated}){
-  const [status,setStatus]=useState(booking['สถานะ']||'จองแล้ว');const [note,setNote]=useState(booking['หมายเหตุ']||'');const [loading,setLoading]=useState(false);const [deleting,setDeleting]=useState(false);
-  async function save(){setLoading(true);const r=await api('updateBooking',{caseId:booking.CaseID,status,note});setLoading(false);if(r.success){showToast('บันทึกการจองแล้ว','ok');onUpdated();onClose();}else showToast('บันทึกไม่สำเร็จ: '+(r.error||''),'err');}
+function BookingDetailModal({booking,currentUser,onClose,onUpdated}){
+  const [status,setStatus]=useState(booking['สถานะ']||'จองแล้ว');const [note,setNote]=useState(booking['หมายเหตุ']||'');const [loading,setLoading]=useState(false);const [deleting,setDeleting]=useState(false);const [confirmDelete,setConfirmDelete]=useState(false);
+  async function save(){setLoading(true);const r=await api('updateBooking',{bookingId:booking.bookingId,caseId:booking.CaseID,createdat:booking['วันที่'],status,note,updatedBy:currentUser?.name||'ระบบ'});setLoading(false);if(r.success){showToast('บันทึกการจองแล้ว','ok');onUpdated();onClose();}else showToast('บันทึกไม่สำเร็จ: '+(r.error||''),'err');}
   async function deleteBooking(){
-    if(!confirm(`ยืนยันลบการจองของ ${booking['ลูกค้า']||booking.CaseID} ใช่ไหม?\n\nการลบนี้จะลบเฉพาะข้อมูลในหน้า "การจอง" ไม่ลบเคสหลักในหน้าเคสปัจจุบัน`))return;
     setDeleting(true);
-    const r=await api('deleteBooking',{caseId:booking.CaseID,createdat:booking['วันที่'],customer:booking['ลูกค้า'],deletedBy:booking['เซลส์']||'ระบบ'});
+    const r=await api('deleteBooking',{bookingId:booking.bookingId,caseId:booking.CaseID,createdat:booking['วันที่'],customer:booking['ลูกค้า'],deletedBy:currentUser?.name||'ระบบ'});
     setDeleting(false);
     if(r.success){showToast('ลบการจองแล้ว','ok');onUpdated();onClose();}else showToast(r.error||'ลบไม่สำเร็จ','err');
   }
-  return <Modal title={`จอง — ${booking.CaseID}`} onClose={onClose} footer={<><button className="btn btn-danger" style={{marginRight:'auto'}} onClick={deleteBooking} disabled={deleting||loading}>{deleting?'กำลังลบ...':'🗑️ ลบเคสจอง'}</button><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={save} disabled={loading||deleting}>{loading?'บันทึก...':'💾 บันทึก'}</button></>}>
+  return <>
+  <Modal title={`จอง — ${booking.CaseID}`} onClose={onClose} footer={<><button className="btn btn-danger" style={{marginRight:'auto'}} onClick={()=>setConfirmDelete(true)} disabled={deleting||loading}>{deleting?'กำลังลบ...':'🗑️ ลบเคสจอง'}</button><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={save} disabled={loading||deleting}>{loading?'บันทึก...':'💾 บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>{[['ลูกค้า',booking['ลูกค้า']],['เซลส์',booking['เซลส์']],['ยี่ห้อ',booking['รถ']],['รุ่น',booking['รุ่น']],['ทะเบียน',booking['ทะเบียน']],['Facebook',booking.Facebook]].map(([l,v])=>v?<div key={l}><div style={{fontSize:11,color:'var(--text2)',marginBottom:3}}>{l}</div><div style={{fontWeight:500}}>{v}</div></div>:null)}</div>
     <div className="form-group"><label>สถานะ</label><select value={status} onChange={e=>setStatus(e.target.value)}>{BOOK_STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
     <div className="form-group"><label>หมายเหตุ</label><textarea rows={2} value={note} onChange={e=>setNote(e.target.value)}/></div>
-  </Modal>;
+  </Modal>
+  {confirmDelete&&<Confirm msg={`ลบการจองของ “${String(booking['ลูกค้า']||booking.CaseID).slice(0,80)}” หรือไม่? การลบนี้ไม่ลบเคสหลักในหน้าเคสปัจจุบัน`} onOk={()=>{setConfirmDelete(false);deleteBooking();}} onCancel={()=>setConfirmDelete(false)}/>}
+  </>;
 }
 
 function AdminUsers({currentUser}){
