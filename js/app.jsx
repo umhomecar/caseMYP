@@ -1412,6 +1412,7 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
   const isEdit=!!item;
   const [form,setForm]=useState({name:item?.name||'',sales:item?.sales||'',status:item?.status||'รอข้อมูล',report:item?.report||''});
   const [loading,setLoading]=useState(false);
+  const [confirmDelete,setConfirmDelete]=useState(false);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   async function submit(){
     if(!form.name.trim())return showToast('กรุณากรอกชื่อ','warn');
@@ -1424,15 +1425,14 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
   }
   async function doDelete(){
     if(!isEdit)return;
-    if(!confirm('ลบข้อมูลนี้ออกจาก '+title+' ใช่ไหม?'))return;
     setLoading(true);
     const r=await api('deleteStandaloneCase',{id:item.id});
     setLoading(false);
     if(r.success){showToast('ลบข้อมูลแล้ว','ok');onSaved();onClose();}
     else showToast(r.error||'ลบไม่สำเร็จ','err',5000);
   }
-  return <Modal title={(isEdit?'✏️ แก้ไข ':'➕ เพิ่ม ')+title} onClose={onClose} footer={<>
-    {isEdit&&<button className="btn btn-danger" onClick={doDelete} disabled={loading} style={{marginRight:'auto'}}>ลบ</button>}
+  return <><Modal title={(isEdit?'✏️ แก้ไข ':'➕ เพิ่ม ')+title} onClose={onClose} footer={<>
+    {isEdit&&<button className="btn btn-danger" onClick={()=>setConfirmDelete(true)} disabled={loading} style={{marginRight:'auto'}}>ลบ</button>}
     <button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button>
     <button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button>
   </>}>
@@ -1446,7 +1446,9 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
         <div>อัปเดตล่าสุด: {formatTextDateToTHBE(item.updated_at)}</div>
       </div>}
     </div>
-  </Modal>;
+  </Modal>
+    {confirmDelete&&<Confirm msg={`ลบ “${String(item?.name||'ข้อมูลนี้').slice(0,80)}” ออกจาก${title}หรือไม่?`} onOk={()=>{setConfirmDelete(false);doDelete();}} onCancel={()=>setConfirmDelete(false)}/>} 
+  </>;
 }
 
 function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
