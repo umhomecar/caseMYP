@@ -2,8 +2,7 @@
 <html lang="th" style="background:#0d1117;">
 <head>
   <meta charset="UTF-8"/>
-  <!-- ★ ล็อคไม่ให้ซูม (user-scalable=no) -->
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
   <title>CasePool — ระบบจัดการเคส</title>
 
   <meta name="theme-color" content="#0d1117"/>
@@ -24,21 +23,16 @@
   <!-- ★ Critical loader CSS inline — แสดงทันทีไม่ต้องรอ styles.css -->
   <style>
     html,body{margin:0;padding:0;background:#0d1117 !important;color:#e6edf3;font-family:'Sarabun',sans-serif;
-      /* ป้องกันซูม double-tap บน iOS */
       touch-action:manipulation;
       -webkit-text-size-adjust:100%;
     }
-    /* ป้องกัน text select บน mobile */
-    body{-webkit-user-select:none;user-select:none;}
-    /* อนุญาต select เฉพาะ input/textarea */
-    input,textarea{-webkit-user-select:auto;user-select:auto;}
     #app-loader{
       position:fixed;inset:0;background:#0d1117;
       display:flex;align-items:center;justify-content:center;
       z-index:8000;flex-direction:column;gap:12px;
       transition:opacity .3s ease;
     }
-    #app-loader .loader-car{font-size:46px;animation:carBounce 1.4s ease-in-out infinite;}
+    #app-loader .loader-car{font-size:46px;}
     #app-loader .loader-title{color:#58a6ff;font-size:20px;font-weight:800;letter-spacing:.5px;}
     #app-loader .loader-sub{color:#8b949e;font-size:12px;margin-top:2px;}
     #app-loader .loader-spinner{
@@ -47,16 +41,10 @@
       border-radius:50%;animation:spin .7s linear infinite;margin-top:8px;
     }
     @keyframes spin{to{transform:rotate(360deg)}}
-    @keyframes carBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
   </style>
 
   <link rel="stylesheet" href="./css/styles.css"/>
   <script src="./js/preload.js"></script>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 </head>
 <body>
   <!-- loader แสดงทันทีก่อน JS โหลด -->
@@ -69,18 +57,8 @@
 
   <div id="root"></div>
 
-  <!-- ★ ป้องกันซูม pinch บน iOS (viewport meta ไม่พอสำหรับ iOS Safari) -->
-  <script>
-    // ป้องกัน pinch-zoom gesture บน iOS
-    document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, {passive:false});
-    document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, {passive:false});
-    document.addEventListener('gestureend', function(e){ e.preventDefault(); }, {passive:false});
-    // ป้องกัน multi-touch zoom
-    document.addEventListener('touchmove', function(e){
-      if(e.touches && e.touches.length > 1){ e.preventDefault(); }
-    }, {passive:false});
-  </script>
-
-  <script type="text/babel" src="./js/app.jsx"></script>
+  <noscript>กรุณาเปิดใช้งาน JavaScript เพื่อใช้ระบบ CasePool</noscript>
+  <script src="./runtime-config.js"></script>
+  <script src="./js/app.bundle.js"></script>
 </body>
 </html>

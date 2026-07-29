@@ -1,0 +1,5 @@
+node_modules/
+public/
+js/app.bundle.js
+.DS_Store
+npm-debug.log*

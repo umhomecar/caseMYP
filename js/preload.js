@@ -3,14 +3,25 @@ document.documentElement.style.background="#0d1117";
 if(document.body)document.body.style.background="#0d1117";
 document.addEventListener('DOMContentLoaded',function(){if(document.body)document.body.style.background="#0d1117";});
 
-// ฆ่า loader ทันทีที่ React พร้อม (React จะ remove เอง)
-// fallback: ถ้า React ไม่ remove ภายใน 500ms ให้ลองอีกรอบ
+// React จะนำ loader ออกเมื่อ mount สำเร็จ
+// ถ้ายังค้างนาน ให้แสดงทางแก้แทนการซ่อน loader แล้วเหลือหน้าว่าง
 window.addEventListener('load',function(){
-  // React App จะ remove loader เอง — นี่คือ fallback กัน stuck
   setTimeout(function(){
     var el=document.getElementById('app-loader');
-    if(el){el.style.pointerEvents='none';el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(function(){if(el.parentNode)el.remove();},350);}
-  },500); // ลดจาก 4000ms → 500ms
+    if(!el)return;
+    var sub=el.querySelector('.loader-sub');
+    var spinner=el.querySelector('.loader-spinner');
+    if(sub)sub.textContent='โหลดนานกว่าปกติ กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่';
+    if(spinner)spinner.style.display='none';
+    if(!el.querySelector('.loader-retry')){
+      var retry=document.createElement('button');
+      retry.type='button';
+      retry.className='loader-retry';
+      retry.textContent='โหลดใหม่';
+      retry.addEventListener('click',function(){location.reload();});
+      el.appendChild(retry);
+    }
+  },8000);
 });
 
 // PWA install prompt listener
