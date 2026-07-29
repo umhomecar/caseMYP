@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild js/app.jsx --bundle --minify --target=es2020 --define:process.env.NODE_ENV=\\\"production\\\" --outfile=js/app.bundle.js",
+    "build": "node scripts/build.mjs",
     "check": "npm run build && node scripts/validate.mjs"
   },
   "dependencies": {
