@@ -49,6 +49,12 @@ if(!source.includes("T.*(?:Z|[+-]"))fail('parseTHDateTime ยังไม่ร�
 const standaloneModal=source.slice(source.indexOf('function StandaloneCaseModal'),source.indexOf('function AdminSentCasesPage'));
 if(/\bconfirm\s*\(/.test(standaloneModal))fail('เคสส่วนตัวและ Line OA ยังใช้กล่องยืนยันลบของเบราว์เซอร์');
 if(!standaloneModal.includes('confirmDelete&&<Confirm'))fail('เคสส่วนตัวและ Line OA ยังไม่ใช้กล่องยืนยันลบมาตรฐานของระบบ');
+const bookingSection=source.slice(source.indexOf('function AddBookingModal'),source.indexOf('function AdminUsers'));
+if(/\bconfirm\s*\(/.test(bookingSection))fail('หน้าการจองยังใช้กล่องยืนยันลบของเบราว์เซอร์');
+if(!bookingSection.includes('confirmDelete&&<Confirm'))fail('หน้าการจองยังไม่ใช้กล่องยืนยันลบมาตรฐานของระบบ');
+if(!source.includes('bookingId:r.id'))fail('รายการจองยังไม่เก็บ primary key สำหรับแก้ไขหรือลบเฉพาะแถว');
+if(!bookingSection.includes('bookingId:booking.bookingId'))fail('หน้าการจองยังแก้ไขหรือลบด้วยรหัสเคสแทน primary key');
+if(!source.includes("กรุณากรอกรหัสเคส ชื่อลูกค้า และเลือกเซลส์"))fail('การจองยังไม่บังคับเลือกเซลส์ผู้รับผิดชอบ');
 for(const file of publicFiles){
   const sourcePath=path.join(root,file);
   const deployPath=path.join(root,'public',file);
