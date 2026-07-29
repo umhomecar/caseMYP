@@ -33,29 +33,21 @@ function getSupabaseConfigError(){
   return '';
 }
 const SUPA_CONFIG_ERROR=getSupabaseConfigError();
-const FCM_EDGE_URL=SUPA_URL?SUPA_URL+'/functions/v1/send-fcm':'';
-
-// FCM disabled — not using Firebase, only in-app Web Notification polling
-// (see usePushNotif hook)
-async function pushNotif(salesName,title,body,data={}){
-  // ยังคงไว้เผื่อใช้ Edge Function ในอนาคต — ปัจจุบันเรียกแต่ไม่พัง
-  if(SUPA_CONFIG_ERROR||!FCM_EDGE_URL)return;
-  try{
-    await fetch(FCM_EDGE_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
-      body:JSON.stringify({sales_name:salesName,title,body,data}),
-    });
-  }catch(e){}
-}
-const API_URL  = SUPA_URL;
 let supabase=null;
 if(!SUPA_CONFIG_ERROR){
   try{supabase=createClient(SUPA_URL,SUPA_KEY,{realtime:{params:{eventsPerSecond:10}}});}catch(e){console.warn('Supabase init failed',e);}
 }
 
 (function(){
-  try{ if(localStorage.getItem('cp_theme')==='light') document.body.classList.add('light'); }catch(e){}
+  try{
+    if(localStorage.getItem('cp_theme')==='light')document.body.classList.add('light');
+    // Remove legacy copies of customer data. Supabase is the only source of truth.
+    localStorage.removeItem('cases');
+    localStorage.removeItem('marketCases');
+    Object.keys(localStorage).forEach(key=>{
+      if(key.startsWith('cnotes_')||key.startsWith('cp_followup_'))localStorage.removeItem(key);
+    });
+  }catch(e){}
 })();
 function toggleTheme(){
   document.body.classList.toggle('light');
@@ -216,13 +208,21 @@ function localCaseSearch(rows,q,limit=500){
     .slice(0,limit)
     .map(x=>x.c);
 }
-let _searchCasesCache={ts:0,rows:null};
-async function getSearchCaseRows(force=false){
-  const fresh=_searchCasesCache.rows&&(Date.now()-_searchCasesCache.ts)<30000;
-  if(!force&&fresh)return _searchCasesCache.rows;
-  const rows=await sbQ('GET','cases',{order:'caseid.desc',limit:'10000'});
-  if(Array.isArray(rows)){_searchCasesCache={ts:Date.now(),rows};return rows;}
-  return _searchCasesCache.rows||[];
+const _searchCasesCache=new Map();
+function clearSearchCasesCache(){_searchCasesCache.clear();}
+async function getSearchCaseRows({force=false,sales=''}={}){
+  const scope=String(sales||'*');
+  const cached=_searchCasesCache.get(scope);
+  const fresh=cached?.rows&&(Date.now()-cached.ts)<30000;
+  if(!force&&fresh)return cached.rows;
+  const query={deleted_at:'is.null',order:'caseid.desc',limit:'10000'};
+  if(sales)query.sales=`eq.${sales}`;
+  const rows=await sbQ('GET','cases',query);
+  if(Array.isArray(rows)){
+    _searchCasesCache.set(scope,{ts:Date.now(),rows});
+    return rows;
+  }
+  return cached?.rows||[];
 }
 
 const CACHEABLE=['getCases','getUsers','getBookings','getDashboard','getNotifications','getStandaloneCases','getTrashCases'];
@@ -246,7 +246,13 @@ async function api(action,data={}){
       if(!result||typeof result!=='object')return{success:false,error:'ระบบตอบกลับไม่ถูกต้อง กรุณาลองใหม่'};
       if(result.success&&isSbError(result.data))return{success:false,error:formatSbError(result.data)};
       if(cacheable&&result.success)cacheSet(action,data,result);
-      if(result.success&&INVALIDATE_MAP[action])cacheClear(INVALIDATE_MAP[action]);
+      if(result.success&&INVALIDATE_MAP[action]){
+        cacheClear(INVALIDATE_MAP[action]);
+        if(INVALIDATE_MAP[action].includes('getCases'))clearSearchCasesCache();
+      }
+      if(result.success&&(result.historySaved===false||result.notificationSaved===false)){
+        showToast('บันทึกข้อมูลหลักสำเร็จ แต่ประวัติหรือการแจ้งเตือนบันทึกไม่ครบ กรุณาแจ้งแอดมิน','warn',5000);
+      }
       return result;
     }catch(e){
       const stale=cacheable?cacheGetStale(action,data):null;
@@ -390,8 +396,14 @@ function mapBooking(r){return{bookingId:r.id,version:Number(r.version)||1,'ว�
 function mapHistory(r){return{historyId:'H'+r.id,'รหัสเคส':r.caseid,'เซลส์':r.sales,action:r.action,detail:r.detail||'','วันที่':r.createdat};}
 function mapNotif(r){return{notifId:'N'+r.id,id:r.id,sales:r.sales,caseid:r.caseid,'เซลส์':r.sales,'รหัสเคส':r.caseid,message:r.message,'วันที่':r.createdat,status:r.status,'สถานะ':r.status};}
 
-function sbHist(caseid,sales,action,detail){sbQ('POST','history',{},{caseid,sales:sales||'ระบบ',action,detail:detail||'',createdat:nowTH()});}
-function sbNotif(sales,caseid,message){sbQ('POST','notifications',{},{sales,caseid,message,createdat:nowTH(),status:'unread'});}
+async function sbHist(caseid,sales,action,detail){
+  const result=await sbQ('POST','history',{},{caseid,sales:sales||'ระบบ',action,detail:detail||'',createdat:nowTH()});
+  return !isSbError(result);
+}
+async function sbNotif(sales,caseid,message){
+  const result=await sbQ('POST','notifications',{},{sales,caseid,message,createdat:nowTH(),status:'unread'});
+  return !isSbError(result);
+}
 
 async function genCaseId(attempt=0,customPrefix=''){
   const d=new Date(),pre=customPrefix||String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
@@ -455,7 +467,7 @@ async function sbApi(action,data){
       const u=rows[0];
       return{success:true,user:{userId:u.userid,username:u.username,name:u.name,role:u.role,avatar:u.avatar||'',startdate:u.startdate||''}};
     }
-    case 'getUsers':{const rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate',order:'userid.asc'});return{success:true,data:(rows||[]).map(u=>({userId:u.userid,username:u.username,name:u.name,role:u.role,status:u.status,avatar:u.avatar||'',startdate:u.startdate||''}))};}
+    case 'getUsers':{const rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate',order:'userid.asc'});if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows).map(u=>({userId:u.userid,username:u.username,name:u.name,role:u.role,status:u.status,avatar:u.avatar||'',startdate:u.startdate||''}))};}
     case 'addUser':{
       if(AUTH_MODE==='supabase')return{success:false,error:'โหมด Supabase Auth ต้องสร้างบัญชีใน Supabase Dashboard แล้วเชื่อม auth_user_id'};
       const ex=await sbQ('GET','users',{select:'userid',order:'userid.desc',limit:'1'});const maxN=ex?.length?parseInt(String(ex[0].userid||'').replace('U',''))||0:0;const userid='U'+String(maxN+1).padStart(3,'0');await sbMutate('POST','users',{},{userid,username:data.username,password:data.password||'1234',name:data.name,status:'active',role:data.role||'Sales',avatar:data.avatar||''});return{success:true};
@@ -523,9 +535,9 @@ async function sbApi(action,data){
         const id=data.caseid||await genCaseId(attempt,data.casePrefix||'');
         const inserted=await sbQ('POST','cases',{},{...baseRow,caseid:id});
         if(!isSbError(inserted)){
-          sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales));
-          if(!isUnassignedSales(assignedSales))sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+')');
-          return{success:true,caseId:id,sales:assignedSales,unassigned:isUnassignedSales(assignedSales)};
+          const historySaved=await sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales));
+          const notificationSaved=isUnassignedSales(assignedSales)?true:await sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+')');
+          return{success:true,caseId:id,sales:assignedSales,unassigned:isUnassignedSales(assignedSales),historySaved,notificationSaved};
         }
         lastError=inserted;
         if(data.caseid||!isDuplicateError(inserted)){
@@ -547,15 +559,18 @@ async function sbApi(action,data){
       if(!safeArray(updated).length)return{success:false,conflict:true,error:'เคสนี้ถูกแก้จากอุปกรณ์อื่น กรุณารีเฟรชก่อนบันทึก'};
       const changed=[];
       ['status','sales','customername','contact','report','next_action','next_action_at'].forEach(k=>{if(data[k]!==undefined&&String(data[k]??'')!==String(before[k]??''))changed.push(`${k}: ${String(before[k]??'-')} → ${String(data[k]??'-')}`);});
-      sbHist(data.caseid,data.changedBy||'ระบบ',data.sales!==undefined&&data.sales!==before.sales?'มอบหมายเคส':'แก้ไข',data.detail||changed.join(' | ')||'บันทึกข้อมูล');
-      if(data.sales&&!isUnassignedSales(data.sales)&&data.sales!==before.sales)sbNotif(data.sales,data.caseid,'📋 ได้รับมอบหมายเคส '+data.caseid+' ('+(data.customername||before.customername||'')+')');
-      return{success:true,data:safeArray(updated)[0]};
+      const historySaved=await sbHist(data.caseid,data.changedBy||'ระบบ',data.sales!==undefined&&data.sales!==before.sales?'มอบหมายเคส':'แก้ไข',data.detail||changed.join(' | ')||'บันทึกข้อมูล');
+      const notificationSaved=data.sales&&!isUnassignedSales(data.sales)&&data.sales!==before.sales
+        ?await sbNotif(data.sales,data.caseid,'📋 ได้รับมอบหมายเคส '+data.caseid+' ('+(data.customername||before.customername||'')+')')
+        :true;
+      return{success:true,data:safeArray(updated)[0],historySaved,notificationSaved};
     }
     case 'bulkAssignCases':{
       const ids=[...new Set(safeArray(data.caseIds).map(String).filter(Boolean))];
       const sales=String(data.sales||'').trim();
       if(!ids.length||!sales)return{success:false,error:'กรุณาเลือกเคสและเซลส์'};
       const results=[];
+      let historySaved=true,notificationSaved=true;
       for(const caseid of ids){
         const rows=await sbQ('GET','cases',{caseid:`eq.${caseid}`,deleted_at:'is.null',limit:'1'});
         const current=safeArray(rows)[0];
@@ -563,13 +578,17 @@ async function sbApi(action,data){
         const updated=await sbQ('PATCH','cases',{caseid:`eq.${caseid}`,deleted_at:'is.null',version:`eq.${Number(current.version)||1}`},{sales,updatedat:nowTH(),version:(Number(current.version)||1)+1,assigned_at:new Date().toISOString(),assigned_by:data.changedBy||'แอดมิน'});
         const ok=!isSbError(updated)&&safeArray(updated).length>0;
         results.push({caseid,success:ok});
-        if(ok){sbHist(caseid,data.changedBy||'แอดมิน','มอบหมายเคส',`มอบหมาย ${current.sales||UNASSIGNED_SALES} → ${sales}`);sbNotif(sales,caseid,'📋 ได้รับมอบหมายเคส '+caseid+' ('+(current.customername||'')+')');}
+        if(ok){
+          historySaved=(await sbHist(caseid,data.changedBy||'แอดมิน','มอบหมายเคส',`มอบหมาย ${current.sales||UNASSIGNED_SALES} → ${sales}`))&&historySaved;
+          notificationSaved=(await sbNotif(sales,caseid,'📋 ได้รับมอบหมายเคส '+caseid+' ('+(current.customername||'')+')'))&&notificationSaved;
+        }
       }
-      return{success:true,assigned:results.filter(x=>x.success).length,failed:results.filter(x=>!x.success).map(x=>x.caseid)};
+      return{success:true,assigned:results.filter(x=>x.success).length,failed:results.filter(x=>!x.success).map(x=>x.caseid),historySaved,notificationSaved};
     }
     case 'searchCases':{
       const q=String(data.q||'').trim();
       if(!q)return{success:true,data:[]};
+      const sales=String(data.sales||'').trim();
 
       // ✅ Search v2: ค้นแบบผสม Server + Local normalized search
       // เหตุผล: Supabase ilike ค้นเบอร์ที่มีขีด/เว้นวรรค, เลขไทย, หรืออักขระพิเศษบางตัวไม่ค่อยเจอ
@@ -582,14 +601,16 @@ async function sbApi(action,data){
         try{
           const cleanQ=q.replace(/\*/g,'').trim();
           const orFilter=`caseid.ilike.*${cleanQ}*,customername.ilike.*${cleanQ}*,contact.ilike.*${cleanQ}*,report.ilike.*${cleanQ}*,sales.ilike.*${cleanQ}*,status.ilike.*${cleanQ}*`;
-          const rows=await sbQ('GET','cases',{or:`(${orFilter})`,order:'caseid.desc',limit:'300'});
+          const query={or:`(${orFilter})`,deleted_at:'is.null',order:'caseid.desc',limit:'300'};
+          if(sales)query.sales=`eq.${sales}`;
+          const rows=await sbQ('GET','cases',query);
           if(Array.isArray(rows))addRows(rows);
         }catch(e){}
       }
 
       // 2) โหลด cache แล้วค้นฝั่ง JS แบบ normalize เสมอ เพื่อแก้กรณีค้นเบอร์/ชื่อ/รหัสไม่ตรง format
       try{
-        const allRows=await getSearchCaseRows();
+        const allRows=await getSearchCaseRows({sales});
         addRows(localCaseSearch(allRows,q,500));
       }catch(e){}
 
@@ -802,8 +823,8 @@ async function sbApi(action,data){
       if(isSbError(restored))return{success:false,error:formatSbError(restored)};
       return{success:true};
     }
-    case 'getDashboard':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const[cs,users]=await Promise.all([sbQ('GET','cases',{caseid:`like.${pre}*`,deleted_at:'is.null'}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'userid,name,avatar,startdate'})]);const cases=cs||[],salesList=users||[];const unassigned=cases.filter(c=>isUnassignedSales(c.sales)).length;if(data.role==='Admin'){return{success:true,data:{sales:salesList.map(u=>{const my=cases.filter(c=>c.sales===u.name);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});return{name:u.name,avatar:u.avatar||'',currentCases:my.filter(c=>!CLOSED_STATUSES.includes(c.status)).length,pendingFollowup:my.filter(c=>c.next_action_at&&!CLOSED_STATUSES.includes(c.status)).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st};}),total:{cases:cases.length,unassigned}}};}const my=cases.filter(c=>c.sales===data.sales);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});const me=salesList.find(u=>u.name===data.sales);return{success:true,data:{currentCases:my.filter(c=>!CLOSED_STATUSES.includes(c.status)).length,pendingFollowup:my.filter(c=>c.next_action_at&&!CLOSED_STATUSES.includes(c.status)).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st,startdate:me?.startdate||''}};}
-    case 'getHistory':{const q={order:'createdat.desc',limit:data.limit||'500'};if(data.caseId)q.caseid=`eq.${data.caseId}`;const rows=await sbQ('GET','history',q);return{success:true,data:(rows||[]).map(mapHistory)};}
+    case 'getDashboard':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const[cs,users]=await Promise.all([sbQ('GET','cases',{caseid:`like.${pre}*`,deleted_at:'is.null'}),sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'userid,name,avatar,startdate'})]);const failed=[cs,users].find(isSbError);if(failed)return{success:false,error:formatSbError(failed)};const cases=safeArray(cs),salesList=safeArray(users);const unassigned=cases.filter(c=>isUnassignedSales(c.sales)).length;if(data.role==='Admin'){return{success:true,data:{sales:salesList.map(u=>{const my=cases.filter(c=>c.sales===u.name);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});return{name:u.name,avatar:u.avatar||'',currentCases:my.filter(c=>!CLOSED_STATUSES.includes(c.status)).length,pendingFollowup:my.filter(c=>c.next_action_at&&!CLOSED_STATUSES.includes(c.status)).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st};}),total:{cases:cases.length,unassigned}}};}const my=cases.filter(c=>c.sales===data.sales);const st={};my.forEach(c=>{st[c.status]=(st[c.status]||0)+1;});const me=salesList.find(u=>u.name===data.sales);return{success:true,data:{currentCases:my.filter(c=>!CLOSED_STATUSES.includes(c.status)).length,pendingFollowup:my.filter(c=>c.next_action_at&&!CLOSED_STATUSES.includes(c.status)).length,sold:my.filter(c=>c.status==='ปล่อยแล้ว').length,statuses:st,startdate:me?.startdate||''}};}
+    case 'getHistory':{const q={order:'createdat.desc',limit:data.limit||'500'};if(data.caseId)q.caseid=`eq.${data.caseId}`;const rows=await sbQ('GET','history',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows).map(mapHistory)};}
     case 'getCaseNotes':{
       const rows=await sbQ('GET','case_notes',{caseid:`eq.${data.caseId||data.caseid}`,deletedat:'is.null',order:'id.desc',limit:'500'});
       if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};
@@ -813,8 +834,8 @@ async function sbApi(action,data){
       const row={caseid:data.caseId||data.caseid,sales:data.sales||'',note:data.note||'',createdat:nowTH(),deletedat:null};
       const inserted=await sbQ('POST','case_notes',{},row);
       if(isSbError(inserted))return{success:false,error:formatSbError(inserted)};
-      sbHist(row.caseid,row.sales,'📝 Note','📝 Note: '+row.note);
-      return{success:true,data:safeArray(inserted).map(mapCaseNote)[0]||mapCaseNote(row)};
+      const historySaved=await sbHist(row.caseid,row.sales,'📝 Note','📝 Note: '+row.note);
+      return{success:true,data:safeArray(inserted).map(mapCaseNote)[0]||mapCaseNote(row),historySaved};
     }
     case 'deleteCaseNote':{
       const rows=await sbQ('GET','case_notes',{id:`eq.${data.id}`,deletedat:'is.null',limit:'1'});
@@ -837,8 +858,8 @@ async function sbApi(action,data){
       const inserted=await sbQ('POST','case_followups',{},row);
       if(isSbError(inserted))return{success:false,error:formatSbError(inserted)};
       const f=safeArray(inserted).map(mapCaseFollowup)[0]||mapCaseFollowup(row);
-      sbHist(row.caseid,row.sales,'นัด Follow-up','ลงนัด '+formatTextDateToTHBE(row.createdat)+' → นัดวันที่ '+formatYMDToTHBE(row.due_date)+(row.note?' — '+row.note:''));
-      return{success:true,data:f};
+      const historySaved=await sbHist(row.caseid,row.sales,'นัด Follow-up','ลงนัด '+formatTextDateToTHBE(row.createdat)+' → นัดวันที่ '+formatYMDToTHBE(row.due_date)+(row.note?' — '+row.note:''));
+      return{success:true,data:f,historySaved};
     }
     case 'updateFollowupStatus':{
       const rows=await sbQ('GET','case_followups',{id:`eq.${data.id}`,deletedat:'is.null',limit:'1'});
@@ -885,10 +906,10 @@ async function sbApi(action,data){
       if(count>0){cacheClear(['getNotifications']);try{if(window.cpTriggerPushPoll)window.cpTriggerPushPoll(500);}catch(e){}}
       return{success:true,count};
     }
-    case 'getNotifications':{const q={order:'id.desc',limit:data.limit||'100'};if(data.sales)q.sales=`eq.${data.sales}`;if(data.unreadOnly)q.status='eq.unread';const rows=await sbQ('GET','notifications',q);return{success:true,data:(rows||[]).map(mapNotif)};}
-    case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');await sbMutate('PATCH','notifications',{id:`eq.${id}`},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
+    case 'getNotifications':{const q={order:'id.desc',limit:data.limit||'100'};if(data.sales)q.sales=`eq.${data.sales}`;if(data.unreadOnly)q.status='eq.unread';const rows=await sbQ('GET','notifications',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows).map(mapNotif)};}
+    case 'markNotifRead':{const id=String(data.notifId||'').replace('N','');const rows=await sbMutate('PATCH','notifications',{id:`eq.${id}`},{status:'read'});if(!safeArray(rows).length)return{success:false,error:'ไม่พบการแจ้งเตือนนี้'};cacheClear(['getNotifications']);return{success:true};}
     case 'markAllNotifRead':{if(data.sales)await sbMutate('PATCH','notifications',{sales:`eq.${data.sales}`,status:'eq.unread'},{status:'read'});cacheClear(['getNotifications']);return{success:true};}
-    case 'deleteCase':{const cid=data.caseId||data.caseid;const rows=await sbQ('PATCH','cases',{caseid:`eq.${cid}`,deleted_at:'is.null'},{deleted_at:new Date().toISOString(),deleted_by:data.deletedBy||'แอดมิน',delete_reason:data.reason||'',updatedat:nowTH()});if(isSbError(rows))return{success:false,error:formatSbError(rows)};if(!safeArray(rows).length)return{success:false,error:'ไม่พบเคส หรือเคสถูกลบไปแล้ว'};sbHist(cid,data.deletedBy||'แอดมิน','ย้ายเข้าถังขยะ','เก็บในถังขยะ 30 วัน'+(data.reason?' — '+data.reason:''));return{success:true};}
+    case 'deleteCase':{const cid=data.caseId||data.caseid;const rows=await sbQ('PATCH','cases',{caseid:`eq.${cid}`,deleted_at:'is.null'},{deleted_at:new Date().toISOString(),deleted_by:data.deletedBy||'แอดมิน',delete_reason:data.reason||'',updatedat:nowTH()});if(isSbError(rows))return{success:false,error:formatSbError(rows)};if(!safeArray(rows).length)return{success:false,error:'ไม่พบเคส หรือเคสถูกลบไปแล้ว'};const historySaved=await sbHist(cid,data.deletedBy||'แอดมิน','ย้ายเข้าถังขยะ','เก็บในถังขยะ 30 วัน'+(data.reason?' — '+data.reason:''));return{success:true,historySaved};}
     case 'getTrashCases':{
       const[caseRows,bookingRows,standaloneRows]=await Promise.all([
         sbQ('GET','cases',{deleted_at:'not.is.null',order:'deleted_at.desc',limit:'500'}),
@@ -899,7 +920,7 @@ async function sbApi(action,data){
       if(failed)return{success:false,error:formatSbError(failed),data:{cases:[],bookings:[],standalone:[]}};
       return{success:true,data:{cases:safeArray(caseRows),bookings:safeArray(bookingRows),standalone:safeArray(standaloneRows)}};
     }
-    case 'restoreCase':{const cid=data.caseId||data.caseid;const rows=await sbQ('PATCH','cases',{caseid:`eq.${cid}`,deleted_at:'not.is.null'},{deleted_at:null,deleted_by:null,delete_reason:null,updatedat:nowTH()});if(isSbError(rows))return{success:false,error:formatSbError(rows)};if(!safeArray(rows).length)return{success:false,error:'ไม่พบเคสในถังขยะ'};sbHist(cid,data.restoredBy||'แอดมิน','กู้คืนเคส','กู้คืนเคสจากถังขยะ');return{success:true};}
+    case 'restoreCase':{const cid=data.caseId||data.caseid;const rows=await sbQ('PATCH','cases',{caseid:`eq.${cid}`,deleted_at:'not.is.null'},{deleted_at:null,deleted_by:null,delete_reason:null,updatedat:nowTH()});if(isSbError(rows))return{success:false,error:formatSbError(rows)};if(!safeArray(rows).length)return{success:false,error:'ไม่พบเคสในถังขยะ'};const historySaved=await sbHist(cid,data.restoredBy||'แอดมิน','กู้คืนเคส','กู้คืนเคสจากถังขยะ');return{success:true,historySaved};}
     case 'adminPullCase':case 'adminChangeSales':{
       const ts=nowTH();
       const current=await sbQ('GET','cases',{caseid:`eq.${data.caseId}`,deleted_at:'is.null',limit:'1'});
@@ -909,9 +930,11 @@ async function sbApi(action,data){
       const updated=await sbQ('PATCH','cases',{caseid:`eq.${data.caseId}`,version:`eq.${Number(before.version)||1}`},{sales:data.newSales,updatedat:ts,version:(Number(before.version)||1)+1,assigned_at:new Date().toISOString(),assigned_by:data.changedBy||'แอดมิน'});
       if(isSbError(updated))return{success:false,error:formatSbError(updated)};
       if(!safeArray(updated).length)return{success:false,conflict:true,error:'เคสถูกแก้จากอุปกรณ์อื่น กรุณารีเฟรช'};
-      sbHist(data.caseId,data.changedBy||'แอดมิน','มอบหมายเคส','มอบหมาย '+(before.sales||UNASSIGNED_SALES)+' → '+data.newSales);
-      if(data.newSales&&!isUnassignedSales(data.newSales))sbNotif(data.newSales,data.caseId,'📋 ได้รับมอบหมายเคส '+data.caseId+' ('+(before.customername||'')+')');
-      return{success:true};
+      const historySaved=await sbHist(data.caseId,data.changedBy||'แอดมิน','มอบหมายเคส','มอบหมาย '+(before.sales||UNASSIGNED_SALES)+' → '+data.newSales);
+      const notificationSaved=data.newSales&&!isUnassignedSales(data.newSales)
+        ?await sbNotif(data.newSales,data.caseId,'📋 ได้รับมอบหมายเคส '+data.caseId+' ('+(before.customername||'')+')')
+        :true;
+      return{success:true,historySaved,notificationSaved};
     }
     case 'getSmartAssign':{const sales=await getSmartAssignSales();return{success:true,sales};}
 
@@ -922,14 +945,11 @@ async function sbApi(action,data){
         if(isSbError(rows))throw new Error(formatSbError(rows));
         targets=safeArray(rows).map(u=>u.name);
       }
-      for(const s of targets){
-        await sbMutate('POST','notifications',{},{sales:s,caseid:'',message:'📢 '+data.message,createdat:nowTH(),status:'unread'});
-      }
+      targets=[...new Set(targets.map(s=>String(s||'').trim()).filter(Boolean))];
+      if(!targets.length)return{success:false,error:'ไม่พบผู้รับประกาศ'};
+      const createdat=nowTH();
+      await sbMutate('POST','notifications',{},targets.map(s=>({sales:s,caseid:'',message:'📢 '+data.message,createdat,status:'unread'})));
       cacheClear(['getNotifications']);
-      // Push FCM notification ทุก target
-      for(const s of targets){
-        await sbNotif(s,'',data.message);
-      }
       return{success:true,sent:targets.length};
     }
 
@@ -1246,11 +1266,11 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const [confirmDel,setConfirmDel]=useState(false);
   const [confirmAuxDelete,setConfirmAuxDelete]=useState(null);
   const [saving,setSaving]=useState(false);
+  const [auxLoadError,setAuxLoadError]=useState('');
   const isAdmin=currentUser.role==='Admin';
   const isClaimed=!!caseData.fromsales;
   const isMarketLocked=false;
   const caseId=caseData.caseid||caseData.caseID;
-  const FU_KEY='cp_followup_'+caseId; // legacy localStorage fallback
   const [showTransfer,setShowTransfer]=useState(false);
   const [transferTo,setTransferTo]=useState('');
   const [transferring,setTransferring]=useState(false);
@@ -1259,7 +1279,6 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     setTransferring(true);
     const r=await api('adminChangeSales',{caseId,newSales:transferTo,changedBy:currentUser.name});
     if(r.success){
-      pushNotif(transferTo,'🔄 ได้รับเคสโอน','เคส '+caseId+' จาก '+currentUser.name);
       onUpdated();onClose();
     }else{showToast('โอนเคสไม่สำเร็จ: '+(r.error||''),'err');setTransferring(false);}
   }
@@ -1268,14 +1287,15 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const [followupDate,setFollowupDate]=useState('');
   const [followupNote,setFollowupNote]=useState('');
   async function loadCaseNotesFollowups(){
-    setNotesLoading(true);setFollowupsLoading(true);
+    setNotesLoading(true);setFollowupsLoading(true);setAuxLoadError('');
     try{
       const [nr,fr]=await Promise.all([api('getCaseNotes',{caseId}),api('getCaseFollowups',{caseId})]);
-      if(nr.success)setNotes(nr.data||[]);else{try{const d=JSON.parse(localStorage.getItem('cnotes_'+caseId)||'[]');setNotes(Array.isArray(d)?d:[]);}catch(e){setNotes([]);}}
-      if(fr.success)setFollowups(fr.data||[]);else{try{const d=JSON.parse(localStorage.getItem(FU_KEY)||'[]');setFollowups(Array.isArray(d)?d:[]);}catch(e){setFollowups([]);}}
+      if(nr.success)setNotes(nr.data||[]);else setNotes([]);
+      if(fr.success)setFollowups(fr.data||[]);else setFollowups([]);
+      if(!nr.success||!fr.success)setAuxLoadError('โหลด Note หรือ Follow-up ไม่สำเร็จ กรุณากดโหลดใหม่');
     }catch(e){
-      try{const d=JSON.parse(localStorage.getItem('cnotes_'+caseId)||'[]');setNotes(Array.isArray(d)?d:[]);}catch(_){setNotes([]);}
-      try{const d=JSON.parse(localStorage.getItem(FU_KEY)||'[]');setFollowups(Array.isArray(d)?d:[]);}catch(_){setFollowups([]);}
+      setNotes([]);setFollowups([]);
+      setAuxLoadError('โหลด Note และ Follow-up ไม่สำเร็จ กรุณากดโหลดใหม่');
     }
     setNotesLoading(false);setFollowupsLoading(false);
   }
@@ -1359,6 +1379,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
             <div className="form-group"><label>ขั้นตอนถัดไป</label><input value={nextAction} onChange={e=>setNextAction(e.target.value)} placeholder="เช่น โทรขอเอกสาร"/></div>
             <div className="form-group"><label>กำหนดติดตาม</label><input type="datetime-local" value={nextActionAt} onChange={e=>setNextActionAt(e.target.value)}/></div>
           </div>
+          {auxLoadError&&<div role="alert" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,background:'rgba(248,81,73,.08)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'8px 10px',marginBottom:10,fontSize:12,color:'var(--red)'}}><span>⚠️ {auxLoadError}</span><button className="btn btn-ghost" style={{fontSize:11,padding:'4px 8px',whiteSpace:'nowrap'}} onClick={loadCaseNotesFollowups}>โหลดใหม่</button></div>}
           {/* Follow-up */}
           <div className="form-group" style={{marginTop:4}}>
             <label style={{display:'flex',alignItems:'center',gap:6}}>📅 นัด Follow-up
@@ -1685,15 +1706,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
 }
 
 function AdminCurrentCases({currentUser,users}){
-  // ✅ โหลดข้อมูลจาก localStorage ตอนเริ่มต้น
-  const [cases,setCases]=useState(()=>{
-    try {
-      const saved = localStorage.getItem('cases');
-      return saved ? JSON.parse(saved) : [];
-    } catch(e) {
-      return [];
-    }
-  });
+  const [cases,setCases]=useState([]);
   const [loading,setLoading]=useState(true);
   const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
   const [sortDir,setSortDir]=useState('desc');
@@ -1711,9 +1724,6 @@ function AdminCurrentCases({currentUser,users}){
     if(r.success){
       const casesData=safeArray(r.data);
       setCases(casesData);
-      try{
-        localStorage.setItem('cases',JSON.stringify(casesData));
-      }catch(e){}
       if(r.stale)showToast('กำลังแสดงข้อมูลสำรองล่าสุด','warn',3500);
     }else{
       showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);
@@ -1721,7 +1731,7 @@ function AdminCurrentCases({currentUser,users}){
     setLoading(false);
   }).catch(()=>{setLoading(false);showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);});},[]);
   useEffect(()=>{load();},[load]);
-  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});const d=safeArray(r.data);if(d.length>0||filter.q.length>0)setCases(d);else load();}catch(e){load();}setLoading(false);}
+  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});if(r.success)setCases(safeArray(r.data));else showToast('ค้นหาไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',4500);}catch(e){showToast('ค้นหาไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',4500);}setLoading(false);}
   function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
   const filtered=safeArray(cases).filter(c=>{
     if(filter.sales===UNASSIGNED_SALES&&!isUnassignedSales(c.sales))return false;
@@ -2467,12 +2477,13 @@ function DailyFocusPage({currentUser,onNavigate}){
   </div>;
 }
 
-function usePushNotif(apiUrl,salesName){
+function usePushNotif(salesName){
   const seenRef=useRef(new Set());
   useEffect(()=>{
-    if(!salesName||!apiUrl)return;
+    if(!salesName)return;
+    const storageKey='cp_seen_notifs_'+encodeURIComponent(salesName);
     var notifPerm='';try{notifPerm=(typeof Notification!=='undefined')?Notification.permission:'';}catch(e){return;}
-    try{const s=JSON.parse(localStorage.getItem('cp_seen_notifs')||'[]');seenRef.current=new Set(s);}catch(e){}
+    try{const s=JSON.parse(localStorage.getItem(storageKey)||'[]');seenRef.current=new Set(s);}catch(e){}
     async function poll(){
       var perm='';try{perm=(typeof Notification!=='undefined')?Notification.permission:'';}catch(e){return;}
       if(perm!=='granted')return;
@@ -2486,31 +2497,32 @@ function usePushNotif(apiUrl,salesName){
           fresh.forEach(n=>seenRef.current.add(String(n.id||n.notifId||n.createdat||n.message||'')));
           const recentKeys=[...seenRef.current].slice(-500);
           seenRef.current=new Set(recentKeys);
-          try{localStorage.setItem('cp_seen_notifs',JSON.stringify(recentKeys));}catch(e){}
+          try{localStorage.setItem(storageKey,JSON.stringify(recentKeys));}catch(e){}
           const body=fresh.length===1?fresh[0].message:fresh.length+' การแจ้งเตือนใหม่';
-          try{new Notification('🚗 CasePool',{body,icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png',tag:'casepool',renotify:true});}catch(e){}
+          try{new Notification('🚗 CasePool',{body,icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png',tag:'casepool-'+salesName,renotify:true});}catch(e){}
         }
       }catch(e){}
     }
     window.cpTriggerPushPoll=function(delayMs){setTimeout(poll,delayMs||1500);};var t=setInterval(poll,120000);return function(){clearInterval(t);window.cpTriggerPushPoll=null;};
-  },[apiUrl,salesName]);
+  },[salesName]);
 }
 
 function PushNotifBanner({currentUser}){
   const supported=(function(){try{return typeof Notification!=='undefined';}catch(e){return false;}})();
+  const dismissKey='cp_pn_dismissed_'+encodeURIComponent(currentUser?.userId||currentUser?.name||'unknown');
   const [perm,setPerm]=useState(function(){try{return supported?Notification.permission:'unsupported';}catch(e){return 'unsupported';}});
-  const [dismissed,setDismissed]=useState(()=>{try{return !!localStorage.getItem('cp_pn_dismissed');}catch(e){return false;}});
+  const [dismissed,setDismissed]=useState(()=>{try{return !!localStorage.getItem(dismissKey);}catch(e){return false;}});
   const [asking,setAsking]=useState(false);
   if(!supported||perm==='granted'||perm==='denied'||dismissed)return null;
   async function requestPerm(){setAsking(true);const p=await Notification.requestPermission();setPerm(p);setAsking(false);if(p==='granted'){new Notification('🚗 CasePool',{body:'เปิดการแจ้งเตือนสำเร็จแล้ว!',icon:'https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png'});}}
-  function dismiss(){setDismissed(true);try{localStorage.setItem('cp_pn_dismissed','1');}catch(e){}}
+  function dismiss(){setDismissed(true);try{localStorage.setItem(dismissKey,'1');}catch(e){}}
   return <div className="pn-banner" style={{marginBottom:14}}><div style={{display:'flex',gap:10,alignItems:'flex-start'}}><div style={{fontSize:26,flexShrink:0}}>🔔</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,marginBottom:3}}>เปิดการแจ้งเตือน</div><div style={{fontSize:12,color:'var(--text2)',marginBottom:10,lineHeight:1.6}}>รับแจ้งเตือนขณะเปิดแอป — เช็คทุก 2 นาที</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-primary" style={{fontSize:12,padding:'6px 16px'}} onClick={requestPerm} disabled={asking}>{asking?'กำลังขอ...':'เปิดการแจ้งเตือน'}</button><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={dismiss}>ภายหลัง</button></div></div></div></div>;
 }
 
 function GlobalSearch({currentUser,onClose,onNavigate}){
   const [q,setQ]=useState('');const [results,setResults]=useState([]);const [loading,setLoading]=useState(false);const inputRef=useRef();const searchSeq=useRef(0);
   useEffect(()=>{setTimeout(()=>inputRef.current?.focus(),80);},[]);
-  useEffect(()=>{const seq=++searchSeq.current;if(q.trim().length<2){setResults([]);setLoading(false);return;}setLoading(true);const t=setTimeout(async()=>{const term=q.trim();const cr=await api('searchCases',{q:term});if(seq!==searchSeq.current)return;const myCases=(cr.success?safeArray(cr.data):[]).filter(c=>c.sales===currentUser.name).map(c=>({...c,_type:'cases'})).sort((a,b)=>getCaseSearchScore(b,term)-getCaseSearchScore(a,term));setResults(myCases);setLoading(false);},380);return()=>clearTimeout(t);},[q,currentUser.name]);
+  useEffect(()=>{const seq=++searchSeq.current;if(q.trim().length<2){setResults([]);setLoading(false);return;}setLoading(true);const t=setTimeout(async()=>{const term=q.trim();const cr=await api('searchCases',{q:term,sales:currentUser.name});if(seq!==searchSeq.current)return;const myCases=(cr.success?safeArray(cr.data):[]).map(c=>({...c,_type:'cases'})).sort((a,b)=>getCaseSearchScore(b,term)-getCaseSearchScore(a,term));setResults(myCases);setLoading(false);},380);return()=>clearTimeout(t);},[q,currentUser.name]);
   return <div className="overlay" style={{alignItems:'flex-start',paddingTop:56,zIndex:200}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,width:'100%',maxWidth:540,boxShadow:'0 20px 60px rgba(0,0,0,.55)',overflow:'hidden'}}>
       <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',borderBottom:'1px solid var(--border)'}}><Ico.gsearch/><input ref={inputRef} value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหาชื่อลูกค้า เบอร์ หรือรหัสเคส..." style={{flex:1,background:'none',border:'none',outline:'none',fontSize:15,color:'var(--text)'}}/><button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onClose}><Ico.x/></button></div>
@@ -3266,7 +3278,7 @@ function SalesFollowups({currentUser}){
 
 function SalesApp({currentUser,onLogout}){
   const [page,setPage]=useState('focus');const [users,setUsers]=useState([]);const [showNotif,setShowNotif]=useState(false);const [notifCount,setNotifCount]=useState(0);const [showSearch,setShowSearch]=useState(false);const [showOnboarding,setShowOnboarding]=useState(false);const [showMobileMore,setShowMobileMore]=useState(false);
-  usePushNotif(API_URL,currentUser.name);
+  usePushNotif(currentUser.name);
   useEffect(()=>{
     api('getUsers').then(r=>{if(r.success)setUsers(r.data||[]);});
     async function refreshNotif(){
@@ -3330,7 +3342,7 @@ class ErrorBoundary extends React.Component{
         <div style={{fontSize:48}}>⚠️</div>
         <div style={{fontWeight:700,fontSize:18}}>เกิดข้อผิดพลาด</div>
         <div style={{fontSize:13,color:'var(--text2)',maxWidth:300,lineHeight:1.6}}>{String(this.state.error.message||'')}</div>
-        <button onClick={()=>this.setState({error:null})} style={{background:'var(--blue2)',color:'#fff',border:'none',borderRadius:8,padding:'10px 24px',cursor:'pointer',fontSize:14,fontWeight:700}}>🔄 ลองใหม่</button>
+        <button onClick={()=>location.reload()} style={{background:'var(--blue2)',color:'#fff',border:'none',borderRadius:8,padding:'10px 24px',cursor:'pointer',fontSize:14,fontWeight:700}}>🔄 โหลดใหม่</button>
       </div>;
     }
     return this.props.children;
@@ -3379,7 +3391,7 @@ function ConnectionBanner(){
     return()=>{window.removeEventListener('online',goOnline);window.removeEventListener('offline',goOffline);};
   },[]);
   if(online)return null;
-  return <div className="connection-banner" role="alert">ไม่มีอินเทอร์เน็ต — ระบบจะยังแสดงข้อมูลเดิม แต่จะไม่บันทึกจนกว่าจะเชื่อมต่ออีกครั้ง</div>;
+  return <div className="connection-banner" role="alert">ไม่มีอินเทอร์เน็ต — ระบบจะแสดงเฉพาะข้อมูลที่โหลดไว้ในหน้านี้ และจะไม่บันทึกจนกว่าจะเชื่อมต่ออีกครั้ง</div>;
 }
 
 function App(){
