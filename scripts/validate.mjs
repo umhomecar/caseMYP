@@ -46,6 +46,9 @@ if(!source.includes('marketWritten=false,claimedDeleted=false'))fail('การ�
 if(source.includes("s.includes('T')?' '+s.slice(11,16):''"))fail('ยังตัดเวลา UTC จาก ISO มาแสดงโดยไม่แปลง timezone');
 if(!source.includes('formatLocalDateTimeToTHBE'))fail('ยังไม่มีตัวแปลง timestamp เป็นเวลาท้องถิ่น');
 if(!source.includes("T.*(?:Z|[+-]"))fail('parseTHDateTime ยังไม่รองรับ timezone ใน ISO timestamp');
+const standaloneModal=source.slice(source.indexOf('function StandaloneCaseModal'),source.indexOf('function AdminSentCasesPage'));
+if(/\bconfirm\s*\(/.test(standaloneModal))fail('เคสส่วนตัวและ Line OA ยังใช้กล่องยืนยันลบของเบราว์เซอร์');
+if(!standaloneModal.includes('confirmDelete&&<Confirm'))fail('เคสส่วนตัวและ Line OA ยังไม่ใช้กล่องยืนยันลบมาตรฐานของระบบ');
 for(const file of publicFiles){
   const sourcePath=path.join(root,file);
   const deployPath=path.join(root,'public',file);
