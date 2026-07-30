@@ -2887,14 +2887,14 @@ function LoginPage({onLogin}){
   const [username,setUsername]=useState('');const [password,setPassword]=useState('');const [showPass,setShowPass]=useState(false);const [loading,setLoading]=useState(false);const [error,setError]=useState('');const [focused,setFocused]=useState('');
   async function submit(){if(!username||!password)return setError('กรุณากรอกข้อมูลให้ครบ');setLoading(true);setError('');const r=await api('login',{username,password});setLoading(false);if(r.success)onLogin(r.user);else setError(r.error||'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');}
   return <div style={{minHeight:'100vh',display:'flex',background:'var(--bg)',overflow:'hidden'}}>
-    <div className="login-left-panel" style={{display:'none',flex:1,background:'linear-gradient(145deg,#0d1b2e,#112240 60%,#0a1628)',alignItems:'center',justifyContent:'center',padding:48,position:'relative',overflow:'hidden'}}>
-      <div style={{position:'absolute',top:-80,right:-80,width:320,height:320,borderRadius:'50%',background:'rgba(88,166,255,.05)',pointerEvents:'none'}}/>
+    <div className="login-left-panel" style={{display:'none',flex:1,background:'#1c1c1d',alignItems:'center',justifyContent:'center',padding:48,position:'relative',overflow:'hidden'}}>
+      <div style={{position:'absolute',top:-80,right:-80,width:320,height:320,borderRadius:'50%',background:'rgba(226,1,59,.08)',pointerEvents:'none'}}/>
       <div style={{position:'relative',zIndex:1,maxWidth:380}}>
         <div style={{fontSize:56,marginBottom:20}}>🚗</div>
-        <div style={{fontSize:32,fontWeight:800,color:'#e6edf3',lineHeight:1.2,marginBottom:16}}>ระบบจัดการเคส<br/><span style={{color:'#58a6ff'}}>รถยนต์</span>ครบวงจร</div>
+        <div style={{fontSize:32,fontWeight:800,color:'#e4e6eb',lineHeight:1.2,marginBottom:16}}>ระบบจัดการเคส<br/><span style={{color:'var(--blue)'}}>รถยนต์</span>ครบวงจร</div>
         <div style={{fontSize:15,color:'rgba(139,148,158,.75)',lineHeight:1.9,marginBottom:32}}>ติดตามเคส อัปเดตสถานะ<br/>และปิดการขายได้อย่างมีประสิทธิภาพ</div>
         {[['🎯','ติดตามเคสแบบ Real-time'],['📊','Dashboard วิเคราะห์ยอดขาย'],['🔔','แจ้งเตือนทันทีเมื่อมีเคสใหม่']].map(([icon,text])=>
-          <div key={text} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:'rgba(88,166,255,.06)',border:'1px solid rgba(88,166,255,.1)',borderRadius:10,marginBottom:8}}>
+          <div key={text} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:'rgba(226,1,59,.07)',border:'1px solid rgba(226,1,59,.18)',borderRadius:12,marginBottom:8}}>
             <span style={{fontSize:18}}>{icon}</span><span style={{fontSize:14,color:'rgba(230,237,243,.8)',fontWeight:500}}>{text}</span>
           </div>)}
       </div>
@@ -2902,7 +2902,7 @@ function LoginPage({onLogin}){
     <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px',minHeight:'100vh'}}>
       <div style={{width:'100%',maxWidth:400}}>
         <div style={{textAlign:'center',marginBottom:32}}>
-          <div style={{width:68,height:68,borderRadius:20,background:'linear-gradient(135deg,#1f6feb,#388bfd)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,margin:'0 auto 16px',boxShadow:'0 8px 28px rgba(31,111,235,.4)'}}>🚗</div>
+          <div style={{width:68,height:68,borderRadius:20,background:'var(--blue)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,margin:'0 auto 16px',boxShadow:'0 12px 28px rgba(226,1,59,.28)'}}>🚗</div>
           <div style={{fontSize:27,fontWeight:800,color:'var(--text)'}}>CasePool</div>
           <div style={{fontSize:13,color:'var(--text2)',marginTop:5}}>เข้าสู่ระบบเพื่อจัดการเคส</div>
         </div>
@@ -2917,7 +2917,7 @@ function LoginPage({onLogin}){
             <input id="cp-pass-in" type={showPass?'text':'password'} value={password} onChange={e=>{setPassword(e.target.value);setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} onFocus={()=>setFocused('pass')} onBlur={()=>setFocused('')} placeholder="••••••••" autoComplete="current-password" style={{paddingRight:44,borderColor:focused==='pass'?'var(--blue)':error?'rgba(248,81,73,.45)':'var(--border)',transition:'border-color .15s'}}/>
             <button type="button" onClick={()=>setShowPass(!showPass)} aria-label={showPass?'ซ่อนรหัสผ่าน':'แสดงรหัสผ่าน'} style={{position:'absolute',right:12,bottom:9,background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:18,padding:4,lineHeight:1}}>{showPass?'🙈':'👁'}</button>
           </div>
-          <button type="button" onClick={submit} disabled={loading} style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,border:'none',borderRadius:12,cursor:loading?'wait':'pointer',background:loading?'var(--bg3)':'linear-gradient(135deg,#1f6feb,#388bfd)',color:loading?'var(--text3)':'#fff',boxShadow:loading?'none':'0 4px 18px rgba(31,111,235,.4)',transition:'all .2s'}}>
+          <button type="button" onClick={submit} disabled={loading} style={{width:'100%',padding:'13px',fontSize:15,fontWeight:700,border:'none',borderRadius:12,cursor:loading?'wait':'pointer',background:loading?'var(--bg3)':'var(--blue)',color:loading?'var(--text3)':'#fff',boxShadow:loading?'none':'0 8px 22px rgba(226,1,59,.28)',transition:'background-color .15s,box-shadow .15s'}}>
             {loading?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}><span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .7s linear infinite',display:'inline-block'}}/>กำลังเข้าสู่ระบบ...</span>:'เข้าสู่ระบบ →'}
           </button>
         </div>
