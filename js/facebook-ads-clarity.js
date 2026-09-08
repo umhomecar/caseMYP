@@ -2,6 +2,10 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+  function setText(el, value) {
+    if (el && el.textContent !== value) el.textContent = value;
+  }
+
   function parseNumber(text) {
     const n = Number(String(text || '').replace(/[^0-9.-]/g, ''));
     return Number.isFinite(n) ? n : 0;
@@ -17,22 +21,21 @@
   function clarifyCards() {
     const bookingCard = $('#bookingCount')?.closest('.kpi');
     if (bookingCard) {
-      const sub = $('.kpi-sub', bookingCard);
-      if (sub) sub.textContent = 'รายการจองทั้งหมดในช่วงที่เลือก (อาจมีหลายรายการต่อ Case ID)';
+      setText($('.kpi-sub', bookingCard), 'รายการจองทั้งหมดในช่วงที่เลือก (อาจมีหลายรายการต่อ Case ID)');
     }
 
     const adsCard = $('#adsCaseCount')?.closest('.kpi');
     if (adsCard) {
-      const sub = $('.kpi-sub', adsCard);
-      if (sub) sub.textContent = 'Case ID ไม่ซ้ำที่มีข้อมูล Ads/Facebook';
+      setText($('.kpi-sub', adsCard), 'Case ID ไม่ซ้ำที่มีข้อมูล Ads/Facebook');
     }
 
     const soldCard = $('#soldCount')?.closest('.kpi');
     if (soldCard) {
       const label = $('.kpi-label', soldCard);
-      if (label) label.textContent = label.textContent.replace('ปล่อยรถ ·', 'ปล่อยรถจาก Ads ·');
-      const sub = $('.kpi-sub', soldCard);
-      if (sub) sub.textContent = 'เฉพาะเคสที่ระบุ Ads/Facebook และถึงสถานะปล่อยรถ';
+      if (label && !label.textContent.includes('ปล่อยรถจาก Ads')) {
+        setText(label, label.textContent.replace('ปล่อยรถ ·', 'ปล่อยรถจาก Ads ·'));
+      }
+      setText($('.kpi-sub', soldCard), 'เฉพาะเคสที่ระบุ Ads/Facebook และถึงสถานะปล่อยรถ');
     }
   }
 
@@ -41,25 +44,23 @@
     if (!rows.length) return;
 
     const values = rows.map(row => parseNumber($('.fnum', row)?.textContent));
+    const names = ['เคสทั้งหมด','เคสที่ระบุ Ads/Facebook','เคสจาก Ads ที่มีการจอง','ผ่านขั้นอนุมัติ','ปล่อยรถจาก Ads'];
+
     rows.forEach((row, index) => {
       const name = $('.fname', row);
       const percent = $('.fpct', row);
+      if (name && names[index]) setText(name, names[index]);
       if (!percent) return;
 
       if (index === 0) {
-        percent.textContent = 'ฐาน 100%';
+        setText(percent, 'ฐาน 100%');
         percent.title = 'เคสทั้งหมดในช่วงที่เลือก';
         return;
       }
 
       const base = values[index - 1];
-      percent.textContent = pct(values[index], base);
+      setText(percent, pct(values[index], base));
       percent.title = `Conversion จากขั้นก่อนหน้า: ${values[index].toLocaleString('th-TH')} / ${base.toLocaleString('th-TH')}`;
-
-      if (index === 1 && name) name.textContent = 'เคสที่ระบุ Ads/Facebook';
-      if (index === 2 && name) name.textContent = 'เคสจาก Ads ที่มีการจอง';
-      if (index === 3 && name) name.textContent = 'ผ่านขั้นอนุมัติ';
-      if (index === 4 && name) name.textContent = 'ปล่อยรถจาก Ads';
     });
   }
 
