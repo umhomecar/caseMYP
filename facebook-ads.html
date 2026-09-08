@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="th" style="background:#0d1117">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>CasePool · วิเคราะห์แอด Facebook</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root{--bg:#0d1117;--panel:#161b22;--panel2:#1c2128;--line:#30363d;--text:#e6edf3;--muted:#8b949e;--blue:#1877f2;--green:#3fb950;--yellow:#d29922;--red:#f85149;--purple:#bc8cff;font-family:'Sarabun',system-ui,sans-serif}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}button,input,select{font:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:230px minmax(0,1fr)}
+    .side{position:sticky;top:0;height:100vh;background:#1c1c1d;border-right:1px solid var(--line);padding:20px 12px;display:flex;flex-direction:column}.brand{padding:4px 8px 20px;border-bottom:1px solid var(--line);margin-bottom:12px}.brand b{color:#e2013b;font-size:18px}.brand small{display:block;color:var(--muted);margin-top:3px}.nav{display:grid;gap:4px}.nav a{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:9px;color:#c9d1d9;text-decoration:none;font-size:13px;font-weight:600}.nav a:hover{background:#262c33}.nav a.active{background:rgba(24,119,242,.18);color:#67a7ff;border:1px solid rgba(24,119,242,.28)}.fbico{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#1877f2;color:#fff;font-weight:800}.side-foot{margin-top:auto;border-top:1px solid var(--line);padding:14px 8px 0;color:var(--muted);font-size:12px}
+    main{padding:24px 28px 50px;min-width:0}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}.title-wrap{display:flex;gap:12px;align-items:center}.bigfb{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#1877f2;font-size:30px;font-weight:800;color:#fff}.title h1{margin:0;font-size:26px}.title p{margin:4px 0 0;color:var(--muted);font-size:13px}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.chip,.btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:9px;padding:8px 11px;font-size:12px}.btn{cursor:pointer}.btn:hover{border-color:#4a5563}.btn-primary{background:#1877f2;border-color:#1877f2;color:white;font-weight:700}.meta-state{color:#f0ad4e}.notice{border:1px solid rgba(24,119,242,.28);background:rgba(24,119,242,.08);padding:11px 13px;border-radius:10px;color:#9cc7ff;font-size:12px;margin-bottom:16px;line-height:1.6}
+    .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:12px}.kpi{padding:14px}.kpi-label{font-size:11px;color:var(--muted);font-weight:700}.kpi-val{font-size:25px;font-weight:800;margin:6px 0}.kpi-sub{font-size:11px;color:var(--muted)}.real{color:#79c0ff}.waiting{color:#f0ad4e}
+    .two{display:grid;grid-template-columns:1.45fr 1fr;gap:12px;margin-bottom:12px}.panel{padding:16px}.panel h3{font-size:14px;margin:0 0 14px}.trend{height:235px;display:flex;align-items:flex-end;gap:9px;border-top:1px solid #242b33;padding:20px 5px 25px;position:relative}.trend-col{flex:1;display:flex;align-items:flex-end;height:100%;position:relative}.trend-bar{width:100%;border-radius:5px 5px 0 0;background:linear-gradient(180deg,#388bfd,#1f6feb);opacity:.72}.trend-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--muted)}.empty-chart{height:235px;display:grid;place-items:center;color:var(--muted);text-align:center;border:1px dashed var(--line);border-radius:10px;font-size:12px;line-height:1.8}.funnel{display:grid;gap:8px}.frow{display:grid;grid-template-columns:minmax(90px,1fr) 80px 55px;align-items:center;gap:8px}.fbarwrap{height:27px;background:#20262e;border-radius:6px;overflow:hidden}.fbar{height:100%;border-radius:6px;background:linear-gradient(90deg,#1877f2,#67a7ff)}.frow:nth-child(3) .fbar{background:linear-gradient(90deg,#7b61ff,#bc8cff)}.frow:nth-child(4) .fbar{background:linear-gradient(90deg,#b7791f,#d29922)}.frow:nth-child(5) .fbar{background:linear-gradient(90deg,#238636,#3fb950)}.frow:nth-child(6) .fbar{background:linear-gradient(90deg,#1f6feb,#2ea043)}.fname{font-size:12px;color:#c9d1d9}.fnum{text-align:right;font-weight:800;font-size:13px}.fpct{text-align:right;color:var(--muted);font-size:11px}
+    .triple{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}.mini{padding:15px}.mini h3{font-size:14px;margin:0 0 12px}.legend{display:grid;gap:8px}.legend-row{display:flex;align-items:center;gap:8px;font-size:12px}.dot{width:9px;height:9px;border-radius:50%;background:#1877f2}.legend-row span:nth-child(2){flex:1;color:#c9d1d9}.legend-row strong{font-size:12px}.muted-box{border:1px dashed var(--line);border-radius:10px;padding:19px 12px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+    .table-card{overflow:hidden;margin-bottom:12px}.table-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.table-head h3{margin:0;font-size:14px}.table-scroll{overflow:auto}table{border-collapse:collapse;width:100%;min-width:850px}th,td{padding:10px 11px;border-bottom:1px solid #242b33;text-align:left;font-size:12px;white-space:nowrap}th{color:var(--muted);font-size:11px;background:#14191f}td.num{text-align:right;font-variant-numeric:tabular-nums}.status{display:inline-block;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700}.good{background:rgba(63,185,80,.12);color:#56d364}.warn{background:rgba(210,153,34,.14);color:#e3b341}.neutral{background:rgba(139,148,158,.12);color:#9da7b1}
+    .bottom{display:grid;grid-template-columns:1fr 1fr 1.25fr;gap:12px}.callout{padding:15px}.callout h3{margin:0 0 10px;font-size:14px}.bigline{font-size:24px;font-weight:800;color:#79c0ff}.bullets{margin:0;padding-left:18px;color:#c9d1d9;font-size:12px;line-height:1.8}.footer{margin-top:16px;color:#59636f;font-size:11px;text-align:right}
+    @media(max-width:1150px){.kpis{grid-template-columns:repeat(3,1fr)}.triple,.bottom{grid-template-columns:1fr 1fr}.bottom .callout:last-child{grid-column:1/-1}}@media(max-width:820px){.shell{grid-template-columns:1fr}.side{display:none}main{padding:16px 12px 90px}.top{flex-direction:column}.actions{justify-content:flex-start}.kpis{grid-template-columns:1fr 1fr}.two,.triple,.bottom{grid-template-columns:1fr}.bottom .callout:last-child{grid-column:auto}.title h1{font-size:22px}.bigfb{width:42px;height:42px;font-size:26px}.trend{height:190px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><b>🚗 CasePool</b><small>Admin Panel</small></div>
+    <nav class="nav">
+      <a href="./">⌂ เคสปัจจุบัน</a>
+      <a href="./">▦ แดชบอร์ด</a>
+      <a class="active" href="./facebook-ads.html"><span class="fbico">f</span> วิเคราะห์แอด Facebook</a>
+      <a href="./">🏆 รายงาน</a>
+      <a href="./">📋 การจอง</a>
+      <a href="./">👥 ผู้ใช้</a>
+      <a href="./">🎯 ทีม</a>
+    </nav>
+    <div class="side-foot"><b id="adminName">Admin</b><br/>ข้อมูล CaseMYP + Meta Ads</div>
+  </aside>
+  <main>
+    <div class="top">
+      <div class="title-wrap"><div class="bigfb">f</div><div class="title"><h1>วิเคราะห์แอด Facebook</h1><p>ดูต้นทางโฆษณา → เคส → การจอง → ปล่อยรถ ในหน้าเดียว</p></div></div>
+      <div class="actions"><span class="chip meta-state">● Meta · ยังไม่ได้เชื่อม</span><button id="refreshBtn" class="btn">🔄 รีเฟรช CaseMYP</button><a class="btn" style="text-decoration:none" href="./">← กลับระบบ</a></div>
+    </div>
+
+    <div class="notice"><b>สถานะปัจจุบัน:</b> หน้านี้อ่านข้อมูลจริงที่มีอยู่ใน CaseMYP เช่น เคส การจอง สถานะ และช่อง Ads/Facebook แต่ตัวเลขค่าโฆษณา, Reach, Click, CPM, CPC และ CTR จะยังไม่แสดงจนกว่าเราจะเลือกวิธีเชื่อม Meta ครับ</div>
+
+    <section class="kpis">
+      <div class="card kpi"><div class="kpi-label">💰 ค่าใช้จ่ายโฆษณา</div><div class="kpi-val waiting">—</div><div class="kpi-sub">รอเชื่อม Meta</div></div>
+      <div class="card kpi"><div class="kpi-label">💬 เคสใน CaseMYP เดือนนี้</div><div id="caseCount" class="kpi-val real">—</div><div class="kpi-sub">ข้อมูลจริงจาก CaseMYP</div></div>
+      <div class="card kpi"><div class="kpi-label">🎯 เคสที่มีข้อมูล Ads</div><div id="adsCaseCount" class="kpi-val real">—</div><div class="kpi-sub">จากข้อมูลคลิปแอดในเคส</div></div>
+      <div class="card kpi"><div class="kpi-label">📋 การจองเดือนนี้</div><div id="bookingCount" class="kpi-val real">—</div><div class="kpi-sub">ข้อมูลจริงจากการจอง</div></div>
+      <div class="card kpi"><div class="kpi-label">🚗 ปล่อยรถเดือนนี้</div><div id="soldCount" class="kpi-val real">—</div><div class="kpi-sub">สถานะปล่อยแล้ว/ปล่อยรถ</div></div>
+    </section>
+
+    <section class="two">
+      <div class="card panel"><h3>แนวโน้มจำนวนเคสรายวัน · เดือนนี้</h3><div id="trend" class="trend"></div></div>
+      <div class="card panel"><h3>เส้นทางลูกค้าจากแอด → การขาย</h3><div id="funnel" class="funnel"></div></div>
+    </section>
+
+    <section class="triple">
+      <div class="card mini"><h3>แหล่ง Ads ที่พบใน CaseMYP</h3><div id="adsSources" class="legend"></div></div>
+      <div class="card mini"><h3>สถานะเคสจากแอด</h3><div id="adStatuses" class="legend"></div></div>
+      <div class="card mini"><h3>ข้อมูลจาก Meta</h3><div class="muted-box">Reach · Impression · Click · CPM · CPC · CTR<br/><b style="color:#f0ad4e">รอเลือกวิธีเชื่อม Meta</b></div></div>
+    </section>
+
+    <section class="card table-card">
+      <div class="table-head"><h3>แอด / แคมเปญที่พบจากข้อมูลในระบบ</h3><span id="tableCount" class="chip">กำลังโหลด...</span></div>
+      <div class="table-scroll"><table><thead><tr><th>Ads / Campaign</th><th>เคส</th><th>จอง</th><th>อนุมัติ</th><th>ปล่อยรถ</th><th>Conversion เคส→ปล่อย</th><th>สถานะข้อมูล</th></tr></thead><tbody id="adsTable"></tbody></table></div>
+    </section>
+
+    <section class="bottom">
+      <div class="card callout"><h3>🏆 แหล่งที่ปิดได้ดีที่สุด</h3><div id="bestSource" class="bigline">—</div><div id="bestSourceDetail" class="kpi-sub">กำลังวิเคราะห์ CaseMYP</div></div>
+      <div class="card callout"><h3>⚠️ จุดที่ควรตรวจ</h3><div id="watchSource" class="bigline" style="color:#e3b341">—</div><div id="watchSourceDetail" class="kpi-sub">กำลังวิเคราะห์ CaseMYP</div></div>
+      <div class="card callout"><h3>💡 ระบบแนะนำ</h3><ul id="tips" class="bullets"><li>กำลังอ่านข้อมูล...</li></ul></div>
+    </section>
+
+    <div id="statusLine" class="footer">กำลังเชื่อม CaseMYP...</div>
+  </main>
+</div>
+<script src="./runtime-config.js"></script>
+<script>
+(() => {
+  const SESSION_KEY='casepool_persistent_session_v2';
+  let session=null;
+  try{session=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(e){}
+  const user=session?.user||null;
+  if(!user||user.role!=='Admin'){
+    location.replace('./');
+    return;
+  }
+  document.getElementById('adminName').textContent=user.name||'Admin';
+
+  const cfg=window.__CASEMYP_CONFIG__||{};
+  const base=String(cfg.supabaseUrl||'').replace(/\/+$/,'');
+  const key=String(cfg.supabaseAnonKey||'');
+  const pad=n=>String(n).padStart(2,'0');
+  const now=new Date();
+  const monthPrefix=String(now.getFullYear()).slice(-2)+pad(now.getMonth()+1);
+  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+
+  async function q(table,query=''){
+    if(!base||!key)throw new Error('ไม่พบ Supabase runtime config');
+    const r=await fetch(base+'/rest/v1/'+table+(query?'?'+query:''),{headers:{apikey:key,Authorization:'Bearer '+key}});
+    const text=await r.text();
+    if(!r.ok)throw new Error(text||('HTTP '+r.status));
+    return text?JSON.parse(text):[];
+  }
+  function monthFromText(v){
+    const s=String(v||'');
+    const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if(m)return String(m[3]).slice(-2)+m[2];
+    const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso)return String(iso[1]).slice(-2)+iso[2];
+    return '';
+  }
+  function dayFromText(v){
+    const s=String(v||''); const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m)return Number(m[1]);
+    const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(iso)return Number(iso[3]);
+    return 0;
+  }
+  function adsFromCase(c){
+    const a=String(c.attachment||'');
+    const m=a.match(/\[CLIP:([^\]]+)\]/i);
+    return m?m[1].trim():'';
+  }
+  function norm(v){return String(v||'').trim();}
+  function isSoldStatus(v){return ['ปล่อยแล้ว','ปล่อยรถ'].includes(norm(v));}
+  function isApprovedStatus(v){return ['อนุมัติ','ปล่อยแล้ว','ปล่อยรถ'].includes(norm(v));}
+  function el(id){return document.getElementById(id)}
+  function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+  async function load(){
+    el('statusLine').textContent='กำลังโหลดข้อมูลจริงจาก CaseMYP...';
+    el('refreshBtn').disabled=true;
+    try{
+      const [cases,bookings]=await Promise.all([
+        q('cases','select=caseid,customername,status,sales,createdat,updatedat,attachment&deleted_at=is.null&order=caseid.desc&limit=10000'),
+        q('bookings','select=id,caseid,sales,customer,facebook,ads,status,createdat&deleted_at=is.null&order=createdat.desc&limit=10000')
+      ]);
+      const monthCases=cases.filter(c=>String(c.caseid||'').startsWith(monthPrefix)||monthFromText(c.createdat)===monthPrefix);
+      const monthBookings=bookings.filter(b=>monthFromText(b.createdat)===monthPrefix||String(b.caseid||'').startsWith(monthPrefix));
+      const adsCases=monthCases.filter(c=>adsFromCase(c));
+      const bookingWithAds=monthBookings.filter(b=>norm(b.ads)||norm(b.facebook));
+      const soldCases=monthCases.filter(c=>isSoldStatus(c.status));
+      const soldBookings=monthBookings.filter(b=>isSoldStatus(b.status));
+      const soldIds=new Set([...soldCases.map(c=>String(c.caseid)),...soldBookings.map(b=>String(b.caseid))]);
+
+      el('caseCount').textContent=monthCases.length.toLocaleString('th-TH');
+      el('adsCaseCount').textContent=(adsCases.length+bookingWithAds.filter(b=>!adsCases.some(c=>String(c.caseid)===String(b.caseid))).length).toLocaleString('th-TH');
+      el('bookingCount').textContent=monthBookings.length.toLocaleString('th-TH');
+      el('soldCount').textContent=soldIds.size.toLocaleString('th-TH');
+
+      renderTrend(monthCases);
+      renderFunnel(monthCases,monthBookings,soldIds);
+      renderBreakdowns(adsCases,bookingWithAds,cases,bookings);
+      el('statusLine').textContent='อัปเดตจาก CaseMYP ล่าสุด '+new Date().toLocaleString('th-TH');
+    }catch(err){
+      console.error(err);
+      el('statusLine').textContent='โหลด CaseMYP ไม่สำเร็จ: '+(err.message||err);
+      el('trend').innerHTML='<div class="empty-chart">โหลดข้อมูลไม่สำเร็จ<br/>กรุณากลับเข้าระบบแล้วลองใหม่</div>';
+    }finally{el('refreshBtn').disabled=false;}
+  }
+
+  function renderTrend(rows){
+    const counts=Array.from({length:daysInMonth},()=>0);
+    rows.forEach(c=>{const d=dayFromText(c.createdat);if(d>=1&&d<=daysInMonth)counts[d-1]++;});
+    const max=Math.max(...counts,1);
+    const picks=counts.map((v,i)=>({v,d:i+1})).filter(x=>x.v>0||x.d===1||x.d===daysInMonth);
+    const source=picks.length>14?picks.filter((_,i)=>i%Math.ceil(picks.length/14)===0||i===picks.length-1):picks;
+    if(rows.length===0){el('trend').innerHTML='<div class="empty-chart">ยังไม่มีเคสในเดือนนี้</div>';return;}
+    el('trend').innerHTML=source.map(x=>'<div class="trend-col"><div class="trend-bar" title="'+x.v+' เคส" style="height:'+Math.max(5,Math.round(x.v/max*100))+'%"></div><span class="trend-label">'+x.d+'</span></div>').join('');
+  }
+
+  function renderFunnel(cases,bookings,soldIds){
+    const caseIds=new Set(cases.map(c=>String(c.caseid)));
+    const bookingIds=new Set(bookings.map(b=>String(b.caseid)).filter(Boolean));
+    const approvedIds=new Set(bookings.filter(b=>isApprovedStatus(b.status)).map(b=>String(b.caseid)));
+    const adAttributed=new Set();
+    cases.forEach(c=>{if(adsFromCase(c))adAttributed.add(String(c.caseid));});
+    bookings.forEach(b=>{if(norm(b.ads)||norm(b.facebook))adAttributed.add(String(b.caseid));});
+    const rows=[['เคสเดือนนี้',caseIds.size],['ระบุ Ads/Facebook',adAttributed.size],['การจอง',bookingIds.size],['อนุมัติ',approvedIds.size],['ปล่อยรถ',soldIds.size]];
+    const max=rows[0][1]||1;
+    el('funnel').innerHTML=rows.map(([name,val],i)=>'<div class="frow"><div class="fbarwrap"><div class="fbar" style="width:'+Math.max(val?5:0,Math.round(val/max*100))+'%"></div></div><span class="fname">'+esc(name)+'</span><span class="fnum">'+val.toLocaleString('th-TH')+'</span><span class="fpct">'+(i===0?'100':Math.round(val/max*100))+'%</span></div>').join('');
+  }
+
+  function renderBreakdowns(adCases,bookingWithAds,allCases,allBookings){
+    const byCase=new Map();
+    adCases.forEach(c=>{const src=adsFromCase(c)||'ไม่ระบุ';const rec=byCase.get(src)||{source:src,cases:new Set(),bookings:new Set(),approved:new Set(),sold:new Set()};rec.cases.add(String(c.caseid));if(isApprovedStatus(c.status))rec.approved.add(String(c.caseid));if(isSoldStatus(c.status))rec.sold.add(String(c.caseid));byCase.set(src,rec);});
+    bookingWithAds.forEach(b=>{const src=norm(b.ads)||norm(b.facebook)||'ไม่ระบุ';const rec=byCase.get(src)||{source:src,cases:new Set(),bookings:new Set(),approved:new Set(),sold:new Set()};const id=String(b.caseid||b.id);rec.cases.add(id);rec.bookings.add(id);if(isApprovedStatus(b.status))rec.approved.add(id);if(isSoldStatus(b.status))rec.sold.add(id);byCase.set(src,rec);});
+    const sources=[...byCase.values()].sort((a,b)=>b.cases.size-a.cases.size);
+
+    el('adsSources').innerHTML=sources.length?sources.slice(0,6).map((r,i)=>'<div class="legend-row"><span class="dot" style="background:'+['#1877f2','#bc8cff','#3fb950','#d29922','#f85149','#79c0ff'][i%6]+'"></span><span title="'+esc(r.source)+'">'+esc(r.source.length>30?r.source.slice(0,30)+'…':r.source)+'</span><strong>'+r.cases.size+'</strong></div>').join(''):'<div class="muted-box">ยังไม่มีเคสที่ระบุ Ads/คลิปแอด</div>';
+
+    const attributedIds=new Set(sources.flatMap(r=>[...r.cases]));
+    const stat={};
+    allCases.filter(c=>attributedIds.has(String(c.caseid))).forEach(c=>{stat[c.status||'ไม่ระบุ']=(stat[c.status||'ไม่ระบุ']||0)+1;});
+    const statuses=Object.entries(stat).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    el('adStatuses').innerHTML=statuses.length?statuses.map(([name,val],i)=>'<div class="legend-row"><span class="dot" style="background:'+['#1877f2','#3fb950','#d29922','#bc8cff','#f85149','#79c0ff'][i%6]+'"></span><span>'+esc(name)+'</span><strong>'+val+'</strong></div>').join(''):'<div class="muted-box">ยังไม่มีสถานะที่ผูกกับ Ads</div>';
+
+    el('tableCount').textContent=sources.length+' แหล่ง';
+    el('adsTable').innerHTML=sources.length?sources.map(r=>{
+      const conv=r.cases.size?Math.round(r.sold.size/r.cases.size*100):0;
+      const cls=r.sold.size?'good':r.cases.size>=3?'warn':'neutral';
+      const label=r.sold.size?'มีผลปิดขาย':r.cases.size>=3?'ควรติดตาม':'ข้อมูลน้อย';
+      return '<tr><td><b>'+esc(r.source)+'</b></td><td class="num">'+r.cases.size+'</td><td class="num">'+r.bookings.size+'</td><td class="num">'+r.approved.size+'</td><td class="num">'+r.sold.size+'</td><td class="num">'+conv+'%</td><td><span class="status '+cls+'">'+label+'</span></td></tr>';
+    }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">ยังไม่พบข้อมูล Ads ใน CaseMYP</td></tr>';
+
+    const best=sources.filter(r=>r.sold.size>0).sort((a,b)=>(b.sold.size/(b.cases.size||1))-(a.sold.size/(a.cases.size||1)))[0];
+    if(best){el('bestSource').textContent=best.source;el('bestSourceDetail').textContent='ปล่อย '+best.sold.size+' จาก '+best.cases.size+' เคส ('+Math.round(best.sold.size/best.cases.size*100)+'%)';}
+    else{el('bestSource').textContent='ยังไม่มีข้อมูล';el('bestSourceDetail').textContent='ต้องมี Ads attribution + ปล่อยรถก่อนจึงจะจัดอันดับได้';}
+
+    const watch=sources.filter(r=>r.cases.size>=3&&r.sold.size===0).sort((a,b)=>b.cases.size-a.cases.size)[0];
+    if(watch){el('watchSource').textContent=watch.source;el('watchSourceDetail').textContent=watch.cases.size+' เคส แต่ยังไม่พบการปล่อยรถ';}
+    else{el('watchSource').textContent='ยังไม่พบ';el('watchSourceDetail').textContent='ระบบยังไม่มีแหล่งที่มีเคสมากแต่ปิดไม่ได้';}
+
+    const tips=[];
+    if(sources.length===0)tips.push('เริ่มบันทึกชื่อ Ads/แคมเปญให้เป็นรูปแบบเดียวกันในเคสและการจอง');
+    else tips.push('ตอนนี้พบ '+sources.length+' ชื่อ Ads/แคมเปญใน CaseMYP — ควรกำหนดชื่อมาตรฐานก่อนเชื่อม Meta');
+    const noAdsBookings=allBookings.filter(b=>!norm(b.ads)&&!norm(b.facebook)).length;
+    if(noAdsBookings>0)tips.push('มีการจอง '+noAdsBookings+' รายการที่ยังไม่ระบุ Ads/Facebook ทำให้ attribution ขาดช่วง');
+    tips.push('ขั้นต่อไปค่อยเลือกว่าจะนำเข้าจาก Ads Manager CSV หรือเชื่อม Meta Marketing API อัตโนมัติ');
+    el('tips').innerHTML=tips.map(t=>'<li>'+esc(t)+'</li>').join('');
+  }
+
+  el('refreshBtn').addEventListener('click',load);
+  load();
+})();
+</script>
+</body>
+</html>
