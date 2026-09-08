@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 
 const root=process.cwd();
 const publicDir=path.join(root,'public');
-const copyFiles=['index.html','facebook-ads.html','manifest.json','css/styles.css','js/preload.js','js/facebook-ads-nav.js','js/preview-db-diagnostics.js','js/preview-readonly.js','js/facebook-ads-range.js','js/facebook-ads-clarity.js'];
+const copyFiles=['index.html','facebook-ads.html','manifest.json','css/styles.css','js/preload.js','js/facebook-ads-nav.js','js/preview-db-diagnostics.js','js/preview-readonly.js','js/facebook-ads-range.js','js/facebook-ads-clarity.js','js/facebook-meta-live.js'];
 const supabaseUrl=String(process.env.CASEMYP_SUPABASE_URL||'').trim();
 const supabaseAnonKey=String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
 const deployEnvironment=String(process.env.VERCEL_ENV||process.env.NODE_ENV||'local').trim();
@@ -28,15 +28,14 @@ for(const file of copyFiles){
   fs.copyFileSync(source,destination);
 }
 
-// Keep the source prototype simple, but always attach the historical/date-range
-// enhancement and clarity layer in the deployable build (Preview and Production alike).
+// Keep the source prototype simple, but always attach the historical/date-range,
+// clarity, and Meta live-data layers in the deployable build.
 const adsHtmlPath=path.join(publicDir,'facebook-ads.html');
 let adsHtml=fs.readFileSync(adsHtmlPath,'utf8');
-if(!adsHtml.includes('./js/facebook-ads-range.js')){
-  adsHtml=adsHtml.replace('</body>','  <script src="./js/facebook-ads-range.js"></script>\n</body>');
-}
-if(!adsHtml.includes('./js/facebook-ads-clarity.js')){
-  adsHtml=adsHtml.replace('</body>','  <script src="./js/facebook-ads-clarity.js"></script>\n</body>');
+for(const script of ['./js/facebook-ads-range.js','./js/facebook-ads-clarity.js','./js/facebook-meta-live.js']){
+  if(!adsHtml.includes(script)){
+    adsHtml=adsHtml.replace('</body>',`  <script src="${script}"></script>\n</body>`);
+  }
 }
 fs.writeFileSync(adsHtmlPath,adsHtml,'utf8');
 
