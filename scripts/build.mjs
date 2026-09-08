@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 
 const root=process.cwd();
 const publicDir=path.join(root,'public');
-const copyFiles=['index.html','manifest.json','css/styles.css','js/preload.js'];
+const copyFiles=['index.html','facebook-ads.html','manifest.json','css/styles.css','js/preload.js','js/facebook-ads-nav.js','js/preview-db-diagnostics.js','js/preview-readonly.js','js/facebook-ads-range.js','js/facebook-ads-clarity.js','js/facebook-meta-live.js','js/facebook-ads-csv.js'];
 const supabaseUrl=String(process.env.CASEMYP_SUPABASE_URL||'').trim();
 const supabaseAnonKey=String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
 const deployEnvironment=String(process.env.VERCEL_ENV||process.env.NODE_ENV||'local').trim();
@@ -28,6 +28,17 @@ for(const file of copyFiles){
   fs.copyFileSync(source,destination);
 }
 
+// Keep the source prototype simple, but always attach the historical/date-range,
+// clarity, Meta live-data, and CSV fallback layers in the deployable build.
+const adsHtmlPath=path.join(publicDir,'facebook-ads.html');
+let adsHtml=fs.readFileSync(adsHtmlPath,'utf8');
+for(const script of ['./js/facebook-ads-range.js','./js/facebook-ads-clarity.js','./js/facebook-meta-live.js','./js/facebook-ads-csv.js']){
+  if(!adsHtml.includes(script)){
+    adsHtml=adsHtml.replace('</body>',`  <script src="${script}"></script>\n</body>`);
+  }
+}
+fs.writeFileSync(adsHtmlPath,adsHtml,'utf8');
+
 const runtimeConfigPath=path.join(publicDir,'runtime-config.js');
 const runtimeConfig={
   supabaseUrl,
@@ -35,14 +46,26 @@ const runtimeConfig={
   deployEnvironment,
   authMode,
 };
+
+let runtimeConfigSource=`window.__CASEMYP_CONFIG__=Object.freeze(${JSON.stringify(runtimeConfig)});\n`;
+
+if(deployEnvironment==='preview'){
+  runtimeConfigSource=[
+    `window.__CASEMYP_CONFIG__=Object.freeze(${JSON.stringify(runtimeConfig)});`,
+    'window.__CASEMYP_PREVIEW_BOOTSTRAP__=window.__CASEMYP_CONFIG__;',
+    `document.write('<script src="https://case-myp.vercel.app/runtime-config.js"><\\/script><script src="./js/preview-readonly.js"><\\/script>');`,
+    ''
+  ].join('\n');
+}
+
 fs.writeFileSync(
   runtimeConfigPath,
-  `window.__CASEMYP_CONFIG__=Object.freeze(${JSON.stringify(runtimeConfig)});\n`,
+  runtimeConfigSource,
   {encoding:'utf8',mode:0o600},
 );
 
 console.log(
   `Production build created in public/ (${deployEnvironment}; Supabase config: ${
     supabaseUrl&&supabaseAnonKey?'configured':'missing'
-  })`,
+  }; preview data mode: ${deployEnvironment==='preview'?'production-readonly':'normal'})`,
 );

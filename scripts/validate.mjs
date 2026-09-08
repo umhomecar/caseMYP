@@ -10,12 +10,16 @@ const fail=message=>{throw new Error(message);};
 const source=read('js/app.jsx');
 const css=read('css/styles.css');
 const html=read('index.html');
+const metaApi=read('api/meta-insights.js');
+const metaClient=read('js/facebook-meta-live.js');
 const bundlePath=path.join(root,'public/js/app.bundle.js');
 const bundle=fs.existsSync(bundlePath)?fs.readFileSync(bundlePath,'utf8'):'';
 const publicFiles=['index.html','manifest.json','css/styles.css','js/preload.js'];
 const runtimeConfigPath=path.join(root,'public/runtime-config.js');
 
 parse(source,{sourceType:'module',plugins:['jsx']});
+parse(metaApi,{sourceType:'script'});
+parse(metaClient,{sourceType:'script'});
 parseCss(css,{positions:true});
 
 if(!fs.existsSync(bundlePath))fail('ไม่พบ public/js/app.bundle.js');
@@ -35,6 +39,15 @@ if(/api\.anthropic\.com|firebase-messaging-sw|\binitFCM\b/.test(bundle))fail('pr
 if(!source.includes('window.__CASEMYP_CONFIG__'))fail('แอปยังไม่อ่าน Supabase runtime config');
 if(/https:\/\/[a-z]{20}\.supabase\.co/i.test(source))fail('พบ Supabase project URL ฝังใน source');
 if(/eyJhbGciOi[A-Za-z0-9_-]*\./.test(source)||/eyJhbGciOi[A-Za-z0-9_-]*\./.test(bundle))fail('พบ JWT/anon key ฝังใน source หรือ bundle');
+if(/EA[A-Za-z0-9]{20,}/.test(metaApi)||/EA[A-Za-z0-9]{20,}/.test(metaClient))fail('พบ Meta access token ฝังใน source');
+if(!metaApi.includes('process.env.META_ACCESS_TOKEN')||!metaApi.includes('process.env.META_AD_ACCOUNT_ID'))fail('Meta endpoint ต้องอ่าน credentials จาก environment เท่านั้น');
+if(!metaApi.includes('CASEMYP_META_DASHBOARD_KEY')||!metaApi.includes('timingSafeEqual'))fail('Meta endpoint ยังไม่มี dashboard-key protection');
+if(!metaApi.includes("GRAPH_DEFAULT_VERSION = 'v26.0'"))fail('Meta endpoint ยังไม่ได้กำหนด Graph API version ปัจจุบัน');
+if(!metaClient.includes('/api/meta-insights'))fail('Meta dashboard client ยังไม่ได้เรียก server endpoint');
+const publicAdsHtml=read('public/facebook-ads.html');
+if(!publicAdsHtml.includes('./js/facebook-meta-live.js'))fail('facebook-ads.html ใน public ยังไม่ได้โหลด Meta live client');
+if(!fs.existsSync(path.join(root,'public/js/facebook-meta-live.js')))fail('ไม่พบ public/js/facebook-meta-live.js');
+if(!fs.readFileSync(path.join(root,'js/facebook-meta-live.js')).equals(fs.readFileSync(path.join(root,'public/js/facebook-meta-live.js'))))fail('Meta live client ใน public ไม่ตรงกับ source');
 if(/>Copy<\/button>/.test(source))fail('ยังมีปุ่ม Copy ภาษาอังกฤษในหน้าข้อมูลลูกค้า');
 if(source.includes("background:'#e53935'")&&source.includes("'บันทึก & ปิด'"))fail('ปุ่มบันทึกยังใช้สีเดียวกับการลบ');
 for(const action of ['ลบ Note','ทำ Follow-up เสร็จ','ลบนัด Follow-up']){
@@ -92,4 +105,4 @@ for(const file of publicFiles){
   if(!fs.readFileSync(sourcePath).equals(fs.readFileSync(deployPath)))fail(`public/${file} ไม่ตรงกับ source`);
 }
 
-console.log('Validation passed: source, production bundle, public output, accessibility and dead-feature checks');
+console.log('Validation passed: source, production bundle, Meta integration, accessibility and dead-feature checks');
