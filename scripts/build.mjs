@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 
 const root=process.cwd();
 const publicDir=path.join(root,'public');
-const copyFiles=['index.html','facebook-ads.html','manifest.json','css/styles.css','js/preload.js','js/facebook-ads-nav.js','js/preview-db-diagnostics.js'];
+const copyFiles=['index.html','facebook-ads.html','manifest.json','css/styles.css','js/preload.js','js/facebook-ads-nav.js','js/preview-db-diagnostics.js','js/preview-readonly.js'];
 const supabaseUrl=String(process.env.CASEMYP_SUPABASE_URL||'').trim();
 const supabaseAnonKey=String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
 const deployEnvironment=String(process.env.VERCEL_ENV||process.env.NODE_ENV||'local').trim();
@@ -35,14 +35,26 @@ const runtimeConfig={
   deployEnvironment,
   authMode,
 };
+
+let runtimeConfigSource=`window.__CASEMYP_CONFIG__=Object.freeze(${JSON.stringify(runtimeConfig)});\n`;
+
+if(deployEnvironment==='preview'){
+  runtimeConfigSource=[
+    `window.__CASEMYP_CONFIG__=Object.freeze(${JSON.stringify(runtimeConfig)});`,
+    'window.__CASEMYP_PREVIEW_BOOTSTRAP__=window.__CASEMYP_CONFIG__;',
+    `document.write('<script src="https://case-myp.vercel.app/runtime-config.js"><\\/script><script src="./js/preview-readonly.js"><\\/script>');`,
+    ''
+  ].join('\n');
+}
+
 fs.writeFileSync(
   runtimeConfigPath,
-  `window.__CASEMYP_CONFIG__=Object.freeze(${JSON.stringify(runtimeConfig)});\n`,
+  runtimeConfigSource,
   {encoding:'utf8',mode:0o600},
 );
 
 console.log(
   `Production build created in public/ (${deployEnvironment}; Supabase config: ${
     supabaseUrl&&supabaseAnonKey?'configured':'missing'
-  })`,
+  }; preview data mode: ${deployEnvironment==='preview'?'production-readonly':'normal'})`,
 );
