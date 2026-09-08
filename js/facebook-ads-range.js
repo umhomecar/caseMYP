@@ -10,14 +10,32 @@
   const sold = (v) => ['ปล่อยแล้ว','ปล่อยรถ'].includes(norm(v));
   const approved = (v) => ['อนุมัติ','ปล่อยแล้ว','ปล่อยรถ'].includes(norm(v));
   const state = { cases: [], bookings: [], range: 'all' };
+  const PAGE_SIZE = 1000;
 
-  async function q(table, query = '') {
+  async function qPage(table, query = '', from = 0, to = PAGE_SIZE - 1) {
     const r = await fetch(`${base}/rest/v1/${table}${query ? `?${query}` : ''}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` }
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Range: `${from}-${to}`,
+        'Range-Unit': 'items'
+      }
     });
     const text = await r.text();
     if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
     return text ? JSON.parse(text) : [];
+  }
+
+  async function qAll(table, query = '') {
+    const rows = [];
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const page = await qPage(table, query, from, from + PAGE_SIZE - 1);
+      if (!Array.isArray(page)) throw new Error(`รูปแบบข้อมูล ${table} ไม่ถูกต้อง`);
+      rows.push(...page);
+      if (page.length < PAGE_SIZE) break;
+      if (rows.length >= 50000) throw new Error(`ข้อมูล ${table} เกินขีดจำกัดความปลอดภัย 50,000 แถว`);
+    }
+    return rows;
   }
 
   function parseDate(v) {
@@ -101,7 +119,7 @@
     const bookingCard = $('bookingCount')?.closest('.kpi');
     const soldCard = $('soldCount')?.closest('.kpi');
     if (caseCard) caseCard.querySelector('.kpi-label').textContent = `💬 เคสใน CaseMYP · ${label}`;
-    if (bookingCard) bookingCard.querySelector('.kpi-label').textContent = `📋 การจอง · ${label}`;
+    if (bookingCard) bookingCard.querySelector('.kpi-label').textContent = `📋 รายการจอง · ${label}`;
     if (soldCard) soldCard.querySelector('.kpi-label').textContent = `🚗 ปล่อยรถ · ${label}`;
     const trendTitle = $('trend')?.closest('.panel')?.querySelector('h3');
     if (trendTitle) trendTitle.textContent = `แนวโน้มจำนวนเคส · ${label}`;
@@ -132,14 +150,33 @@
     }).join('');
   }
 
-  function renderFunnel(cases, bookings, soldIds) {
+  function getFunnelSets(cases, bookings) {
     const caseIds = new Set(cases.map(c => String(c.caseid)).filter(Boolean));
-    const bookingIds = new Set(bookings.map(b => String(b.caseid)).filter(Boolean));
-    const approvedIds = new Set(bookings.filter(b => approved(b.status)).map(b => String(b.caseid)).filter(Boolean));
     const attributed = new Set();
     cases.forEach(c => { if (adsFromCase(c)) attributed.add(String(c.caseid)); });
     bookings.forEach(b => { if (norm(b.ads) || norm(b.facebook)) attributed.add(String(b.caseid || b.id)); });
-    const rows = [['เคส',caseIds.size],['ระบุ Ads/Facebook',attributed.size],['การจอง',bookingIds.size],['อนุมัติ',approvedIds.size],['ปล่อยรถ',soldIds.size]];
+
+    const soldIds = new Set([
+      ...cases.filter(c => sold(c.status)).map(c => String(c.caseid)).filter(Boolean),
+      ...bookings.filter(b => sold(b.status)).map(b => String(b.caseid)).filter(Boolean)
+    ].filter(id => attributed.has(id)));
+
+    const approvedIds = new Set([
+      ...bookings.filter(b => approved(b.status)).map(b => String(b.caseid)).filter(Boolean).filter(id => attributed.has(id)),
+      ...soldIds
+    ]);
+
+    const bookingIds = new Set([
+      ...bookings.map(b => String(b.caseid)).filter(Boolean).filter(id => attributed.has(id)),
+      ...approvedIds
+    ]);
+
+    return { caseIds, attributed, bookingIds, approvedIds, soldIds };
+  }
+
+  function renderFunnel(cases, bookings) {
+    const {caseIds, attributed, bookingIds, approvedIds, soldIds} = getFunnelSets(cases, bookings);
+    const rows = [['เคส',caseIds.size],['ระบุ Ads/Facebook',attributed.size],['เคสที่มีการจอง',bookingIds.size],['อนุมัติ/ผ่านขั้นอนุมัติ',approvedIds.size],['ปล่อยรถ',soldIds.size]];
     const max = rows[0][1] || 1;
     $('funnel').innerHTML = rows.map(([name,val],i) => `<div class="frow"><div class="fbarwrap"><div class="fbar" style="width:${Math.max(val?5:0,Math.round(val/max*100))}%"></div></div><span class="fname">${esc(name)}</span><span class="fnum">${val.toLocaleString('th-TH')}</span><span class="fpct">${i===0?'100':Math.round(val/max*100)}%</span></div>`).join('');
   }
@@ -160,6 +197,10 @@
       const src = norm(b.ads) || norm(b.facebook); if (!src) continue;
       const rec = ensure(src); const id = String(b.caseid || b.id || ''); if (!id) continue;
       rec.cases.add(id); rec.bookings.add(id); if (approved(b.status)) rec.approved.add(id); if (sold(b.status)) rec.sold.add(id);
+    }
+    for (const rec of sources.values()) {
+      for (const id of rec.sold) rec.approved.add(id);
+      for (const id of rec.approved) rec.bookings.add(id);
     }
     const list = [...sources.values()].sort((a,b) => b.cases.size - a.cases.size);
     $('adsSources').innerHTML = list.length ? list.slice(0,8).map((r,i) => `<div class="legend-row"><span class="dot" style="background:${['#1877f2','#bc8cff','#3fb950','#d29922','#f85149','#79c0ff'][i%6]}"></span><span title="${esc(r.source)}">${esc(r.source.length>30?r.source.slice(0,30)+'…':r.source)}</span><strong>${r.cases.size}</strong></div>`).join('') : '<div class="muted-box">ยังไม่มีเคสที่ระบุ Ads/คลิปแอด</div>';
@@ -201,14 +242,11 @@
     const bookings = state.bookings.filter(r => inRange(r,state.range));
     const adsCases = cases.filter(c => adsFromCase(c));
     const bookingAds = bookings.filter(b => norm(b.ads) || norm(b.facebook));
-    const soldIds = new Set([
-      ...cases.filter(c => sold(c.status)).map(c => String(c.caseid)).filter(Boolean),
-      ...bookings.filter(b => sold(b.status)).map(b => String(b.caseid)).filter(Boolean)
-    ]);
     const attributed = new Set([
       ...adsCases.map(c => String(c.caseid)).filter(Boolean),
       ...bookingAds.map(b => String(b.caseid || b.id)).filter(Boolean)
     ]);
+    const {soldIds} = getFunnelSets(cases, bookings);
 
     setLabels(label);
     $('caseCount').textContent = cases.length.toLocaleString('th-TH');
@@ -216,18 +254,18 @@
     $('bookingCount').textContent = bookings.length.toLocaleString('th-TH');
     $('soldCount').textContent = soldIds.size.toLocaleString('th-TH');
     renderTrend(cases,state.range);
-    renderFunnel(cases,bookings,soldIds);
+    renderFunnel(cases,bookings);
     renderBreakdowns(cases,bookings);
-    $('statusLine').textContent = `อัปเดตจาก CaseMYP · ${label} · ${new Date().toLocaleString('th-TH')}`;
+    $('statusLine').textContent = `อัปเดตจาก CaseMYP · ${label} · โหลดครบ ${state.cases.length.toLocaleString('th-TH')} เคส / ${state.bookings.length.toLocaleString('th-TH')} รายการจอง · ${new Date().toLocaleString('th-TH')}`;
   }
 
   async function loadAll() {
     installControls();
     try {
-      $('statusLine').textContent = 'กำลังโหลดข้อมูล CaseMYP ทุกช่วงเวลา...';
+      $('statusLine').textContent = 'กำลังโหลดข้อมูล CaseMYP แบบแบ่งหน้า...';
       const [cases,bookings] = await Promise.all([
-        q('cases','select=caseid,customername,status,sales,createdat,updatedat,attachment&deleted_at=is.null&order=caseid.desc&limit=10000'),
-        q('bookings','select=id,caseid,sales,customer,facebook,ads,status,createdat&deleted_at=is.null&order=createdat.desc&limit=10000')
+        qAll('cases','select=caseid,customername,status,sales,createdat,updatedat,attachment&deleted_at=is.null&order=caseid.desc'),
+        qAll('bookings','select=id,caseid,sales,customer,facebook,ads,status,createdat&deleted_at=is.null&order=createdat.desc')
       ]);
       state.cases = Array.isArray(cases) ? cases : [];
       state.bookings = Array.isArray(bookings) ? bookings : [];
