@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 
 const root=process.cwd();
 const publicDir=path.join(root,'public');
-const copyFiles=['index.html','facebook-ads.html','manifest.json','css/styles.css','js/preload.js','js/facebook-ads-nav.js'];
+const copyFiles=['index.html','facebook-ads.html','manifest.json','css/styles.css','js/preload.js','js/facebook-ads-nav.js','js/preview-db-diagnostics.js'];
 const supabaseUrl=String(process.env.CASEMYP_SUPABASE_URL||'').trim();
 const supabaseAnonKey=String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
 const deployEnvironment=String(process.env.VERCEL_ENV||process.env.NODE_ENV||'local').trim();
