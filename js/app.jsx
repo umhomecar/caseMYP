@@ -2928,33 +2928,51 @@ function LoginPage({onLogin}){
 }
 
 function AdminFollowupsContent({users,neon='#00f5ff'}){
-  const [history,setHistory]=useState([]);
+  const [followups,setFollowups]=useState([]);
+  const [notes,setNotes]=useState([]);
   const [loading,setLoading]=useState(true);
   const [filterSales,setFilterSales]=useState('all');
   const [filterType,setFilterType]=useState('all');
-  const [dateFrom,setDateFrom]=useState('');
-  const [dateTo,setDateTo]=useState('');
   const salesList=(users||[]).filter(u=>u.role==='Sales');
+
   const load=useCallback(()=>{
     setLoading(true);
-    sbQ('GET','history',{order:'createdat.desc',limit:'500'}).then(rows=>{
-      const f=safeArray(rows).filter(r=>String(r.detail||'').includes('นัด Follow-up')||String(r.detail||'').includes('📝 Note:'));
-      setHistory(f);setLoading(false);
-    }).catch(()=>setLoading(false));
+    Promise.all([
+      sbQ('GET','case_followups',{deletedat:'is.null',order:'id.desc',limit:'5000'}),
+      sbQ('GET','case_notes',{deletedat:'is.null',order:'id.desc',limit:'5000'})
+    ]).then(([followupRows,noteRows])=>{
+      if(isSbError(followupRows)||isSbError(noteRows))throw new Error('โหลดข้อมูล Follow-up หรือ Note ไม่สำเร็จ');
+      setFollowups(safeArray(followupRows).map(mapCaseFollowup).filter(f=>f.status!=='cancelled'));
+      setNotes(safeArray(noteRows).map(mapCaseNote));
+      setLoading(false);
+    }).catch(e=>{
+      setFollowups([]);setNotes([]);setLoading(false);
+      showToast(e?.message||'โหลดข้อมูล Follow-up ไม่สำเร็จ','err');
+    });
   },[]);
   useEffect(()=>{load();},[load]);
-  const today=new Date().toISOString().slice(0,10);
-  function parseHD(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
-  const filtered=history.filter(r=>{
+
+  const today=todayYMD();
+  const items=[
+    ...followups.map(f=>({...f,_kind:'followup'})),
+    ...notes.map(n=>({...n,_kind:'note'}))
+  ].sort((a,b)=>{
+    const ad=parseTHDateTime(a.createdat),bd=parseTHDateTime(b.createdat);
+    const at=ad?ad.getTime():0,bt=bd?bd.getTime():0;
+    if(bt!==at)return bt-at;
+    return Number(b.id||0)-Number(a.id||0);
+  });
+
+  const filtered=items.filter(r=>{
     if(filterSales!=='all'&&r.sales!==filterSales)return false;
-    if(filterType==='followup'&&!String(r.detail||'').includes('นัด Follow-up'))return false;
-    if(filterType==='note'&&!String(r.detail||'').includes('📝 Note:'))return false;
-    if(dateFrom){const d=parseHD(r.createdat);if(!d||d<new Date(dateFrom))return false;}
-    if(dateTo){const d=parseHD(r.createdat);const to=new Date(dateTo);to.setHours(23,59,59);if(!d||d>to)return false;}
+    if(filterType==='followup'&&r._kind!=='followup')return false;
+    if(filterType==='note'&&r._kind!=='note')return false;
     return true;
   });
-  const overdue=filtered.filter(r=>{const m=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m&&m[1]<today;}).length;
-  const todayCount=filtered.filter(r=>{const m=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);return m&&m[1]===today;}).length;
+  const pendingFollowups=filtered.filter(r=>r._kind==='followup'&&r.status!=='done');
+  const overdue=pendingFollowups.filter(r=>String(r.due_date||r.date||'')<today).length;
+  const todayCount=pendingFollowups.filter(r=>String(r.due_date||r.date||'')===today).length;
+
   return <div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
       {[['ทั้งหมด',filtered.length,neon],['วันนี้',todayCount,'#ffd700'],['เลยกำหนด',overdue,'#ff2d78']].map(([l,v,c])=>
@@ -2979,24 +2997,22 @@ function AdminFollowupsContent({users,neon='#00f5ff'}){
       <div style={{textAlign:'center',padding:'48px 20px',color:'var(--text2)'}}><div style={{fontSize:40,marginBottom:10}}>📭</div><div>ยังไม่มีข้อมูล</div><div style={{fontSize:12,marginTop:6,color:'var(--text3)'}}>เซลส์ต้องบันทึกนัดหรือ note ผ่านหน้าเคสก่อน</div></div>:
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
         {filtered.map((r,i)=>{
-          const isFollowup=String(r.detail||'').includes('นัด Follow-up');
-          const fuDateM=String(r.detail||'').match(/(\d{4}-\d{2}-\d{2})/);
-          const fuDate=fuDateM?fuDateM[1]:'';
-          const noteText=String(r.detail||'').replace('📝 Note: ','');
-          const fuNoteM=String(r.detail||'').match(/— (.+)$/);
-          const fuNote=fuNoteM?fuNoteM[1]:'';
-          const isOverdue=fuDate&&fuDate<today;
-          const cardC=isOverdue?'#ff2d78':isFollowup?'#00ff88':neon;
-          return<div key={i} style={{background:cardC+'08',border:'1px solid '+cardC+'30',borderLeft:'3px solid '+cardC,borderRadius:'0 10px 10px 0',padding:'10px 14px'}}>
+          const isFollowup=r._kind==='followup';
+          const fuDate=isFollowup?String(r.due_date||r.date||''):'';
+          const isDone=isFollowup&&r.status==='done';
+          const isOverdue=isFollowup&&!isDone&&fuDate&&fuDate<today;
+          const cardC=isDone?'#00ff88':isOverdue?'#ff2d78':isFollowup?'#00ff88':neon;
+          return <div key={r._kind+':'+(r.id||i)} style={{background:cardC+'08',border:'1px solid '+cardC+'30',borderLeft:'3px solid '+cardC,borderRadius:'0 10px 10px 0',padding:'10px 14px',opacity:isDone?0.78:1}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4,flexWrap:'wrap',gap:4}}>
               <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                <span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20,background:cardC+'20',color:cardC}}>{isFollowup?'📅 นัด':'📝 NOTE'}</span>
+                <span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20,background:cardC+'20',color:cardC}}>{isFollowup?(isDone?'✅ ทำแล้ว':'📅 นัด'):'📝 NOTE'}</span>
                 <span style={{color:'var(--blue)',fontWeight:700,fontSize:12}}>{r.caseid}</span>
                 <span style={{fontSize:11,color:'var(--purple)'}}>{r.sales}</span>
               </div>
-              {fuDate&&<span style={{fontSize:11,fontWeight:700,color:cardC}}>{isOverdue?'⚠️ ':''}{fuDate}</span>}
+              {isFollowup&&fuDate&&<span style={{fontSize:11,fontWeight:700,color:cardC}}>{isOverdue?'⚠️ ':''}{fuDate}</span>}
+              {!isFollowup&&<span style={{fontSize:11,color:'var(--text3)'}}>{r.createdDisplay||formatTextDateToTHBE(r.createdat)}</span>}
             </div>
-            <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5}}>{isFollowup?fuNote||'ไม่มีหมายเหตุ':noteText}</div>
+            <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5,textDecoration:isDone?'line-through':'none'}}>{r.note||'ไม่มีหมายเหตุ'}</div>
           </div>;
         })}
       </div>
