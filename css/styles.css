@@ -2059,7 +2059,7 @@ body:not(.light) tr:hover td{background:#2f3031 !important;}
   }
 }
 
-/* Final mobile current-cases layout: dedicated 3-row cards, no desktop table leakage. */
+/* Final mobile current-cases layout: one-line cards colored by case status. */
 .admin-cases-mobile-list{display:none;}
 
 @media(max-width:768px){
@@ -2078,35 +2078,63 @@ body:not(.light) tr:hover td{background:#2f3031 !important;}
   .admin-cases-mobile-list{
     display:flex !important;
     flex-direction:column;
-    gap:10px;
+    gap:8px;
   }
   .admin-mobile-case-card{
-    background:var(--bg2);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:8px 14px;
-    box-shadow:0 1px 2px rgba(0,0,0,.18);
-  }
-  .admin-mobile-case-line{
-    min-height:42px;
-    display:flex;
+    min-height:50px;
+    display:grid;
+    grid-template-columns:max-content minmax(0,1fr) minmax(56px,100px);
     align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    border-bottom:1px solid var(--border);
+    gap:10px;
+    border:1px solid var(--border);
+    border-radius:13px;
+    padding:0 14px;
+    box-shadow:0 1px 2px rgba(0,0,0,.18);
+    cursor:pointer;
+    overflow:hidden;
+  }
+  .admin-mobile-case-id,
+  .admin-mobile-case-status,
+  .admin-mobile-case-sales{
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    color:inherit !important;
+  }
+  .admin-mobile-case-id{
+    font-size:15px;
+    font-weight:800;
+  }
+  .admin-mobile-case-status{
+    text-align:center;
     font-size:14px;
+    font-weight:800;
   }
-  .admin-mobile-case-line:last-child{border-bottom:0;}
-  .admin-mobile-case-line>span:first-child{
-    color:var(--text2);
-    font-size:13px;
-  }
-  .admin-mobile-case-line strong{
+  .admin-mobile-case-sales{
+    text-align:right;
     font-size:14px;
-    font-weight:700;
+    font-weight:800;
   }
-  .admin-mobile-case-line:first-child strong{color:var(--blue);}
-  .admin-mobile-case-sales{color:var(--purple);}
+
+  /* Use the exact same status palette as StatusBadge, but on the whole card. */
+  .admin-mobile-case-card.s-wait{background:#3a3d42 !important;color:#fff !important;border-color:#6e7681 !important;}
+  .admin-mobile-case-card.s-go{background:#1a4731 !important;color:#3fb950 !important;border-color:#2f6d4c !important;}
+  .admin-mobile-case-card.s-calling{background:#0d3149 !important;color:#79c0ff !important;border-color:#24577a !important;}
+  .admin-mobile-case-card.s-nurse{background:#3d2b00 !important;color:#ffa657 !important;border-color:#6b4b00 !important;}
+  .admin-mobile-case-card.s-half{background:#2d1b00 !important;color:#d29922 !important;border-color:#5f4100 !important;}
+  .admin-mobile-case-card.s-cant{background:#3d1515 !important;color:#f85149 !important;border-color:#6b2a2a !important;}
+  .admin-mobile-case-card.s-later{background:#2b1f3d !important;color:#bc8cff !important;border-color:#51386f !important;}
+  .admin-mobile-case-card.s-book{background:#0d2149 !important;color:#58a6ff !important;border-color:#244d87 !important;}
+  .admin-mobile-case-card.s-sign{background:#0d3149 !important;color:#39d353 !important;border-color:#246445 !important;}
+  .admin-mobile-case-card.s-wait2{background:#1a2a3d !important;color:#79c0ff !important;border-color:#385471 !important;}
+  .admin-mobile-case-card.s-approve{background:#132d18 !important;color:#3fb950 !important;border-color:#2e6237 !important;}
+  .admin-mobile-case-card.s-close{background:#5a0a0a !important;color:#ff6b6b !important;border-color:#8d1b1b !important;}
+  .admin-mobile-case-card.s-reject{background:#3d0a0a !important;color:#f85149 !important;border-color:#761919 !important;}
+  .admin-mobile-case-card.s-release{background:#0a2418 !important;color:#3fb950 !important;border-color:#22563b !important;}
+  .admin-mobile-case-card.s-other{background:#2d1500 !important;color:#ffa657 !important;border-color:#623512 !important;}
+  .admin-mobile-case-card.s-throw{background:#3d2e00 !important;color:#ffd700 !important;border-color:#725800 !important;}
+
   .admin-mobile-case-empty{
     padding:28px 16px;
     text-align:center;
