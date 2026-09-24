@@ -1504,7 +1504,8 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       lineResult=await notifyLineCaseCreated({
         caseId:r.caseId,
         customername:submitData.customername,
-        contact:submitData.contact||'',
+        contact:submitData.contact_by==='QR Code'?'':(submitData.contact||''),
+        hasContact:!!submitData.contact,
         contact_by:submitData.contact_by||'',
         status:submitData.status||'รอข้อมูล',
         sales:r.sales||submitData.sales||UNASSIGNED_SALES
