@@ -19,6 +19,33 @@ function qrSignature(caseId,token){
     .slice(0,32);
 }
 
+async function lineNotificationEnabled(){
+  const supaUrl=String(process.env.CASEMYP_SUPABASE_URL||'').trim().replace(/\/$/,'');
+  const supaKey=String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
+  if(!supaUrl||!supaKey)return true;
+
+  try{
+    const url=new URL(supaUrl+'/rest/v1/targets');
+    url.searchParams.set('select','target_value');
+    url.searchParams.set('month_key','eq.__system__');
+    url.searchParams.set('sales_name','eq.__line_notifications__');
+    url.searchParams.set('limit','1');
+    const response=await fetch(url,{
+      headers:{
+        apikey:supaKey,
+        Authorization:'Bearer '+supaKey,
+        Accept:'application/json'
+      }
+    });
+    if(!response.ok)throw new Error('Supabase setting read failed: '+response.status);
+    const rows=await response.json();
+    return !Array.isArray(rows)||!rows.length?true:Number(rows[0].target_value)!==0;
+  }catch(error){
+    console.error('LINE setting check failed; defaulting to enabled',error?.message||error);
+    return true;
+  }
+}
+
 module.exports = async function handler(req,res){
   if(req.method!=='POST'){
     res.setHeader('Allow','POST');
@@ -33,6 +60,12 @@ module.exports = async function handler(req,res){
   if(allowedOrigin&&requestOrigin&&requestOrigin!==allowedOrigin){
     return res.status(403).json({success:false,error:'Origin not allowed'});
   }
+
+  const enabled=await lineNotificationEnabled();
+  if(!enabled){
+    return res.status(200).json({success:true,skipped:true,reason:'disabled'});
+  }
+
   if(!token||!groupId){
     return res.status(503).json({success:false,error:'LINE notification is not configured'});
   }
