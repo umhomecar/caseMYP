@@ -126,6 +126,8 @@ const BOOK_STATUSES = ['จองแล้ว','รอเซ็นต์','ร�
 const CONTACT_BY = ['เบอร์','ไลน์','QR Code','เบอร์&ไลน์'];
 const SENT_TYPES = ['ปกติ','ส่วนตัว','Line OA'];
 const UNASSIGNED_SALES = 'รอมอบหมาย';
+const LINE_SETTING_MONTH='__system__';
+const LINE_SETTING_SALES='__line_notifications__';
 const CLOSED_STATUSES = ['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
 function isUnassignedSales(value){return !String(value||'').trim()||String(value).trim()===UNASSIGNED_SALES;}
 const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V','CR-V','Accord','Mobilio'],Toyota:['Yaris','Vios','Altis','Revo','VIGO','Fortuner','Cross','C-HR','Camry','Veloz','Alphard','Sienta','Avanza','Prius','Innova'],Isuzu:['D-Max','MU-X','MU-7','X-Series'],Mazda:['2','3','CX-3','CX-30','BT-50'],MG:['3','5','ZS'],Nissan:['Navara','Almera','Note','March','Sylphy','Teana','Juke'],Mitsubishi:['Triton','Mirage','Attrage','Xpander','Pajero'],Suzuki:['Swift','Ciaz','Carry']};
@@ -279,7 +281,7 @@ async function notifyLineCaseCreated(payload){
     if(!response.ok||!data.success){
       return{success:false,error:data.error||('HTTP '+response.status)};
     }
-    return{success:true};
+    return{...data,success:true};
   }catch(e){
     return{success:false,error:e?.message||'เชื่อมต่อระบบแจ้ง LINE ไม่สำเร็จ'};
   }
@@ -956,6 +958,25 @@ async function sbApi(action,data){
     }
     case 'getSmartAssign':{const sales=await getSmartAssignSales();return{success:true,sales};}
 
+    case 'getLineNotificationSetting':{
+      const rows=await sbQ('GET','targets',{month_key:`eq.${LINE_SETTING_MONTH}`,sales_name:`eq.${LINE_SETTING_SALES}`,select:'target_value',limit:'1'});
+      if(isSbError(rows))return{success:false,error:formatSbError(rows)};
+      return{success:true,enabled:safeArray(rows).length?Number(rows[0].target_value)!==0:true};
+    }
+    case 'setLineNotificationSetting':{
+      const enabled=Boolean(data.enabled);
+      const rows=await sbQ('GET','targets',{month_key:`eq.${LINE_SETTING_MONTH}`,sales_name:`eq.${LINE_SETTING_SALES}`,select:'id,target_value',limit:'1'});
+      if(isSbError(rows))return{success:false,error:formatSbError(rows)};
+      let saved;
+      if(safeArray(rows).length){
+        saved=await sbQ('PATCH','targets',{month_key:`eq.${LINE_SETTING_MONTH}`,sales_name:`eq.${LINE_SETTING_SALES}`},{target_value:enabled?1:0,updated_at:new Date().toISOString()});
+      }else{
+        saved=await sbQ('POST','targets',{},{month_key:LINE_SETTING_MONTH,sales_name:LINE_SETTING_SALES,target_value:enabled?1:0,updated_at:new Date().toISOString()});
+      }
+      if(isSbError(saved))return{success:false,error:formatSbError(saved)};
+      return{success:true,enabled};
+    }
+
     case 'broadcast':{
       let targets=[data.sales];
       if(data.sales==='all'){
@@ -1515,6 +1536,8 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
     if(r.success){
       if(backdated){
         showToast('เพิ่มเคสย้อนหลังสำเร็จ','ok');
+      }else if(lineResult?.skipped){
+        showToast('เพิ่มเคสสำเร็จ • ปิดแจ้งเตือน LINE อยู่','ok');
       }else if(lineResult?.success){
         showToast('เพิ่มเคสสำเร็จ • แจ้ง LINE แล้ว','ok');
       }else{
@@ -3205,6 +3228,59 @@ function AdminTrash({currentUser}){
   </div>;
 }
 
+function AdminLineToggle({compact=false}){
+  const [enabled,setEnabled]=useState(true);
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+
+  const load=useCallback(()=>{
+    setLoading(true);
+    api('getLineNotificationSetting',{}).then(r=>{
+      if(r.success)setEnabled(r.enabled!==false);
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+  },[]);
+
+  useEffect(()=>{
+    load();
+    const sync=e=>{if(typeof e?.detail?.enabled==='boolean')setEnabled(e.detail.enabled);};
+    window.addEventListener('cp-line-notification-setting',sync);
+    return()=>window.removeEventListener('cp-line-notification-setting',sync);
+  },[load]);
+
+  async function toggle(){
+    if(loading||saving)return;
+    const before=enabled,next=!before;
+    setEnabled(next);setSaving(true);
+    const r=await api('setLineNotificationSetting',{enabled:next});
+    setSaving(false);
+    if(!r.success){
+      setEnabled(before);
+      showToast('เปลี่ยนการแจ้งเตือน LINE ไม่สำเร็จ: '+(r.error||''),'err');
+      return;
+    }
+    setEnabled(r.enabled!==false);
+    window.dispatchEvent(new CustomEvent('cp-line-notification-setting',{detail:{enabled:r.enabled!==false}}));
+    showToast(r.enabled!==false?'เปิดแจ้งเตือน LINE แล้ว':'ปิดแจ้งเตือน LINE แล้ว','ok');
+  }
+
+  const active=enabled&&!loading;
+  return <button type="button" onClick={toggle} disabled={loading||saving} aria-pressed={active}
+    title={active?'LINE แจ้งเตือน: เปิด':'LINE แจ้งเตือน: ปิด'}
+    style={{
+      width:compact?'auto':'100%',minWidth:compact?92:0,
+      display:'flex',alignItems:'center',justifyContent:'center',gap:7,
+      padding:compact?'6px 9px':'8px 10px',borderRadius:9,cursor:loading||saving?'wait':'pointer',
+      border:'1px solid '+(active?'rgba(6,199,85,.48)':'var(--border)'),
+      background:active?'rgba(6,199,85,.12)':'var(--bg3)',
+      color:active?'#06c755':'var(--text2)',fontSize:compact?11:12,fontWeight:800,
+      transition:'all .18s',opacity:loading?0.65:1
+    }}>
+    <span style={{width:8,height:8,borderRadius:'50%',background:loading?'var(--text3)':active?'#06c755':'var(--red)',boxShadow:active?'0 0 10px rgba(6,199,85,.6)':'none'}}/>
+    <span>{saving?'กำลังบันทึก...':compact?(active?'LINE เปิด':'LINE ปิด'):(active?'LINE แจ้งเตือน · เปิด':'LINE แจ้งเตือน · ปิด')}</span>
+  </button>;
+}
+
 function AdminApp({currentUser,onLogout}){
   const [page,setPage]=useState('cases');
   const [users,setUsers]=useState([]);
@@ -3255,6 +3331,7 @@ function AdminApp({currentUser,onLogout}){
         <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
+        <div style={{marginBottom:10}}><AdminLineToggle/></div>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
           <div style={{width:36,height:36,borderRadius:'50%',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{currentUser.avatar?<img src={currentUser.avatar} alt={`รูปโปรไฟล์ ${currentUser.name}`} decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Ico.user/>}</div>
           <div><div style={{fontWeight:600,fontSize:13}}>{currentUser.name}</div><div style={{fontSize:11,color:'var(--text2)'}}>Admin</div></div>
@@ -3269,6 +3346,7 @@ function AdminApp({currentUser,onLogout}){
     <div className="admin-topbar">
       <div style={{fontWeight:800,color:'var(--blue)',display:'flex',alignItems:'center',gap:8}}>🚗 CasePool <span style={{fontSize:11,color:'var(--text3)',fontWeight:400,background:'var(--bg3)',padding:'2px 8px',borderRadius:20}}>Admin</span></div>
       <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <AdminLineToggle compact/>
         <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={toggleTheme} aria-label="สลับธีม">🌓</button>
         <button className="btn btn-ghost" style={{padding:'4px 8px',position:'relative'}} onClick={()=>setShowNotif(!showNotif)} aria-label="การแจ้งเตือน"><Ico.bell/>{notifCount>0&&<span style={{position:'absolute',top:0,right:0,background:'var(--red)',width:16,height:16,borderRadius:'50%',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}>{notifCount}</span>}</button>
         <button className="btn btn-ghost" style={{padding:'4px 8px'}} onClick={onLogout} aria-label="ออกจากระบบ"><Ico.logout/></button>
