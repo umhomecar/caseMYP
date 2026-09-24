@@ -3177,7 +3177,6 @@ function AdminApp({currentUser,onLogout}){
     {key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},
     {key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},
     {key:'analytics',icon:<Ico.trophy/>,label:'รายงาน'},
-    {key:'summary',icon:<span style={{fontSize:18,lineHeight:1}}>📈</span>,label:'สรุปยอด',href:'https://umhome-summary-web.vercel.app/'},
     {key:'bookings',icon:<Ico.book/>,label:'การจอง'},
     {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
     {key:'team',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/> <circle cx="9" cy="7" r="4"/> <path d="M23 21v-2a4 4 0 0 0-3-3.87"/> <path d="M16 3.13a4 4 0 0 1 0 7.75"/> </svg>,label:'ทีม'},
@@ -3197,8 +3196,7 @@ function AdminApp({currentUser,onLogout}){
   return <div>
     <div className="sidebar">
       <div className="sidebar-logo"><div style={{fontWeight:800,fontSize:18,color:'var(--blue)'}}>🚗 CasePool</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Admin Panel</div></div>
-      <nav className="sidebar-nav">{allNavItems.map(n=>n.href?
-        <a key={n.key} className="nav-item nav-link-external" href={n.href} target="_blank" rel="noopener noreferrer" title="เปิดหน้าสรุปยอด UM Home Car">{n.icon}<span>{n.label}</span><span style={{marginLeft:'auto',fontSize:11,opacity:.65}}>↗</span></a>:
+      <nav className="sidebar-nav">{allNavItems.map(n=>
         <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
