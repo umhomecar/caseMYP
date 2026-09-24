@@ -1500,7 +1500,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
     }
     const r=await api('addCase',submitData);
     let lineResult=null;
-    if(r.success&&!backdated){
+    if(r.success){
       lineResult=await notifyLineCaseCreated({
         caseId:r.caseId,
         customername:submitData.customername,
