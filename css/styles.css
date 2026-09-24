@@ -2059,3 +2059,66 @@ body:not(.light) tr:hover td{background:#2f3031 !important;}
   }
 }
 
+/* Final mobile current-cases layout: dedicated 3-row cards, no desktop table leakage. */
+.admin-cases-mobile-list{display:none;}
+
+@media(max-width:768px){
+  .admin-topbar{
+    height:calc(68px + env(safe-area-inset-top,0px)) !important;
+    min-height:calc(68px + env(safe-area-inset-top,0px)) !important;
+    padding:calc(env(safe-area-inset-top,0px) + 16px) 12px 0 !important;
+  }
+
+  .admin-mobile-content,
+  .main-content.admin-mobile-content{
+    padding-top:calc(82px + env(safe-area-inset-top,0px)) !important;
+  }
+
+  .admin-cases-desktop-table{display:none !important;}
+  .admin-cases-mobile-list{
+    display:flex !important;
+    flex-direction:column;
+    gap:10px;
+  }
+  .admin-mobile-case-card{
+    background:var(--bg2);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:8px 14px;
+    box-shadow:0 1px 2px rgba(0,0,0,.18);
+  }
+  .admin-mobile-case-line{
+    min-height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    border-bottom:1px solid var(--border);
+    font-size:14px;
+  }
+  .admin-mobile-case-line:last-child{border-bottom:0;}
+  .admin-mobile-case-line>span:first-child{
+    color:var(--text2);
+    font-size:13px;
+  }
+  .admin-mobile-case-line strong{
+    font-size:14px;
+    font-weight:700;
+  }
+  .admin-mobile-case-line:first-child strong{color:var(--blue);}
+  .admin-mobile-case-sales{color:var(--purple);}
+  .admin-mobile-case-empty{
+    padding:28px 16px;
+    text-align:center;
+    color:var(--text2);
+    background:var(--bg2);
+    border:1px solid var(--border);
+    border-radius:14px;
+  }
+}
+
+@media(min-width:769px){
+  .admin-cases-mobile-list{display:none !important;}
+  .admin-cases-desktop-table{display:block !important;}
+}
+
