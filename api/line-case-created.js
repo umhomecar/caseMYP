@@ -1,3 +1,5 @@
+const crypto=require('node:crypto');
+
 function oneLine(value){
   return String(value ?? '').replace(/[\r\n\t]+/g,' ').replace(/\s{2,}/g,' ').trim();
 }
@@ -6,9 +8,15 @@ function contactLabel(contactBy){
   const type=oneLine(contactBy);
   if(type==='เบอร์')return 'เบอร์';
   if(type==='ไลน์')return 'ไลน์';
-  if(type==='QR Code')return 'QR Code';
   if(type==='เบอร์&ไลน์')return 'เบอร์/ไลน์';
   return 'ข้อมูลติดต่อ';
+}
+
+function qrSignature(caseId,token){
+  return crypto.createHmac('sha256',token)
+    .update('case-myp-line-qr:'+caseId)
+    .digest('hex')
+    .slice(0,32);
 }
 
 module.exports = async function handler(req,res){
@@ -29,11 +37,18 @@ module.exports = async function handler(req,res){
     return res.status(503).json({success:false,error:'LINE notification is not configured'});
   }
 
-  const body=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
+  let body={};
+  try{
+    body=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
+  }catch(e){
+    return res.status(400).json({success:false,error:'Invalid JSON body'});
+  }
+
   const caseId=oneLine(body.caseId||body.caseid);
   const customername=oneLine(body.customername);
   const contact=oneLine(body.contact);
   const contactBy=oneLine(body.contact_by);
+  const hasContact=Boolean(body.hasContact||contact);
   const status=oneLine(body.status)||'รอข้อมูล';
   const sales=oneLine(body.sales)||'รอมอบหมาย';
 
@@ -41,14 +56,29 @@ module.exports = async function handler(req,res){
     return res.status(400).json({success:false,error:'Missing caseId or customername'});
   }
 
+  const isQr=contactBy==='QR Code';
   const lines=[
     'รหัสเคส: '+caseId,
     'ชื่อลูกค้า: '+customername,
-    contactLabel(contactBy)+': '+(contact||'-'),
+    isQr?'ติดต่อ: QR Code':contactLabel(contactBy)+': '+(contact||'-'),
     'สถานะ: '+status,
     'เซลส์: '+sales
   ];
   const text=lines.join('\n');
+  const messages=[{type:'text',text}];
+
+  if(isQr&&hasContact){
+    const baseUrl=allowedOrigin||('https://'+String(req.headers.host||'').trim());
+    if(baseUrl&&/^https:\/\//i.test(baseUrl)){
+      const sig=qrSignature(caseId,token);
+      const imageUrl=baseUrl.replace(/\/$/,'')+'/api/line-qr-image?caseId='+encodeURIComponent(caseId)+'&sig='+encodeURIComponent(sig);
+      messages.push({
+        type:'image',
+        originalContentUrl:imageUrl,
+        previewImageUrl:imageUrl
+      });
+    }
+  }
 
   try{
     const lineRes=await fetch('https://api.line.me/v2/bot/message/push',{
@@ -57,10 +87,7 @@ module.exports = async function handler(req,res){
         'Authorization':'Bearer '+token,
         'Content-Type':'application/json'
       },
-      body:JSON.stringify({
-        to:groupId,
-        messages:[{type:'text',text}]
-      })
+      body:JSON.stringify({to:groupId,messages})
     });
 
     if(!lineRes.ok){
@@ -68,7 +95,7 @@ module.exports = async function handler(req,res){
       console.error('LINE push failed',lineRes.status,detail);
       return res.status(502).json({success:false,error:'LINE push failed',status:lineRes.status});
     }
-    return res.status(200).json({success:true});
+    return res.status(200).json({success:true,imageIncluded:messages.length>1});
   }catch(error){
     console.error('LINE push error',error?.message||error);
     return res.status(502).json({success:false,error:'LINE push request failed'});
