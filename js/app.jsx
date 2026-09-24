@@ -1872,8 +1872,8 @@ function AdminCurrentCases({currentUser,users}){
     return rows;
   }
   return <div className="page">
-    <div className="page-hd"><div><div className="page-title">📋 เคสทั่วไป</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
-    <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
+    <div className="page-hd"><div><div className="page-title">📋 เคสทั่วไป</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div></div><div className="admin-current-cases-desktop-tools" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    <div className="admin-current-cases-desktop-filters" style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
         <input value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ชื่อ เบอร์ รหัสเคส" style={{paddingLeft:28,fontSize:13,height:34}}/>
@@ -1890,7 +1890,7 @@ function AdminCurrentCases({currentUser,users}){
       <span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>{filtered.length} เคส</span>
     </div>
     {/* Date range filter row */}
-    <div style={{display:'flex',gap:6,marginBottom:10,alignItems:'center',flexWrap:'wrap'}}>
+    <div className="admin-current-cases-desktop-date" style={{display:'flex',gap:6,marginBottom:10,alignItems:'center',flexWrap:'wrap'}}>
       <span style={{fontSize:12,color:'var(--text2)',flexShrink:0}}>📅 สร้างระหว่าง:</span>
       <input type="date" value={filter.dateFrom||''} onChange={e=>setFilter(f=>({...f,dateFrom:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
       <span style={{fontSize:12,color:'var(--text3)'}}>—</span>
