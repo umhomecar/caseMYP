@@ -3002,7 +3002,7 @@ function AdminFollowupsContent({users,neon='#00f5ff'}){
           const isDone=isFollowup&&r.status==='done';
           const isOverdue=isFollowup&&!isDone&&fuDate&&fuDate<today;
           const cardC=isDone?'#00ff88':isOverdue?'#ff2d78':isFollowup?'#00ff88':neon;
-          return <div key={r._kind+':'+(r.id||i)} style={{background:cardC+'08',border:'1px solid '+cardC+'30',borderLeft:'3px solid '+cardC,borderRadius:'0 10px 10px 0',padding:'10px 14px',opacity:isDone?.78:1}}>
+          return <div key={r._kind+':'+(r.id||i)} style={{background:cardC+'08',border:'1px solid '+cardC+'30',borderLeft:'3px solid '+cardC,borderRadius:'0 10px 10px 0',padding:'10px 14px',opacity:isDone?0.78:1}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4,flexWrap:'wrap',gap:4}}>
               <div style={{display:'flex',gap:6,alignItems:'center'}}>
                 <span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20,background:cardC+'20',color:cardC}}>{isFollowup?(isDone?'✅ ทำแล้ว':'📅 นัด'):'📝 NOTE'}</span>
