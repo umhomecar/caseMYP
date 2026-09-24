@@ -2005,3 +2005,57 @@ body:not(.light) tr:hover td{background:#2f3031 !important;}
   }
 }
 
+/* Mobile admin cases: compact header/search/cards + lower iPhone topbar controls. */
+.admin-current-cases-mobile-search{display:none;}
+
+@media(max-width:768px){
+  .admin-topbar{
+    height:calc(60px + env(safe-area-inset-top,0px)) !important;
+    min-height:calc(60px + env(safe-area-inset-top,0px)) !important;
+    padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0 !important;
+  }
+
+  .admin-mobile-content,
+  .main-content.admin-mobile-content{
+    padding-top:calc(72px + env(safe-area-inset-top,0px)) !important;
+  }
+
+  .admin-current-cases-desktop-summary{display:none !important;}
+  .admin-current-cases-mobile-search{
+    display:block !important;
+    margin-top:10px;
+  }
+  .admin-current-cases-mobile-search input{
+    width:100% !important;
+    min-height:42px !important;
+    padding:9px 12px !important;
+    font-size:16px !important;
+    border-radius:12px !important;
+  }
+
+  .admin-case-row{
+    padding:8px 12px !important;
+    margin-bottom:8px !important;
+  }
+  .admin-case-col-select,
+  .admin-case-col-customer,
+  .admin-case-col-contact,
+  .admin-case-col-next,
+  .admin-case-col-updated,
+  .admin-case-sla{
+    display:none !important;
+  }
+  .admin-case-col-id,
+  .admin-case-col-status,
+  .admin-case-col-sales{
+    display:flex !important;
+    min-height:38px;
+    padding:6px 0 !important;
+  }
+  .admin-case-col-id::before,
+  .admin-case-col-status::before,
+  .admin-case-col-sales::before{
+    font-size:12px !important;
+  }
+}
+
