@@ -1975,3 +1975,16 @@ body:not(.light) tr:hover td{background:#2f3031 !important;}
   body:not(.light) .modal{border-radius:16px !important;}
   .btn{min-height:44px;}
 }
+
+/* Admin current cases: mobile uses cards + floating add button only. */
+@media(max-width:768px){
+  .admin-current-cases-desktop-tools,
+  .admin-current-cases-desktop-filters,
+  .admin-current-cases-desktop-date{
+    display:none !important;
+  }
+  .admin-mobile-content .page-hd{
+    margin-bottom:10px !important;
+  }
+}
+
