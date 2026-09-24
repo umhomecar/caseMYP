@@ -267,6 +267,24 @@ async function api(action,data={}){
   return task;
 }
 
+async function notifyLineCaseCreated(payload){
+  try{
+    const response=await fetch('/api/line-case-created',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload||{})
+    });
+    let data={};
+    try{data=await response.json();}catch(e){}
+    if(!response.ok||!data.success){
+      return{success:false,error:data.error||('HTTP '+response.status)};
+    }
+    return{success:true};
+  }catch(e){
+    return{success:false,error:e?.message||'เชื่อมต่อระบบแจ้ง LINE ไม่สำเร็จ'};
+  }
+}
+
 function formatDate(dateStr){
   if(!dateStr) return '-';
   const s = String(dateStr).trim();
@@ -1481,8 +1499,28 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       submitData.updatedat=backTs;
     }
     const r=await api('addCase',submitData);
+    let lineResult=null;
+    if(r.success&&!backdated){
+      lineResult=await notifyLineCaseCreated({
+        caseId:r.caseId,
+        customername:submitData.customername,
+        contact:submitData.contact||'',
+        contact_by:submitData.contact_by||'',
+        status:submitData.status||'รอข้อมูล',
+        sales:r.sales||submitData.sales||UNASSIGNED_SALES
+      });
+    }
     setLoading(false);
-    if(r.success){showToast(backdated?'เพิ่มเคสย้อนหลังสำเร็จ':'เพิ่มเคสสำเร็จ','ok');onAdded();onClose();}else showToast(r.error||'เกิดข้อผิดพลาด','err');
+    if(r.success){
+      if(backdated){
+        showToast('เพิ่มเคสย้อนหลังสำเร็จ','ok');
+      }else if(lineResult?.success){
+        showToast('เพิ่มเคสสำเร็จ • แจ้ง LINE แล้ว','ok');
+      }else{
+        showToast('เพิ่มเคสสำเร็จ แต่แจ้ง LINE ไม่สำเร็จ'+(lineResult?.error?' — '+lineResult.error:''),'warn',5000);
+      }
+      onAdded();onClose();
+    }else showToast(r.error||'เกิดข้อผิดพลาด','err');
   }
   return <Modal title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
