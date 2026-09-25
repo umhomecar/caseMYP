@@ -84,6 +84,7 @@ module.exports = async function handler(req,res){
   const hasContact=Boolean(body.hasContact||contact);
   const status=oneLine(body.status)||'รอข้อมูล';
   const sales=oneLine(body.sales)||'รอมอบหมาย';
+  const note=oneLine(body.note);
 
   if(!caseId||!customername){
     return res.status(400).json({success:false,error:'Missing caseId or customername'});
@@ -97,6 +98,7 @@ module.exports = async function handler(req,res){
     'สถานะ: '+status,
     'เซลส์: '+sales
   ];
+  if(note)lines.push('หมายเหตุ: '+note);
   const text=lines.join('\n');
   const messages=[{type:'text',text}];
 
