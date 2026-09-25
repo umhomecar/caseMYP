@@ -555,9 +555,19 @@ async function sbApi(action,data){
         const id=data.caseid||await genCaseId(attempt,data.casePrefix||'');
         const inserted=await sbQ('POST','cases',{},{...baseRow,caseid:id});
         if(!isSbError(inserted)){
-          const historySaved=await sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales));
+          let historySaved=await sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales));
+          let noteSaved=true;
+          const initialNote=String(data.note||'').trim();
+          if(initialNote){
+            const noteRow={caseid:id,sales:data.createdBy||assignedSales||'ระบบ',note:initialNote,createdat:ts,deletedat:null};
+            const noteInserted=await sbQ('POST','case_notes',{},noteRow);
+            noteSaved=!isSbError(noteInserted)&&safeArray(noteInserted).length>0;
+            if(noteSaved){
+              historySaved=(await sbHist(id,data.createdBy||assignedSales||'ระบบ','📝 Note','📝 Note: '+initialNote))&&historySaved;
+            }
+          }
           const notificationSaved=isUnassignedSales(assignedSales)?true:await sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+')');
-          return{success:true,caseId:id,sales:assignedSales,unassigned:isUnassignedSales(assignedSales),historySaved,notificationSaved};
+          return{success:true,caseId:id,sales:assignedSales,unassigned:isUnassignedSales(assignedSales),historySaved,notificationSaved,noteSaved};
         }
         lastError=inserted;
         if(data.caseid||!isDuplicateError(inserted)){
@@ -1485,7 +1495,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   const lastMonthDate=new Date(today.getFullYear(),today.getMonth()-1,Math.min(today.getDate(),28));
   const defaultBackMonth=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}`;
   const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
-  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',report:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||'ปกติ',clipad:''});
+  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',note:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||'ปกติ',clipad:''});
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
   const [duplicates,setDuplicates]=useState([]);
   const [duplicateConfirmed,setDuplicateConfirmed]=useState(false);
@@ -1507,6 +1517,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
     }
     const submitData={...form};
     submitData.createdBy=currentUser.name;
+    submitData.report='';
     if(forcedSent) submitData.sent=forcedSent;
     // เก็บ clipad ใน attachment field โดย prefix [CLIP:...]
     if(submitData.clipad){submitData.attachment='[CLIP:'+submitData.clipad+']';}
@@ -1529,12 +1540,15 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
         hasContact:!!submitData.contact,
         contact_by:submitData.contact_by||'',
         status:submitData.status||'รอข้อมูล',
-        sales:r.sales||submitData.sales||UNASSIGNED_SALES
+        sales:r.sales||submitData.sales||UNASSIGNED_SALES,
+        note:submitData.note||''
       });
     }
     setLoading(false);
     if(r.success){
-      if(backdated){
+      if(r.noteSaved===false){
+        showToast('เพิ่มเคสสำเร็จ แต่บันทึกหมายเหตุไม่สำเร็จ กรุณาเปิดเคสแล้วเพิ่ม Note อีกครั้ง','warn',6000);
+      }else if(backdated){
         showToast('เพิ่มเคสย้อนหลังสำเร็จ','ok');
       }else if(lineResult?.skipped){
         showToast('เพิ่มเคสสำเร็จ • ปิดแจ้งเตือน LINE อยู่','ok');
@@ -1566,7 +1580,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
         <label style={{display:'flex',alignItems:'center',gap:6,color:'var(--yellow)',marginBottom:6}}>🎬 ข้อมูลคลิปแอด <span style={{fontSize:11,fontWeight:400,color:'var(--text3)'}}>เห็นเฉพาะ Admin</span></label>
         <input value={form.clipad} onChange={e=>set('clipad',e.target.value)} placeholder="ชื่อแอด / แคมเปญ / คลิป URL..."/>
       </div>}
-      <div className="form-group" style={{gridColumn:'1/-1'}}><label>รีพอร์ต</label><textarea rows={4} value={form.report} onChange={e=>set('report',e.target.value)} placeholder="ข้อมูลลูกค้า..."/></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label>หมายเหตุ</label><textarea rows={3} value={form.note} onChange={e=>set('note',e.target.value)} placeholder="เช่น ลูกค้าสะดวกคุยช่วงเย็น / สนใจรุ่นไหน / ข้อมูลที่ควรรู้ก่อนติดต่อ"/></div>
       {duplicates.length>0&&<div style={{gridColumn:'1/-1',background:'rgba(210,153,34,.10)',border:'1px solid rgba(210,153,34,.45)',borderRadius:10,padding:'12px'}}>
         <div style={{fontWeight:800,color:'var(--yellow)',marginBottom:6}}>⚠️ พบข้อมูลที่อาจซ้ำ {duplicates.length} รายการ</div>
         {duplicates.map(c=><div key={c.caseid} style={{fontSize:12,color:'var(--text2)',marginBottom:4}}>{c.caseid} · {c.customername} · {displayContact(c.contact)}</div>)}
