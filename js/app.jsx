@@ -1303,7 +1303,9 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const [status,setStatus]=useState(caseData.status||caseData.newstatus||'รอข้อมูล');
   const [sentType,setSentType]=useState(caseData.sent||'ปกติ');
   const [report,setReport]=useState(caseData.report||'');
-  const [editReport,setEditReport]=useState(false);
+  const [customerName,setCustomerName]=useState(caseData.customername||caseData.name||'');
+  const [contact,setContact]=useState(caseData.contact||'');
+  const [editAll,setEditAll]=useState(false);
   const [showHistory,setShowHistory]=useState(false);
   const [newSales,setNewSales]=useState(caseData.sales||caseData.sale||'');
   const [nextAction,setNextAction]=useState(caseData.next_action||'');
@@ -1367,18 +1369,18 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     else{setNotes(n=>n.filter(x=>x.id!==temp.id));showToast('บันทึก Note ไม่สำเร็จ: '+(r.error||''),'err');}
   }
   async function deleteNote(i){const before=notes;const n=before[i];setNotes(before.filter((_,idx)=>idx!==i));if(n?.id&&!String(n.id).startsWith('tmp_')){const r=await api('deleteCaseNote',{id:n.id,sales:currentUser.name});if(!r.success){setNotes(before);showToast('ลบ Note ไม่สำเร็จ: '+(r.error||''),'err');}}}
-  const contactRaw=caseData.contact||'';
+  const contactRaw=contact||'';
   const contactVal=formatContact(contactRaw);
   const isQR=contactRaw.startsWith('http')||contactRaw.startsWith('data:image');
   async function save(){
     if(saving)return;
     setSaving(true);
-    const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report:editReport?report:caseData.report,sales:(isAdmin&&newSales)?newSales:caseData.sales};
+    const optimisticData=isClaimed?{...caseData,newstatus:status}:{...caseData,status,report,customername:customerName,contact,sales:(isAdmin&&newSales)?newSales:caseData.sales};
     let r;
     if(isClaimed){
       r=await api('updateClaimed',{caseId,newstatus:status,Notes:'',sales:currentUser.name});
     }else{
-      const upd={caseid:caseId,status,sent:sentType,report,next_action:nextAction,next_action_at:nextActionAt||null,expectedVersion:Number(caseData.version)||1,changedBy:currentUser.name,detail:'บันทึกสถานะและแผนติดตาม'};
+      const upd={caseid:caseId,status,sent:sentType,report,customername:customerName,contact,next_action:nextAction,next_action_at:nextActionAt||null,expectedVersion:Number(caseData.version)||1,changedBy:currentUser.name,detail:'แก้ไขข้อมูลเคส'};
       r=await api('updateCase',upd);
       if(r.success&&isAdmin&&newSales&&newSales!==caseData.sales)r=await api('adminChangeSales',{caseId,newSales,changedBy:currentUser.name});
     }
@@ -1388,7 +1390,6 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
     showToast('บันทึกข้อมูลแล้ว','ok',2200);
     onClose();
   }
-  async function saveReport(){if(!report.trim()||saving)return;setSaving(true);const r=await api('updateCase',{caseid:caseId,report,expectedVersion:Number(caseData.version)||1,changedBy:currentUser.name,detail:'แก้ไขรีพอร์ต'});setSaving(false);if(!r.success){showToast('บันทึกรีพอร์ตไม่สำเร็จ: '+(r.error||'กรุณาลองใหม่'),'err',5000);return;}setEditReport(false);onUpdated({...caseData,report,version:(Number(caseData.version)||1)+1});showToast('บันทึกรีพอร์ตแล้ว','ok',2200);}
   async function doDelete(){if(saving)return;setSaving(true);const r=await api('deleteCase',{caseId,caseid:caseId,deletedBy:currentUser.name});setSaving(false);if(r.success){cacheClear(['getCases','getTrashCases','getDashboard','getHistory','getNotifications']);onUpdated();onClose();showToast('ย้ายเคสไปถังขยะแล้ว','ok');}else{showToast('เกิดข้อผิดพลาด: '+(r.error||'ไม่สามารถลบได้'),'err');}}
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
@@ -1398,8 +1399,8 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
         <div style={{padding:'16px 20px',overflowY:'auto',maxHeight:'calc(100vh - 320px)'}}>
           <div style={{marginBottom:14,display:'grid',gap:9}}>
             <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>รหัสเคส: </span><span style={{fontWeight:700,color:'var(--blue)'}}>{caseId}</span><button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseId)}>คัดลอก</button></div>
-            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ชื่อเฟส: </span><span style={{fontWeight:600}}>{caseData.customername||caseData.name||'-'}</span>{(caseData.customername||caseData.name)&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseData.customername||caseData.name||'')}>คัดลอก</button>}</div>
-            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ติดต่อ: </span>{isQR?<div style={{marginTop:6,width:'100%'}}><img src={contactRaw} alt="QR" style={{maxWidth:'100%',maxHeight:220,borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',display:'block'}} onError={e=>{e.target.style.display='none';}}/></div>:isMarketLocked?<div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(188,140,255,.08)',border:'1px solid rgba(188,140,255,.3)',borderRadius:8,padding:'6px 12px'}}><span style={{fontSize:13,color:'var(--purple)',fontWeight:600}}>🏪 เคสอยู่ในตลาด — ไม่สามารถดูข้อมูลติดต่อได้</span></div>:<><span style={{fontWeight:600}}>{contactVal||'-'}</span>{contactVal&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(contactVal)}>คัดลอก</button>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`tel:${contactVal}`} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`https://line.me/ti/p/~${contactVal}`} target="_blank" rel="noopener" className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none'}}>💬 Line</a>}</>}</div>
+            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ชื่อเฟส: </span>{editAll?<input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="ชื่อลูกค้า" style={{flex:1,minWidth:180}}/>:<><span style={{fontWeight:600}}>{customerName||'-'}</span>{customerName&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(customerName)}>คัดลอก</button>}</>}</div>
+            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ติดต่อ: </span>{editAll?(isQR?<div style={{width:'100%',marginTop:6}}><QrUploader value={contact} onChange={setContact} caseId={caseId}/></div>:<input value={contact} onChange={e=>setContact(e.target.value)} placeholder="เบอร์ / ไลน์ / ID" style={{flex:1,minWidth:180}}/>):isQR?<div style={{marginTop:6,width:'100%'}}><img src={contactRaw} alt="QR" style={{maxWidth:'100%',maxHeight:220,borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',display:'block'}} onError={e=>{e.target.style.display='none';}}/></div>:isMarketLocked?<div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(188,140,255,.08)',border:'1px solid rgba(188,140,255,.3)',borderRadius:8,padding:'6px 12px'}}><span style={{fontSize:13,color:'var(--purple)',fontWeight:600}}>🏪 เคสอยู่ในตลาด — ไม่สามารถดูข้อมูลติดต่อได้</span></div>:<><span style={{fontWeight:600}}>{contactVal||'-'}</span>{contactVal&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(contactVal)}>คัดลอก</button>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`tel:${contactVal}`} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`https://line.me/ti/p/~${contactVal}`} target="_blank" rel="noopener" className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none'}}>💬 Line</a>}</>}</div>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10}}>
             <div className="form-group"><label>สถานะ:</label><select value={status} onChange={e=>setStatus(e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
@@ -1423,7 +1424,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
             <div style={{fontSize:12,color:'var(--blue)',fontWeight:600}}>💡 {getCaseSuggestion({...caseData,status})}</div>
             {getCaseAlert({...caseData,status})&&<div style={{fontSize:11,fontWeight:700,color:getCaseAlert({...caseData,status}).color,marginTop:4}}>{getCaseAlert({...caseData,status}).msg}</div>}
           </div>}
-          <div className="form-group"><label>รีพอร์ต:</label>{editReport?<><TemplateSelector value={report} onChange={v=>setReport(v)}/><textarea rows={4} value={report} onChange={e=>setReport(e.target.value)} style={{color:'var(--text)'}}/></>:<div style={{background:'var(--bg3)',padding:'8px 12px',borderRadius:6,fontSize:13,minHeight:56,whiteSpace:'pre-wrap',color:'var(--text2)',lineHeight:1.6}}>{report||'ไม่มีรีพอร์ต'}</div>}</div>
+          <div className="form-group"><label>รีพอร์ต:</label>{editAll?<><TemplateSelector value={report} onChange={v=>setReport(v)}/><textarea rows={4} value={report} onChange={e=>setReport(e.target.value)} style={{color:'var(--text)'}}/></>:<div style={{background:'var(--bg3)',padding:'8px 12px',borderRadius:6,fontSize:13,minHeight:56,whiteSpace:'pre-wrap',color:'var(--text2)',lineHeight:1.6}}>{report||'ไม่มีรีพอร์ต'}</div>}</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
             <div className="form-group"><label>ขั้นตอนถัดไป</label><input value={nextAction} onChange={e=>setNextAction(e.target.value)} placeholder="เช่น โทรขอเอกสาร"/></div>
             <div className="form-group"><label>กำหนดติดตาม</label><input type="datetime-local" value={nextActionAt} onChange={e=>setNextActionAt(e.target.value)}/></div>
@@ -1464,7 +1465,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
               <div style={{fontSize:12,color:'var(--text2)'}}>ไม่สามารถแก้ไขหรือติดต่อลูกค้าได้</div>
             </div>:
             <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              {!isClaimed&&<button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={editReport?saveReport:()=>setEditReport(true)} disabled={saving}>✏️ {saving&&editReport?'กำลังบันทึก...':editReport?'บันทึกรีพอร์ต':'แก้ไขรีพอร์ต'}</button>}
+              {!isClaimed&&<button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||caseData.name||'');setContact(caseData.contact||'');setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>}
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
               {!isClaimed&&<button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>}
             </div>}
