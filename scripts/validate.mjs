@@ -55,14 +55,29 @@ if(!bookingSection.includes('bookingId:booking.bookingId'))fail('หน้าก
 if(!source.includes("กรุณากรอกรหัสเคส ชื่อลูกค้า และเลือกเซลส์"))fail('การจองยังไม่บังคับเลือกเซลส์ผู้รับผิดชอบ');
 const adminApp=source.slice(source.indexOf('function AdminApp'),source.indexOf('function SalesFollowups'));
 const salesApp=source.slice(source.indexOf('function SalesApp'),source.indexOf('function App'));
-if(adminApp.includes("key:'market'")||adminApp.includes('market:<AdminMarket'))fail('เมนูแอดมินยังเปิดตลาดเคสได้');
-if(salesApp.includes("key:'market'")||salesApp.includes("key:'claimed'")||salesApp.includes('market:<SalesMarket')||salesApp.includes('claimed:<SalesClaimedCases'))fail('เมนูเซลส์ยังเปิดตลาดเคสหรือรับตลาดได้');
 if(source.includes('autoSendStaleCasesToMarket('))fail('ยังมีระบบย้ายเคสเข้าตลาดอัตโนมัติ');
 if(!source.includes("const UNASSIGNED_SALES = 'รอมอบหมาย'"))fail('ยังไม่มีสถานะคิวรอมอบหมาย');
-if(!source.includes('retiredMarketActions')||!source.includes('ตลาดเคสถูกยกเลิกแล้ว'))fail('ยังปิด endpoint เก่าของตลาดเคสไม่ครบ');
+for(const deadMarketCode of [
+  "function AdminMarket",
+  "function SalesMarket",
+  "function SalesClaimedCases",
+  "case 'getMarket'",
+  "case 'sendToMarket'",
+  "case 'getMarketIds'",
+  "case 'closeMarketCase'",
+  "case 'claimCase'",
+  "case 'getClaimedCases'",
+  "case 'updateClaimed'",
+  "case 'returnCase'",
+  "case 'getSmartAssign'",
+  'getSmartAssignSales',
+  'retiredMarketActions'
+]){
+  if(source.includes(deadMarketCode))fail('ยังมีโค้ดตลาดเคสที่ยกเลิกแล้ว: '+deadMarketCode);
+}
 if(!source.includes("case 'bulkAssignCases'"))fail('ยังไม่มีการมอบหมายเคสแบบหลายรายการ');
 if(adminApp.includes("key:'assignment'")||adminApp.includes('assignment:<AdminCurrentCases'))fail('เมนูคิวรอมอบหมายยังไม่ถูกถอดออก');
-const searchSection=source.slice(source.indexOf("case 'searchCases'"),source.indexOf("case 'getMarket'"));
+const searchSection=source.slice(source.indexOf("case 'searchCases'"),source.indexOf("case 'getBookings'"));
 if(!searchSection.includes("deleted_at:'is.null'"))fail('การค้นหาเคสยังไม่ตัดรายการในถังขยะ');
 if(!searchSection.includes("query.sales=`eq.${sales}`")||!source.includes("api('searchCases',{q:term,sales:currentUser.name})"))fail('การค้นหาของเซลส์ยังไม่จำกัดข้อมูลที่ฝั่งฐานข้อมูล');
 if(!source.includes("const _searchCasesCache=new Map()")||!source.includes('clearSearchCasesCache()'))fail('search cache ยังไม่แยก scope หรือไม่ถูกล้างหลังแก้ข้อมูล');
@@ -70,8 +85,14 @@ if(source.includes("localStorage.getItem('cases')")||source.includes("localStora
 if(source.includes("localStorage.getItem('cnotes_")||source.includes("localStorage.getItem(FU_KEY"))fail('Note/Follow-up ยังอ่าน fallback เก่าจาก localStorage');
 if(source.includes("localStorage.getItem('cp_seen_notifs')")||source.includes("localStorage.getItem('cp_pn_dismissed')"))fail('notification cache ยังใช้ key ร่วมกันทุกบัญชี');
 if(/\bFCM_EDGE_URL\b|\bpushNotif\s*\(/.test(source))fail('ยังมีการเรียก Edge Function แจ้งเตือนที่ไม่ได้ใช้งาน');
-const broadcastSection=source.slice(source.indexOf("case 'broadcast'"),source.indexOf("case 'uploadImage'"));
+const broadcastSection=source.slice(source.indexOf("case 'broadcast'"),source.indexOf('default:return'));
 if(broadcastSection.includes('sbNotif('))fail('Broadcast ยังบันทึก notification ซ้ำ');
+for(const deadNoop of ["case 'uploadImage'","case 'deleteImage'","case 'checkInactive'"]){
+  if(source.includes(deadNoop))fail('ยังมี API no-op ที่ไม่ได้ใช้งาน: '+deadNoop);
+}
+for(const deadAiCode of ['function AdminAIPage','function AIAdvisorPage','function ApiKeyManager','/api/disabled-ai','getAnthropicKey','saveAnthropicKey']){
+  if(source.includes(deadAiCode))fail('ยังมี AI feature ที่ถูกถอดแล้ว: '+deadAiCode);
+}
 if(!source.includes("case 'checkCaseDuplicates'"))fail('ยังไม่มีตัวตรวจเคสซ้ำ');
 if(!source.includes('expectedVersion'))fail('ยังไม่มี optimistic concurrency');
 if(!source.includes("case 'getTrashCases'")||!source.includes('function AdminTrash'))fail('ยังไม่มีถังขยะและการกู้คืน');
