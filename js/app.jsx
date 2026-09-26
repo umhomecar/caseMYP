@@ -166,16 +166,16 @@ function getCaseSearchScore(c,q){
   if(!term)return 0;
   const loose=normalizeLoose(q);
   const digits=normalizeDigits(q);
-  const caseid=normalizeSearchText(c.caseid||c.caseID||c.ID||'');
-  const caseidLoose=normalizeLoose(c.caseid||c.caseID||c.ID||'');
-  const name=normalizeSearchText(c.customername||c.name||c.customer||'');
-  const nameLoose=normalizeLoose(c.customername||c.name||c.customer||'');
+  const caseid=normalizeSearchText(c.caseid||'');
+  const caseidLoose=normalizeLoose(c.caseid||'');
+  const name=normalizeSearchText(c.customername||'');
+  const nameLoose=normalizeLoose(c.customername||'');
   const contact=normalizeSearchText(c.contact||'');
   const contactDigits=normalizeDigits(c.contact||'');
-  const report=normalizeSearchText(c.report||c.Notes||c.notes||'');
-  const status=normalizeSearchText(c.status||c.newstatus||'');
-  const sales=normalizeSearchText(c.sales||c.sale||c.old_sales||c.fromsales||'');
-  const created=normalizeSearchText(c.createdat||c.date||c.AssignedAt||'');
+  const report=normalizeSearchText(c.report||'');
+  const status=normalizeSearchText(c.status||'');
+  const sales=normalizeSearchText(c.sales||'');
+  const created=normalizeSearchText(c.createdat||'');
   const sent=normalizeSearchText(c.sent||'');
   let score=0;
 
@@ -206,7 +206,7 @@ function localCaseSearch(rows,q,limit=500){
   return safeArray(rows)
     .map(c=>({c,score:getCaseSearchScore(c,q)}))
     .filter(x=>x.score>0)
-    .sort((a,b)=>b.score-a.score||String(b.c.caseid||b.c.caseID||b.c.ID||'').localeCompare(String(a.c.caseid||a.c.caseID||a.c.ID||'')))
+    .sort((a,b)=>b.score-a.score||String(b.c.caseid||'').localeCompare(String(a.c.caseid||'')))
     .slice(0,limit)
     .map(x=>x.c);
 }
@@ -878,9 +878,6 @@ function Confirm({msg,onOk,onCancel}){
   return <div className="overlay"><div className="modal" style={{maxWidth:340}} role="alertdialog" aria-modal="true" aria-label="ยืนยันการทำรายการ"><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}} aria-hidden="true">⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button type="button" className="btn btn-ghost" onClick={onCancel}>ยกเลิก</button><button type="button" className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
 }
 
-// ============================================================
-// ✅ API KEY MANAGER COMPONENT (ใช้ใน AdminAIPage และ AIAdvisorPage)
-// ============================================================
 function HistoryModal({caseId,onClose}){
   const [rows,setRows]=useState([]);const [loading,setLoading]=useState(true);
   useEffect(()=>{api('getHistory',{caseId}).then(r=>{if(r.success)setRows(r.data||[]);setLoading(false);});},[caseId]);
@@ -1071,15 +1068,15 @@ function AdminAnalytics({currentUser}){
   </div>;
 }
 
-function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=false}){
-  const [status,setStatus]=useState(caseData.status||caseData.newstatus||'รอข้อมูล');
+function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
+  const [status,setStatus]=useState(caseData.status||'รอข้อมูล');
   const [sentType,setSentType]=useState(caseData.sent||'ปกติ');
   const [report,setReport]=useState(caseData.report||'');
-  const [customerName,setCustomerName]=useState(caseData.customername||caseData.name||'');
+  const [customerName,setCustomerName]=useState(caseData.customername||'');
   const [contact,setContact]=useState(caseData.contact||'');
   const [editAll,setEditAll]=useState(false);
   const [showHistory,setShowHistory]=useState(false);
-  const [newSales,setNewSales]=useState(caseData.sales||caseData.sale||'');
+  const [newSales,setNewSales]=useState(caseData.sales||'');
   const [nextAction,setNextAction]=useState(caseData.next_action||'');
   const [nextActionAt,setNextActionAt]=useState(caseData.next_action_at?String(caseData.next_action_at).slice(0,16):'');
   const [notes,setNotes]=useState([]);
@@ -1091,7 +1088,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   const [saving,setSaving]=useState(false);
   const [auxLoadError,setAuxLoadError]=useState('');
   const isAdmin=currentUser.role==='Admin';
-  const caseId=caseData.caseid||caseData.caseID;
+  const caseId=caseData.caseid;
   const [showTransfer,setShowTransfer]=useState(false);
   const [transferTo,setTransferTo]=useState('');
   const [transferring,setTransferring]=useState(false);
@@ -1123,9 +1120,9 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
   useEffect(()=>{loadCaseNotesFollowups();},[caseId]);
   async function saveFollowup(){
     if(!followupDate)return;
-    const temp={id:'tmp_'+Date.now(),due_date:followupDate,date:followupDate,note:followupNote,status:'pending',caseid:caseId,customername:caseData.customername||caseData.name||'',sales:currentUser.name,createdat:nowTH(),createdDisplay:formatTextDateToTHBE(nowTH()),dueDisplay:formatYMDToTHBE(followupDate)};
+    const temp={id:'tmp_'+Date.now(),due_date:followupDate,date:followupDate,note:followupNote,status:'pending',caseid:caseId,customername:caseData.customername||'',sales:currentUser.name,createdat:nowTH(),createdDisplay:formatTextDateToTHBE(nowTH()),dueDisplay:formatYMDToTHBE(followupDate)};
     setFollowups(f=>[...f,temp]);setFollowupDate('');setFollowupNote('');
-    const r=await api('addCaseFollowup',{caseId,sales:currentUser.name,customername:caseData.customername||caseData.name||'',due_date:followupDate,note:followupNote});
+    const r=await api('addCaseFollowup',{caseId,sales:currentUser.name,customername:caseData.customername||'',due_date:followupDate,note:followupNote});
     if(r.success){setFollowups(f=>f.map(x=>x.id===temp.id?r.data:x));showToast('บันทึกนัดแล้ว','ok');}
     else{setFollowups(f=>f.filter(x=>x.id!==temp.id));showToast('บันทึกนัดไม่สำเร็จ: '+(r.error||''),'err');}
   }
@@ -1178,7 +1175,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
               </div>
             </div>
           </div>
-          <div className="form-group"><label>เซลส์:</label>{isAdmin?<select value={newSales} onChange={e=>setNewSales(e.target.value)}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>:<div style={{display:'flex',gap:8,alignItems:'center'}}><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:14,flex:1}}>{caseData.sales||caseData.sale||currentUser.name}</div>{currentUser.role==='Sales'&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px',whiteSpace:'nowrap',color:'var(--orange)'}} onClick={()=>setShowTransfer(v=>!v)}>↔ โอนเคส</button>}</div>}</div>
+          <div className="form-group"><label>เซลส์:</label>{isAdmin?<select value={newSales} onChange={e=>setNewSales(e.target.value)}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>:<div style={{display:'flex',gap:8,alignItems:'center'}}><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:14,flex:1}}>{caseData.sales||currentUser.name}</div>{currentUser.role==='Sales'&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px',whiteSpace:'nowrap',color:'var(--orange)'}} onClick={()=>setShowTransfer(v=>!v)}>↔ โอนเคส</button>}</div>}</div>
           {showTransfer&&!isAdmin&&<div style={{background:'rgba(255,166,87,.08)',border:'1px solid rgba(255,166,87,.3)',borderRadius:8,padding:'12px',marginTop:-8,marginBottom:8}}><div style={{fontWeight:600,fontSize:13,marginBottom:8,color:'var(--orange)'}}>↔ โอนเคสให้เพื่อน</div><div style={{display:'flex',gap:8}}><select value={transferTo} onChange={e=>setTransferTo(e.target.value)} style={{flex:1,fontSize:13}}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales'&&u.name!==currentUser.name).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" style={{fontSize:12,padding:'0 12px',whiteSpace:'nowrap',background:'var(--orange)'}} disabled={!transferTo||transferring} onClick={doTransfer}>{transferring?'กำลังโอน...':'โอนเลย'}</button></div></div>}
           {/* Case Intelligence */}
           {<div style={{background:'rgba(88,166,255,.07)',border:'1px solid rgba(88,166,255,.2)',borderRadius:8,padding:'10px 12px',marginBottom:12}}>
@@ -1226,11 +1223,11 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated,isInMarket=fals
         <div style={{padding:'10px 16px', borderTop:'1px solid var(--border)', paddingBottom:'max(20px, env(safe-area-inset-bottom))'}}>
           {
             <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              {<button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||caseData.name||'');setContact(caseData.contact||'');setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>}
+              <button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
-              {<button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>}
-            </div>}
-          {<button className="btn btn-primary" style={{width:'100%',justifyContent:'center',padding:'11px',fontSize:14,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}} onClick={save} disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกและปิด'}</button>}
+              <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>
+            </div>
+          <button className="btn btn-primary" style={{width:'100%',justifyContent:'center',padding:'11px',fontSize:14,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}} onClick={save} disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกและปิด'}</button>
           
         </div>
       </div>
@@ -2208,8 +2205,6 @@ function SalesCurrentCases({currentUser,users}){
     {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
   </div>;
 }
-
-// QR placeholder
 
 function SalesDashboard({currentUser}){
   const [data,setData]=useState(null);const [allCases,setAllCases]=useState([]);const [loading,setLoading]=useState(true);
