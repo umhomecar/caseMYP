@@ -1085,7 +1085,13 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   const [confirmAuxDelete,setConfirmAuxDelete]=useState(null);
   const [saving,setSaving]=useState(false);
   const [lineRetrying,setLineRetrying]=useState(false);
+  const [lineCooldownLeft,setLineCooldownLeft]=useState(0);
   const [auxLoadError,setAuxLoadError]=useState('');
+  useEffect(()=>{
+    if(lineCooldownLeft<=0)return;
+    const timer=setTimeout(()=>setLineCooldownLeft(v=>Math.max(0,v-1)),1000);
+    return()=>clearTimeout(timer);
+  },[lineCooldownLeft]);
   const isAdmin=currentUser.role==='Admin';
   const caseId=caseData.caseid;
   const [showTransfer,setShowTransfer]=useState(false);
@@ -1139,7 +1145,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   const contactVal=formatContact(contactRaw);
   const isQR=contactRaw.startsWith('http')||contactRaw.startsWith('data:image');
   async function retryLineNotification(){
-    if(lineRetrying)return;
+    if(lineRetrying||lineCooldownLeft>0)return;
     const raw=String(caseData.contact||'').trim();
     const digits=raw.replace(/\D/g,'');
     const contactBy=(raw.startsWith('http')||raw.startsWith('data:image'))?'QR Code':(/^\d{8,10}$/.test(digits)?'เบอร์':'ไลน์');
@@ -1160,6 +1166,12 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
     }
     if(result?.success){
       showToast('ส่ง LINE ใหม่สำเร็จแล้ว','ok',3000);
+      return;
+    }
+    if(result?.lineStatus===429){
+      const wait=Math.max(15,Number(result?.cooldownSeconds)||60);
+      setLineCooldownLeft(wait);
+      showToast((result?.error||'LINE จำกัดการส่งชั่วคราว')+' — กรุณาอย่ากดส่งซ้ำทันที','warn',8000);
       return;
     }
     const suffix=result?.lineStatus?' (LINE '+result.lineStatus+')':'';
@@ -1241,7 +1253,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
               <button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>
-              {isAdmin&&<button className="btn btn-ghost" style={{flexBasis:'100%',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:'1px solid rgba(6,199,85,.45)',color:'#06c755'}} onClick={retryLineNotification} disabled={lineRetrying||saving}>📨 {lineRetrying?'กำลังส่ง LINE...':'ส่ง LINE ใหม่'}</button>}
+              {isAdmin&&<button className="btn btn-ghost" style={{flexBasis:'100%',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:'1px solid rgba(6,199,85,.45)',color:lineCooldownLeft>0?'var(--text3)':'#06c755',opacity:lineCooldownLeft>0?.65:1}} onClick={retryLineNotification} disabled={lineRetrying||saving||lineCooldownLeft>0}>📨 {lineRetrying?'กำลังส่ง LINE...':lineCooldownLeft>0?`รอ ${lineCooldownLeft} วิ แล้วส่งใหม่`:'ส่ง LINE ใหม่'}</button>}
             </div>
           <button className="btn btn-primary" style={{width:'100%',justifyContent:'center',padding:'11px',fontSize:14,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}} onClick={save} disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกและปิด'}</button>
           
@@ -1329,6 +1341,8 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
         showToast('เพิ่มเคสสำเร็จ • ปิดแจ้งเตือน LINE อยู่','ok');
       }else if(lineResult?.success){
         showToast('เพิ่มเคสสำเร็จ • แจ้ง LINE แล้ว','ok');
+      }else if(lineResult?.lineStatus===429){
+        showToast('เพิ่มเคสสำเร็จ แต่ LINE ถูกจำกัดการส่งชั่วคราว • เคสยังบันทึกปกติ กรุณารอก่อนส่งใหม่','warn',7000);
       }else{
         showToast('เพิ่มเคสสำเร็จ แต่แจ้ง LINE ไม่สำเร็จ'+(lineResult?.error?' — '+lineResult.error:''),'warn',5000);
       }
