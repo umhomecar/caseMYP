@@ -47,7 +47,11 @@ async function diagnoseLineFailure(token,groupId){
 
 function friendlyLineError(status,detail,diagnostic={}){
   if(status===401)return 'LINE Channel Access Token ไม่ถูกต้องหรือหมดอายุ';
-  if(status===429)return 'LINE จำกัดการส่งชั่วคราวหรือโควตาการส่งเต็ม';
+  if(status===429){
+    const d=String(detail||'').toLowerCase();
+    if(d.includes('monthly limit')||d.includes('target limit'))return 'โควตาการส่ง LINE เดือนนี้เต็ม กรุณาตรวจแพ็กเกจหรือโควตาใน LINE Official Account';
+    return 'LINE จำกัดความถี่การส่งชั่วคราว กรุณารอสักครู่ก่อนส่งใหม่';
+  }
   if(status>=500)return 'ระบบ LINE ขัดข้องชั่วคราว กรุณาลองส่งใหม่อีกครั้ง';
   if(diagnostic.groupReachable===false){
     if(diagnostic.groupStatus===401)return 'LINE Channel Access Token ไม่ถูกต้องหรือหมดอายุ';
@@ -176,16 +180,35 @@ module.exports = async function handler(req,res){
     if(!lineRes.ok){
       const rawDetail=await lineRes.text().catch(()=>'');
       const detail=safeLineDetail(rawDetail);
+      const requestId=oneLine(lineRes.headers.get('x-line-request-id')||'');
+
+      // 429 ต้องหยุดทันที: LINE แนะนำไม่ให้ retry 4xx และไม่ควรยิง API วินิจฉัยซ้ำ
+      // เพราะจะเพิ่ม request ขณะ channel กำลังถูกจำกัดอยู่
+      if(lineRes.status===429){
+        const error=friendlyLineError(429,detail,{});
+        console.error('LINE push rate limited',429,detail,requestId);
+        return res.status(429).json({
+          success:false,
+          error,
+          lineStatus:429,
+          detail,
+          retryable:false,
+          cooldownSeconds:60,
+          lineRequestId:requestId
+        });
+      }
+
       const diagnostic=await diagnoseLineFailure(token,groupId);
       const error=friendlyLineError(lineRes.status,detail,diagnostic);
-      console.error('LINE push failed',lineRes.status,detail,diagnostic);
+      console.error('LINE push failed',lineRes.status,detail,diagnostic,requestId);
       return res.status(502).json({
         success:false,
         error,
         lineStatus:lineRes.status,
         detail,
         groupReachable:diagnostic.groupReachable,
-        groupStatus:diagnostic.groupStatus||null
+        groupStatus:diagnostic.groupStatus||null,
+        lineRequestId:requestId
       });
     }
     return res.status(200).json({success:true,imageIncluded:messages.length>1});
