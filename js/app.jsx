@@ -274,7 +274,7 @@ async function notifyLineCaseCreated(payload){
     let data={};
     try{data=await response.json();}catch(e){}
     if(!response.ok||!data.success){
-      return{success:false,error:data.error||('HTTP '+response.status)};
+      return{...data,success:false,error:data.error||('HTTP '+response.status)};
     }
     return{...data,success:true};
   }catch(e){
@@ -1084,6 +1084,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   const [confirmDel,setConfirmDel]=useState(false);
   const [confirmAuxDelete,setConfirmAuxDelete]=useState(null);
   const [saving,setSaving]=useState(false);
+  const [lineRetrying,setLineRetrying]=useState(false);
   const [auxLoadError,setAuxLoadError]=useState('');
   const isAdmin=currentUser.role==='Admin';
   const caseId=caseData.caseid;
@@ -1137,6 +1138,33 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   const contactRaw=contact||'';
   const contactVal=formatContact(contactRaw);
   const isQR=contactRaw.startsWith('http')||contactRaw.startsWith('data:image');
+  async function retryLineNotification(){
+    if(lineRetrying)return;
+    const raw=String(caseData.contact||'').trim();
+    const digits=raw.replace(/\D/g,'');
+    const contactBy=(raw.startsWith('http')||raw.startsWith('data:image'))?'QR Code':(/^\d{8,10}$/.test(digits)?'เบอร์':'ไลน์');
+    setLineRetrying(true);
+    const result=await notifyLineCaseCreated({
+      caseId,
+      customername:caseData.customername||'-',
+      contact:contactBy==='QR Code'?'':raw,
+      hasContact:!!raw,
+      contact_by:contactBy,
+      status:caseData.status||'รอข้อมูล',
+      sales:caseData.sales||UNASSIGNED_SALES
+    });
+    setLineRetrying(false);
+    if(result?.skipped){
+      showToast('ยังไม่ได้ส่ง LINE เพราะระบบแจ้งเตือน LINE ถูกปิดอยู่','warn',5000);
+      return;
+    }
+    if(result?.success){
+      showToast('ส่ง LINE ใหม่สำเร็จแล้ว','ok',3000);
+      return;
+    }
+    const suffix=result?.lineStatus?' (LINE '+result.lineStatus+')':'';
+    showToast('ส่ง LINE ใหม่ไม่สำเร็จ'+suffix+' — '+(result?.error||'กรุณาลองใหม่'),'err',8000);
+  }
   async function save(){
     if(saving)return;
     setSaving(true);
@@ -1213,6 +1241,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
               <button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>
+              {isAdmin&&<button className="btn btn-ghost" style={{flexBasis:'100%',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:'1px solid rgba(6,199,85,.45)',color:'#06c755'}} onClick={retryLineNotification} disabled={lineRetrying||saving}>📨 {lineRetrying?'กำลังส่ง LINE...':'ส่ง LINE ใหม่'}</button>}
             </div>
           <button className="btn btn-primary" style={{width:'100%',justifyContent:'center',padding:'11px',fontSize:14,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}} onClick={save} disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกและปิด'}</button>
           
