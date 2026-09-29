@@ -12,6 +12,54 @@ function contactLabel(contactBy){
   return 'ข้อมูลติดต่อ';
 }
 
+function safeLineDetail(raw){
+  const text=String(raw||'').trim();
+  if(!text)return '';
+  try{
+    const parsed=JSON.parse(text);
+    const parts=[];
+    if(parsed?.message)parts.push(oneLine(parsed.message));
+    if(Array.isArray(parsed?.details)){
+      parsed.details.slice(0,3).forEach(d=>{
+        const msg=oneLine(d?.message||'');
+        const prop=oneLine(d?.property||'');
+        if(msg)parts.push((prop?prop+': ':'')+msg);
+      });
+    }
+    return parts.join(' · ').slice(0,400);
+  }catch(e){
+    return oneLine(text).slice(0,400);
+  }
+}
+
+async function diagnoseLineFailure(token,groupId){
+  try{
+    const response=await fetch('https://api.line.me/v2/bot/group/'+encodeURIComponent(groupId)+'/summary',{
+      headers:{Authorization:'Bearer '+token}
+    });
+    if(response.ok)return{groupReachable:true};
+    const raw=await response.text().catch(()=>'');
+    return{groupReachable:false,groupStatus:response.status,groupDetail:safeLineDetail(raw)};
+  }catch(error){
+    return{groupReachable:null,groupError:oneLine(error?.message||error)};
+  }
+}
+
+function friendlyLineError(status,detail,diagnostic={}){
+  if(status===401)return 'LINE Channel Access Token ไม่ถูกต้องหรือหมดอายุ';
+  if(status===429)return 'LINE จำกัดการส่งชั่วคราวหรือโควตาการส่งเต็ม';
+  if(status>=500)return 'ระบบ LINE ขัดข้องชั่วคราว กรุณาลองส่งใหม่อีกครั้ง';
+  if(diagnostic.groupReachable===false){
+    if(diagnostic.groupStatus===401)return 'LINE Channel Access Token ไม่ถูกต้องหรือหมดอายุ';
+    if(diagnostic.groupStatus===404)return 'ไม่พบกลุ่ม LINE หรือบอทไม่ได้อยู่ในกลุ่มที่ตั้งค่าไว้';
+    if(diagnostic.groupStatus===403)return 'บอทไม่มีสิทธิ์เข้าถึงกลุ่ม LINE ที่ตั้งค่าไว้';
+  }
+  if(status===403)return 'LINE ไม่อนุญาตให้บอทส่งข้อความไปยังปลายทางนี้';
+  if(status===404)return 'ไม่พบปลายทาง LINE ที่ตั้งค่าไว้';
+  if(status===400)return detail?'LINE ปฏิเสธข้อมูลที่ส่ง: '+detail:'LINE ปฏิเสธข้อมูลที่ส่ง กรุณาตรวจ Group ID และข้อมูลข้อความ';
+  return detail?'LINE ส่งข้อความไม่สำเร็จ: '+detail:'LINE ส่งข้อความไม่สำเร็จ (HTTP '+status+')';
+}
+
 function qrSignature(caseId,token){
   return crypto.createHmac('sha256',token)
     .update('case-myp-line-qr:'+caseId)
@@ -126,13 +174,23 @@ module.exports = async function handler(req,res){
     });
 
     if(!lineRes.ok){
-      const detail=await lineRes.text().catch(()=>'');
-      console.error('LINE push failed',lineRes.status,detail);
-      return res.status(502).json({success:false,error:'LINE push failed',status:lineRes.status});
+      const rawDetail=await lineRes.text().catch(()=>'');
+      const detail=safeLineDetail(rawDetail);
+      const diagnostic=await diagnoseLineFailure(token,groupId);
+      const error=friendlyLineError(lineRes.status,detail,diagnostic);
+      console.error('LINE push failed',lineRes.status,detail,diagnostic);
+      return res.status(502).json({
+        success:false,
+        error,
+        lineStatus:lineRes.status,
+        detail,
+        groupReachable:diagnostic.groupReachable,
+        groupStatus:diagnostic.groupStatus||null
+      });
     }
     return res.status(200).json({success:true,imageIncluded:messages.length>1});
   }catch(error){
     console.error('LINE push error',error?.message||error);
-    return res.status(502).json({success:false,error:'LINE push request failed'});
+    return res.status(502).json({success:false,error:'เชื่อมต่อ LINE API ไม่สำเร็จ กรุณาลองใหม่',detail:oneLine(error?.message||error)});
   }
 };
