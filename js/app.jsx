@@ -127,6 +127,7 @@ const CONTACT_BY = ['เบอร์','ไลน์','QR Code','เบอร์&
 const UNASSIGNED_SALES = 'รอมอบหมาย';
 const LINE_SETTING_MONTH='__system__';
 const LINE_SETTING_SALES='__line_notifications__';
+const LINE_SENDERS=['เกมส์','อาท'];
 const CLOSED_STATUSES = ['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
 function isUnassignedSales(value){return !String(value||'').trim()||String(value).trim()===UNASSIGNED_SALES;}
 const CAR_MODELS = {Honda:['Civic FC','Civic FK','Civic FE','City','Jazz','HR-V','CR-V','Accord','Mobilio'],Toyota:['Yaris','Vios','Altis','Revo','VIGO','Fortuner','Cross','C-HR','Camry','Veloz','Alphard','Sienta','Avanza','Prius','Innova'],Isuzu:['D-Max','MU-X','MU-7','X-Series'],Mazda:['2','3','CX-3','CX-30','BT-50'],MG:['3','5','ZS'],Nissan:['Navara','Almera','Note','March','Sylphy','Teana','Juke'],Mitsubishi:['Triton','Mirage','Attrage','Xpander','Pajero'],Suzuki:['Swift','Ciaz','Carry']};
@@ -528,7 +529,9 @@ async function sbApi(action,data){
         const id=data.caseid||await genCaseId(attempt,data.casePrefix||'');
         const inserted=await sbQ('POST','cases',{},{...baseRow,caseid:id});
         if(!isSbError(inserted)){
-          let historySaved=await sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales));
+          const lineSender=LINE_SENDERS.includes(String(data.lineSender||'').trim())?String(data.lineSender).trim():'';
+          const lineSenderDetail=lineSender?' | ผู้ส่ง LINE: '+lineSender:'';
+          let historySaved=await sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales)+lineSenderDetail);
           let noteSaved=true;
           const initialNote=String(data.note||'').trim();
           if(initialNote){
@@ -1165,7 +1168,11 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
       return;
     }
     if(result?.success){
-      showToast('ส่ง LINE ใหม่สำเร็จแล้ว','ok',3000);
+      showToast('ส่ง LINE ใหม่สำเร็จแล้ว'+(result?.recipientName?' → '+result.recipientName:''),'ok',3000);
+      return;
+    }
+    if(result?.recipientMissing){
+      showToast(result?.error||'ยังไม่ได้ลงทะเบียนปลายทาง LINE','warn',6500);
       return;
     }
     if(result?.lineStatus===429){
@@ -1283,6 +1290,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   const defaultBackMonth=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}`;
   const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
   const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',note:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||'ปกติ',clipad:''});
+  const [lineSender,setLineSender]=useState(()=>LINE_SENDERS.includes(currentUser?.name)?currentUser.name:'เกมส์');
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
   const [duplicates,setDuplicates]=useState([]);
   const [duplicateConfirmed,setDuplicateConfirmed]=useState(false);
@@ -1304,6 +1312,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
     }
     const submitData={...form};
     submitData.createdBy=currentUser.name;
+    submitData.lineSender=lineSender;
     submitData.report='';
     if(forcedSent) submitData.sent=forcedSent;
     // เก็บ clipad ใน attachment field โดย prefix [CLIP:...]
@@ -1328,7 +1337,8 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
         contact_by:submitData.contact_by||'',
         status:submitData.status||'รอข้อมูล',
         sales:r.sales||submitData.sales||UNASSIGNED_SALES,
-        note:submitData.note||''
+        note:submitData.note||'',
+        sender:lineSender
       });
     }
     setLoading(false);
@@ -1340,7 +1350,9 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       }else if(lineResult?.skipped){
         showToast('เพิ่มเคสสำเร็จ • ปิดแจ้งเตือน LINE อยู่','ok');
       }else if(lineResult?.success){
-        showToast('เพิ่มเคสสำเร็จ • แจ้ง LINE แล้ว','ok');
+        showToast('เพิ่มเคสสำเร็จ • แจ้ง LINE '+(lineResult.recipientName||lineSender)+' แล้ว','ok');
+      }else if(lineResult?.recipientMissing){
+        showToast('เพิ่มเคสสำเร็จ แต่ '+(lineResult.error||'ยังไม่ได้ลงทะเบียนปลายทาง LINE'),'warn',6500);
       }else if(lineResult?.lineStatus===429){
         showToast('เพิ่มเคสสำเร็จ แต่ LINE ถูกจำกัดการส่งชั่วคราว • เคสยังบันทึกปกติ กรุณารอก่อนส่งใหม่','warn',7000);
       }else{
@@ -1352,6 +1364,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   return <Modal title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label>ผู้ส่งเคสเข้า LINE</label><select value={lineSender} onChange={e=>setLineSender(e.target.value)}>{LINE_SENDERS.map(name=><option key={name} value={name}>{name}</option>)}</select><div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>ระบบจะส่งแจ้งเตือนเคสนี้เข้า LINE ส่วนตัวของผู้ส่งที่ลงทะเบียนกับ Um-Bot</div></div>
       {backdated&&<div style={{gridColumn:'1/-1',background:'linear-gradient(135deg,rgba(88,166,255,.10),rgba(188,140,255,.08))',border:'1px solid rgba(88,166,255,.25)',borderRadius:12,padding:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
         <div style={{gridColumn:'1/-1',fontSize:13,fontWeight:800,color:'var(--blue)'}}>🕒 โหมดเพิ่มเคสย้อนหลัง</div>
         <div className="form-group" style={{marginBottom:0}}><label>เดือนของรหัสเคส</label><input type="month" value={backMonth} onChange={e=>{setBackMonth(e.target.value);if(e.target.value){const day=String(backDate||'').split('-')[2]||'01';setBackDate(e.target.value+'-'+day);}}}/></div>
