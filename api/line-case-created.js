@@ -1,5 +1,7 @@
 const crypto=require('node:crypto');
 
+const DIRECT_LINE_SENDERS=new Set(['เกมส์','อาท']);
+
 function oneLine(value){
   return String(value ?? '').replace(/[\r\n\t]+/g,' ').replace(/\s{2,}/g,' ').trim();
 }
@@ -32,7 +34,90 @@ function safeLineDetail(raw){
   }
 }
 
-async function diagnoseLineFailure(token,groupId){
+function getSupabaseConfig(){
+  return{
+    url:String(process.env.CASEMYP_SUPABASE_URL||'').trim().replace(/\/$/,''),
+    key:String(process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim()
+  };
+}
+
+async function supabaseRows(table,params){
+  const {url,key}=getSupabaseConfig();
+  if(!url||!key)throw new Error('CASEMYP Supabase is not configured');
+  const endpoint=new URL(url+'/rest/v1/'+table);
+  Object.entries(params||{}).forEach(([k,v])=>endpoint.searchParams.set(k,String(v)));
+  const response=await fetch(endpoint,{
+    headers:{apikey:key,Authorization:'Bearer '+key,Accept:'application/json'}
+  });
+  if(!response.ok){
+    const detail=oneLine(await response.text().catch(()=>''));
+    throw new Error('Supabase '+table+' lookup failed: '+response.status+(detail?' '+detail:''));
+  }
+  const rows=await response.json();
+  return Array.isArray(rows)?rows:[];
+}
+
+async function getRegisteredLineUserId(senderName){
+  const rows=await supabaseRows('users',{
+    select:'userid,name,status,line_user_id',
+    name:'eq.'+senderName,
+    status:'eq.active',
+    limit:'1'
+  });
+  const lineUserId=oneLine(rows[0]?.line_user_id);
+  return /^U[0-9a-f]{32}$/i.test(lineUserId)?lineUserId:'';
+}
+
+async function inferLineSender(caseId){
+  if(!caseId)return '';
+  try{
+    const rows=await supabaseRows('history',{
+      select:'sales,detail,action,id',
+      caseid:'eq.'+caseId,
+      action:'eq.เพิ่มเคส',
+      order:'id.asc',
+      limit:'1'
+    });
+    const row=rows[0];
+    if(!row)return '';
+    const detail=oneLine(row.detail);
+    const match=detail.match(/ผู้ส่ง LINE:\s*(เกมส์|อาท)/u);
+    if(match&&DIRECT_LINE_SENDERS.has(match[1]))return match[1];
+    const creator=oneLine(row.sales);
+    return DIRECT_LINE_SENDERS.has(creator)?creator:'';
+  }catch(error){
+    console.error('LINE sender inference failed',caseId,error?.message||error);
+    return '';
+  }
+}
+
+async function resolveLineTarget(senderName,caseId,legacyGroupId){
+  let sender=oneLine(senderName);
+  if(!sender)sender=await inferLineSender(caseId);
+
+  if(sender){
+    if(!DIRECT_LINE_SENDERS.has(sender)){
+      return{error:'ผู้ส่ง LINE ไม่ถูกต้อง',recipientMissing:true,recipientName:sender};
+    }
+    const userId=await getRegisteredLineUserId(sender);
+    if(!userId){
+      return{
+        error:sender+' ยังไม่ได้ลงทะเบียน LINE กับ Um-Bot',
+        recipientMissing:true,
+        recipientName:sender
+      };
+    }
+    return{targetId:userId,targetType:'user',recipientName:sender};
+  }
+
+  if(legacyGroupId){
+    return{targetId:legacyGroupId,targetType:'group',recipientName:''};
+  }
+
+  return{error:'ยังไม่ได้ตั้งค่าปลายทาง LINE',recipientMissing:true,recipientName:''};
+}
+
+async function diagnoseGroupFailure(token,groupId){
   try{
     const response=await fetch('https://api.line.me/v2/bot/group/'+encodeURIComponent(groupId)+'/summary',{
       headers:{Authorization:'Bearer '+token}
@@ -60,7 +145,7 @@ function friendlyLineError(status,detail,diagnostic={}){
   }
   if(status===403)return 'LINE ไม่อนุญาตให้บอทส่งข้อความไปยังปลายทางนี้';
   if(status===404)return 'ไม่พบปลายทาง LINE ที่ตั้งค่าไว้';
-  if(status===400)return detail?'LINE ปฏิเสธข้อมูลที่ส่ง: '+detail:'LINE ปฏิเสธข้อมูลที่ส่ง กรุณาตรวจ Group ID และข้อมูลข้อความ';
+  if(status===400)return detail?'LINE ปฏิเสธข้อมูลที่ส่ง: '+detail:'LINE ปฏิเสธข้อมูลที่ส่ง กรุณาตรวจข้อมูลปลายทางและข้อความ';
   return detail?'LINE ส่งข้อความไม่สำเร็จ: '+detail:'LINE ส่งข้อความไม่สำเร็จ (HTTP '+status+')';
 }
 
@@ -72,8 +157,7 @@ function qrSignature(caseId,token){
 }
 
 async function lineNotificationEnabled(){
-  const supaUrl=String(process.env.CASEMYP_SUPABASE_URL||'').trim().replace(/\/$/,'');
-  const supaKey=String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
+  const {url:supaUrl,key:supaKey}=getSupabaseConfig();
   if(!supaUrl||!supaKey)return true;
 
   try{
@@ -105,7 +189,7 @@ module.exports = async function handler(req,res){
   }
 
   const token=String(process.env.LINE_CHANNEL_ACCESS_TOKEN||'').trim();
-  const groupId=String(process.env.LINE_GROUP_ID||'').trim();
+  const legacyGroupId=String(process.env.LINE_GROUP_ID||'').trim();
   const allowedOrigin=String(process.env.CASEMYP_ALLOWED_ORIGIN||'').trim().replace(/\/$/,'');
   const requestOrigin=String(req.headers.origin||'').trim().replace(/\/$/,'');
 
@@ -118,7 +202,7 @@ module.exports = async function handler(req,res){
     return res.status(200).json({success:true,skipped:true,reason:'disabled'});
   }
 
-  if(!token||!groupId){
+  if(!token){
     return res.status(503).json({success:false,error:'LINE notification is not configured'});
   }
 
@@ -137,9 +221,26 @@ module.exports = async function handler(req,res){
   const status=oneLine(body.status)||'รอข้อมูล';
   const sales=oneLine(body.sales)||'รอมอบหมาย';
   const note=oneLine(body.note);
+  const requestedSender=oneLine(body.sender||body.lineSender);
 
   if(!caseId||!customername){
     return res.status(400).json({success:false,error:'Missing caseId or customername'});
+  }
+
+  let target;
+  try{
+    target=await resolveLineTarget(requestedSender,caseId,legacyGroupId);
+  }catch(error){
+    console.error('LINE target lookup failed',error?.message||error);
+    return res.status(503).json({success:false,error:'ค้นหาปลายทาง LINE ไม่สำเร็จ กรุณาลองใหม่'});
+  }
+  if(target.error){
+    return res.status(409).json({
+      success:false,
+      error:target.error,
+      recipientMissing:Boolean(target.recipientMissing),
+      recipientName:target.recipientName||''
+    });
   }
 
   const isQr=contactBy==='QR Code';
@@ -174,7 +275,7 @@ module.exports = async function handler(req,res){
         'Authorization':'Bearer '+token,
         'Content-Type':'application/json'
       },
-      body:JSON.stringify({to:groupId,messages})
+      body:JSON.stringify({to:target.targetId,messages})
     });
 
     if(!lineRes.ok){
@@ -182,8 +283,6 @@ module.exports = async function handler(req,res){
       const detail=safeLineDetail(rawDetail);
       const requestId=oneLine(lineRes.headers.get('x-line-request-id')||'');
 
-      // 429 ต้องหยุดทันที: LINE แนะนำไม่ให้ retry 4xx และไม่ควรยิง API วินิจฉัยซ้ำ
-      // เพราะจะเพิ่ม request ขณะ channel กำลังถูกจำกัดอยู่
       if(lineRes.status===429){
         const error=friendlyLineError(429,detail,{});
         console.error('LINE push rate limited',429,detail,requestId);
@@ -194,11 +293,14 @@ module.exports = async function handler(req,res){
           detail,
           retryable:false,
           cooldownSeconds:60,
-          lineRequestId:requestId
+          lineRequestId:requestId,
+          recipientName:target.recipientName||''
         });
       }
 
-      const diagnostic=await diagnoseLineFailure(token,groupId);
+      const diagnostic=target.targetType==='group'
+        ?await diagnoseGroupFailure(token,target.targetId)
+        :{};
       const error=friendlyLineError(lineRes.status,detail,diagnostic);
       console.error('LINE push failed',lineRes.status,detail,diagnostic,requestId);
       return res.status(502).json({
@@ -208,10 +310,16 @@ module.exports = async function handler(req,res){
         detail,
         groupReachable:diagnostic.groupReachable,
         groupStatus:diagnostic.groupStatus||null,
-        lineRequestId:requestId
+        lineRequestId:requestId,
+        recipientName:target.recipientName||''
       });
     }
-    return res.status(200).json({success:true,imageIncluded:messages.length>1});
+    return res.status(200).json({
+      success:true,
+      imageIncluded:messages.length>1,
+      targetType:target.targetType,
+      recipientName:target.recipientName||''
+    });
   }catch(error){
     console.error('LINE push error',error?.message||error);
     return res.status(502).json({success:false,error:'เชื่อมต่อ LINE API ไม่สำเร็จ กรุณาลองใหม่',detail:oneLine(error?.message||error)});
