@@ -20,7 +20,7 @@ function verifyLineSignature(rawBody,signature,secret){
 
 function supabaseConfig(){
   const url=String(process.env.CASEMYP_SUPABASE_URL||'').trim().replace(/\/$/,'');
-  const key=String(process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
+  const key=String(process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||'').trim();
   return{url,key};
 }
 
@@ -34,58 +34,103 @@ function sbHeaders(key,extra={}){
   };
 }
 
-async function fetchUserByName(name){
+function assertServerDbConfig(){
   const {url,key}=supabaseConfig();
-  if(!url||!key)throw new Error('CASEMYP Supabase is not configured');
-  const endpoint=new URL(url+'/rest/v1/users');
-  endpoint.searchParams.set('select','userid,name,status,line_user_id');
-  endpoint.searchParams.set('name','eq.'+name);
-  endpoint.searchParams.set('limit','2');
-  const response=await fetch(endpoint,{headers:sbHeaders(key)});
-  if(!response.ok)throw new Error('Supabase user lookup failed: '+response.status);
-  const rows=await response.json();
-  return Array.isArray(rows)?rows:[];
+  if(!url||!key){
+    const error=new Error('CASEMYP server database secret is not configured');
+    error.code='server_db_not_configured';
+    throw error;
+  }
+  return{url,key};
 }
 
-async function fetchUserByLineId(lineUserId){
-  const {url,key}=supabaseConfig();
-  if(!url||!key)throw new Error('CASEMYP Supabase is not configured');
-  const endpoint=new URL(url+'/rest/v1/users');
-  endpoint.searchParams.set('select','userid,name,status,line_user_id');
+async function fetchRecipientByName(name){
+  const {url,key}=assertServerDbConfig();
+  const endpoint=new URL(url+'/rest/v1/line_recipients');
+  endpoint.searchParams.set('select','sender_name,line_user_id,active,registered_at,updated_at');
+  endpoint.searchParams.set('sender_name','eq.'+name);
+  endpoint.searchParams.set('limit','1');
+  const response=await fetch(endpoint,{headers:sbHeaders(key)});
+  if(!response.ok){
+    const detail=oneLine(await response.text().catch(()=>''));
+    const error=new Error('Supabase LINE recipient lookup failed: '+response.status+(detail?' '+detail:''));
+    error.status=response.status;
+    throw error;
+  }
+  const rows=await response.json();
+  return Array.isArray(rows)?rows[0]||null:null;
+}
+
+async function fetchRecipientByLineId(lineUserId){
+  const {url,key}=assertServerDbConfig();
+  const endpoint=new URL(url+'/rest/v1/line_recipients');
+  endpoint.searchParams.set('select','sender_name,line_user_id,active');
   endpoint.searchParams.set('line_user_id','eq.'+lineUserId);
-  endpoint.searchParams.set('limit','2');
+  endpoint.searchParams.set('limit','1');
   const response=await fetch(endpoint,{headers:sbHeaders(key)});
-  if(!response.ok)throw new Error('Supabase LINE lookup failed: '+response.status);
+  if(!response.ok){
+    const detail=oneLine(await response.text().catch(()=>''));
+    const error=new Error('Supabase LINE recipient reverse lookup failed: '+response.status+(detail?' '+detail:''));
+    error.status=response.status;
+    throw error;
+  }
   const rows=await response.json();
-  return Array.isArray(rows)?rows:[];
+  return Array.isArray(rows)?rows[0]||null:null;
 }
 
-async function bindLineUser(name,lineUserId){
-  const {url,key}=supabaseConfig();
-  if(!url||!key)throw new Error('CASEMYP Supabase is not configured');
+async function bindLineRecipient(name,lineUserId){
+  const {url,key}=assertServerDbConfig();
 
-  const targetRows=await fetchUserByName(name);
-  const target=targetRows.find(row=>String(row?.status||'active')==='active')||targetRows[0];
-  if(!target)return{ok:false,message:'ไม่พบผู้ใช้ '+name+' ใน CASE_MYP'};
-  if(String(target.status||'active')!=='active')return{ok:false,message:'บัญชี '+name+' ถูกปิดใช้งานอยู่'};
+  const target=await fetchRecipientByName(name);
+  if(!target){
+    return{ok:false,message:'ยังไม่ได้ติดตั้งข้อมูลผู้ส่งเคส '+name+' ใน CASE_MYP'};
+  }
+  if(target.active===false){
+    return{ok:false,message:'ผู้ส่งเคส '+name+' ถูกปิดใช้งานอยู่'};
+  }
 
-  const existingRows=await fetchUserByLineId(lineUserId);
-  const other=existingRows.find(row=>oneLine(row?.name)!==name);
-  if(other)return{ok:false,message:'LINE นี้ถูกผูกกับ '+oneLine(other.name)+' อยู่แล้ว กรุณาแจ้งแอดมิน'};
+  const existingForName=oneLine(target.line_user_id);
+  if(existingForName){
+    if(existingForName===lineUserId){
+      return{ok:true,message:'✅ '+name+' ลงทะเบียน LINE นี้ไว้แล้ว\nพร้อมรับเคสจาก CASE_MYP'};
+    }
+    return{
+      ok:false,
+      message:'🔒 '+name+' ลงทะเบียนกับ LINE อื่นไว้แล้ว\nหากต้องการเปลี่ยน LINE กรุณาให้แอดมินล้างการลงทะเบียนเดิมก่อน'
+    };
+  }
 
-  const endpoint=new URL(url+'/rest/v1/users');
-  endpoint.searchParams.set('userid','eq.'+String(target.userid));
+  const existingForLine=await fetchRecipientByLineId(lineUserId);
+  if(existingForLine&&oneLine(existingForLine.sender_name)!==name){
+    return{
+      ok:false,
+      message:'LINE นี้ถูกลงทะเบียนเป็น '+oneLine(existingForLine.sender_name)+' อยู่แล้ว กรุณาแจ้งแอดมิน'
+    };
+  }
+
+  const endpoint=new URL(url+'/rest/v1/line_recipients');
+  endpoint.searchParams.set('sender_name','eq.'+name);
+  endpoint.searchParams.set('line_user_id','is.null');
+  const now=new Date().toISOString();
   const response=await fetch(endpoint,{
     method:'PATCH',
     headers:sbHeaders(key,{Prefer:'return=representation'}),
-    body:JSON.stringify({line_user_id:lineUserId})
+    body:JSON.stringify({line_user_id:lineUserId,registered_at:now,updated_at:now})
   });
   if(!response.ok){
     const detail=oneLine(await response.text().catch(()=>''));
     throw new Error('Supabase LINE registration failed: '+response.status+(detail?' '+detail:''));
   }
+
   const rows=await response.json().catch(()=>[]);
-  if(!Array.isArray(rows)||!rows.length)throw new Error('Supabase LINE registration returned no row');
+  if(!Array.isArray(rows)||!rows.length){
+    const latest=await fetchRecipientByName(name);
+    if(oneLine(latest?.line_user_id)===lineUserId){
+      return{ok:true,message:'✅ '+name+' ลงทะเบียน LINE นี้ไว้แล้ว\nพร้อมรับเคสจาก CASE_MYP'};
+    }
+    return{ok:false,message:'ลงทะเบียน '+name+' ไม่สำเร็จ เพราะมีการเปลี่ยนข้อมูลพร้อมกัน กรุณาลองใหม่'};
+  }
+
   return{ok:true,message:'✅ ลงทะเบียน '+name+' สำเร็จแล้ว\nต่อไป CASE_MYP สามารถส่งเคสเข้า LINE นี้โดยตรงได้'};
 }
 
@@ -115,11 +160,14 @@ async function handleEvent(event){
   if(!ALLOWED_NAMES.has(name))return;
 
   try{
-    const result=await bindLineUser(name,String(event.source.userId));
+    const result=await bindLineRecipient(name,String(event.source.userId));
     await replyLine(event.replyToken,result.message);
   }catch(error){
     console.error('LINE registration failed',name,error?.message||error);
-    await replyLine(event.replyToken,'❌ ลงทะเบียน '+name+' ไม่สำเร็จ กรุณาแจ้งแอดมิน');
+    const message=error?.code==='server_db_not_configured'
+      ?'❌ ระบบยังไม่ได้ตั้งค่า CASEMYP_SUPABASE_SERVICE_ROLE_KEY กรุณาแจ้งแอดมิน'
+      :'❌ ลงทะเบียน '+name+' ไม่สำเร็จ กรุณาแจ้งแอดมิน';
+    await replyLine(event.replyToken,message);
     throw error;
   }
 }
