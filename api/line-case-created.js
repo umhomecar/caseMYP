@@ -34,16 +34,29 @@ function safeLineDetail(raw){
   }
 }
 
-function getSupabaseConfig(){
-  return{
-    url:String(process.env.CASEMYP_SUPABASE_URL||'').trim().replace(/\/$/,''),
-    key:String(process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim()
-  };
+function getSupabaseUrl(){
+  return String(process.env.CASEMYP_SUPABASE_URL||'').trim().replace(/\/$/,'');
 }
 
-async function supabaseRows(table,params){
-  const {url,key}=getSupabaseConfig();
-  if(!url||!key)throw new Error('CASEMYP Supabase is not configured');
+function getPublicSupabaseKey(){
+  return String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
+}
+
+function getServerSupabaseKey(){
+  return String(process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||'').trim();
+}
+
+async function supabaseRows(table,params,{serverOnly=false}={}){
+  const url=getSupabaseUrl();
+  const key=serverOnly?getServerSupabaseKey():(getServerSupabaseKey()||getPublicSupabaseKey());
+  if(!url||!key){
+    const error=new Error(serverOnly
+      ?'CASEMYP_SUPABASE_SERVICE_ROLE_KEY is not configured'
+      :'CASEMYP Supabase is not configured');
+    error.code=serverOnly?'server_db_not_configured':'db_not_configured';
+    throw error;
+  }
+
   const endpoint=new URL(url+'/rest/v1/'+table);
   Object.entries(params||{}).forEach(([k,v])=>endpoint.searchParams.set(k,String(v)));
   const response=await fetch(endpoint,{
@@ -51,19 +64,21 @@ async function supabaseRows(table,params){
   });
   if(!response.ok){
     const detail=oneLine(await response.text().catch(()=>''));
-    throw new Error('Supabase '+table+' lookup failed: '+response.status+(detail?' '+detail:''));
+    const error=new Error('Supabase '+table+' lookup failed: '+response.status+(detail?' '+detail:''));
+    error.status=response.status;
+    throw error;
   }
   const rows=await response.json();
   return Array.isArray(rows)?rows:[];
 }
 
 async function getRegisteredLineUserId(senderName){
-  const rows=await supabaseRows('users',{
-    select:'userid,name,status,line_user_id',
-    name:'eq.'+senderName,
-    status:'eq.active',
+  const rows=await supabaseRows('line_recipients',{
+    select:'sender_name,line_user_id,active',
+    sender_name:'eq.'+senderName,
+    active:'eq.true',
     limit:'1'
-  });
+  },{serverOnly:true});
   const lineUserId=oneLine(rows[0]?.line_user_id);
   return /^U[0-9a-f]{32}$/i.test(lineUserId)?lineUserId:'';
 }
@@ -157,7 +172,8 @@ function qrSignature(caseId,token){
 }
 
 async function lineNotificationEnabled(){
-  const {url:supaUrl,key:supaKey}=getSupabaseConfig();
+  const supaUrl=getSupabaseUrl();
+  const supaKey=getPublicSupabaseKey()||getServerSupabaseKey();
   if(!supaUrl||!supaKey)return true;
 
   try{
@@ -232,7 +248,10 @@ module.exports = async function handler(req,res){
     target=await resolveLineTarget(requestedSender,caseId,legacyGroupId);
   }catch(error){
     console.error('LINE target lookup failed',error?.message||error);
-    return res.status(503).json({success:false,error:'ค้นหาปลายทาง LINE ไม่สำเร็จ กรุณาลองใหม่'});
+    const message=error?.code==='server_db_not_configured'
+      ?'ยังไม่ได้ตั้งค่า CASEMYP_SUPABASE_SERVICE_ROLE_KEY สำหรับระบบ LINE 1:1'
+      :'ค้นหาปลายทาง LINE ไม่สำเร็จ กรุณาลองใหม่';
+    return res.status(503).json({success:false,error:message});
   }
   if(target.error){
     return res.status(409).json({
