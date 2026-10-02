@@ -29,6 +29,31 @@ select
   to_regclass('public.claimedcases_archive') is not null as claimed_archived;
 ```
 
+## 1.5 LINE direct recipients
+
+Run `20261002_01_line_recipients.sql` in the CASE_MYP production Supabase project.
+
+This creates a server-only `public.line_recipients` table for the two logical
+case senders (`เกมส์`, `อาท`). These are **not** salesperson accounts and do
+not need rows in `public.users`.
+
+Then add `CASEMYP_SUPABASE_SERVICE_ROLE_KEY` to the Vercel Production
+environment as a **Secret** and redeploy. Never expose this key in
+`runtime-config.js` or browser code.
+
+Verify in Supabase:
+
+```sql
+select sender_name, active, line_user_id is not null as registered
+from public.line_recipients
+order by sender_name;
+```
+
+Before anyone registers, both rows should exist with `registered = false`.
+After the verified LINE webhook receives `ลงทะเบียน เกมส์`, the เกมส์ row
+should become registered. Registration is first-write locked: once a sender is
+bound to one LINE user ID, a different LINE account cannot silently replace it.
+
 ## 2. Prepare and link Supabase Auth accounts
 
 Run `20260729_01_prepare_auth_account_link.sql`.
