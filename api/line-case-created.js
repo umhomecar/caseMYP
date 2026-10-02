@@ -51,7 +51,7 @@ async function supabaseRows(table,params,{serverOnly=false}={}){
   const key=serverOnly?getServerSupabaseKey():(getServerSupabaseKey()||getPublicSupabaseKey());
   if(!url||!key){
     const error=new Error(serverOnly
-      ?'CASEMYP_SUPABASE_SERVICE_ROLE_KEY is not configured'
+      ?'Supabase server secret is not configured'
       :'CASEMYP Supabase is not configured');
     error.code=serverOnly?'server_db_not_configured':'db_not_configured';
     throw error;
