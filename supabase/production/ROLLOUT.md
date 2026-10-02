@@ -37,9 +37,11 @@ This creates a server-only `public.line_recipients` table for the two logical
 case senders (`เกมส์`, `อาท`). These are **not** salesperson accounts and do
 not need rows in `public.users`.
 
-Then add `CASEMYP_SUPABASE_SERVICE_ROLE_KEY` to the Vercel Production
-environment as a **Secret** and redeploy. Never expose this key in
-`runtime-config.js` or browser code.
+Then add `CASEMYP_SUPABASE_SECRET_KEY` to the Vercel Production environment
+as a **Secret** and redeploy. Use the current Supabase Secret key from
+Settings > API Keys. The code still accepts `CASEMYP_SUPABASE_SERVICE_ROLE_KEY`
+only as a legacy fallback. Never expose either server key in `runtime-config.js`
+or browser code.
 
 Verify in Supabase:
 
