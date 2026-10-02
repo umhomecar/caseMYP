@@ -20,7 +20,7 @@ function verifyLineSignature(rawBody,signature,secret){
 
 function supabaseConfig(){
   const url=String(process.env.CASEMYP_SUPABASE_URL||'').trim().replace(/\/$/,'');
-  const key=String(process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||'').trim();
+  const key=String(process.env.CASEMYP_SUPABASE_SECRET_KEY||process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||'').trim();
   return{url,key};
 }
 
@@ -165,7 +165,7 @@ async function handleEvent(event){
   }catch(error){
     console.error('LINE registration failed',name,error?.message||error);
     const message=error?.code==='server_db_not_configured'
-      ?'❌ ระบบยังไม่ได้ตั้งค่า CASEMYP_SUPABASE_SERVICE_ROLE_KEY กรุณาแจ้งแอดมิน'
+      ?'❌ ระบบยังไม่ได้ตั้งค่า Supabase Secret key สำหรับ CASE_MYP กรุณาแจ้งแอดมิน'
       :'❌ ลงทะเบียน '+name+' ไม่สำเร็จ กรุณาแจ้งแอดมิน';
     await replyLine(event.replyToken,message);
     throw error;
