@@ -43,7 +43,7 @@ function getPublicSupabaseKey(){
 }
 
 function getServerSupabaseKey(){
-  return String(process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||'').trim();
+  return String(process.env.CASEMYP_SUPABASE_SECRET_KEY||process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||'').trim();
 }
 
 async function supabaseRows(table,params,{serverOnly=false}={}){
@@ -249,7 +249,7 @@ module.exports = async function handler(req,res){
   }catch(error){
     console.error('LINE target lookup failed',error?.message||error);
     const message=error?.code==='server_db_not_configured'
-      ?'ยังไม่ได้ตั้งค่า CASEMYP_SUPABASE_SERVICE_ROLE_KEY สำหรับระบบ LINE 1:1'
+      ?'ยังไม่ได้ตั้งค่า Supabase Secret key สำหรับระบบ LINE 1:1'
       :'ค้นหาปลายทาง LINE ไม่สำเร็จ กรุณาลองใหม่';
     return res.status(503).json({success:false,error:message});
   }
