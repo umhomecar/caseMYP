@@ -1614,7 +1614,7 @@ function AdminCurrentCases({currentUser,users}){
   const filtered=safeArray(cases).filter(c=>{
     const q=String(filter.q||'').trim().toLowerCase();
     if(q){
-      const hay=[c.caseid,c.customername,c.contact,c.sales,c.status].map(v=>String(v||'').toLowerCase()).join(' ');
+      const hay=[c.caseid,c.customername,c.contact,getClipAd(c.attachment),c.sales,c.status].map(v=>String(v||'').toLowerCase()).join(' ');
       if(!hay.includes(q))return false;
     }
     if(filter.sales===UNASSIGNED_SALES&&!isUnassignedSales(c.sales))return false;
