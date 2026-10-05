@@ -1917,7 +1917,7 @@ body:not(.light) tr:hover td{background:#2f3031 !important;}
   .admin-case-col-select,
   .admin-case-col-customer,
   .admin-case-col-contact,
-  .admin-case-col-next,
+  .admin-case-col-clip,
   .admin-case-col-updated,
   .admin-case-sla{
     display:none !important;
