@@ -2287,7 +2287,7 @@ function SalesDashboard({currentUser}){
     {(()=>{const active=allCases.filter(c=>!['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'].includes(c.status));const hot=active.filter(c=>calculateCaseScore(c)>=80);const stale=active.filter(c=>{const m=String(c.updatedat||'').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);if(!m)return false;const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]),parseInt(m[5]));return(Date.now()-d.getTime())>86400000;});if(!hot.length&&!stale.length)return null;
     return<div className="card" style={{marginBottom:14}}><div style={{fontWeight:700,fontSize:14,marginBottom:10}}>🧠 สรุปวันนี้</div>
       {hot.length>0&&<div style={{background:'rgba(248,81,73,.08)',border:'1px solid rgba(248,81,73,.3)',borderRadius:8,padding:'10px 12px',marginBottom:8}}><div style={{fontWeight:600,fontSize:13,color:'var(--red)',marginBottom:6}}>🔥 เคสร้อน ต้องโทรวันนี้ ({hot.length})</div>{hot.slice(0,3).map((c,i)=><div key={i} style={{fontSize:12,display:'flex',justifyContent:'space-between',marginBottom:i<Math.min(hot.length,3)-1?4:0}}><span style={{color:'var(--blue)',fontWeight:600}}>{c.caseid}</span><span>{c.customername}</span><StatusBadge status={c.status}/></div>)}</div>}
-      {stale.length>0&&<div style={{background:'rgba(210,153,34,.08)',border:'1px solid rgba(210,153,34,.3)',borderRadius:8,padding:'10px 12px'}}><div style={{fontWeight:600,fontSize:13,color:'var(--yellow)',marginBottom:6}}>⏰ ค้างนาน &gt; 24 ชม. ({stale.length} เคส)</div><div style={{fontSize:12,color:'var(--text2)'}}>อัปเดตสถานะหรือกำหนดการติดตามครั้งถัดไป</div></div>}
+      {stale.length>0&&<div style={{background:'rgba(210,153,34,.08)',border:'1px solid rgba(210,153,34,.3)',borderRadius:8,padding:'10px 12px'}}><div style={{fontWeight:600,fontSize:13,color:'var(--yellow)',marginBottom:6}}>⏰ ค้างนาน &gt; 24 ชม. ({stale.length} เคส)</div><div style={{fontSize:12,color:'var(--text2)'}}>อัปเดตสถานะ หรือเพิ่ม Note / นัด Follow-up</div></div>}
     </div>;})()}
   </div>;
 }
@@ -2298,7 +2298,7 @@ function OnboardingTour({currentUser,onDone}){
   const steps=[
     {icon:'🎉',title:'ยินดีต้อนรับสู่ CasePool!',desc:'ระบบจัดการเคสลูกค้าที่ช่วยให้คุณทำงานเป็นระบบ',tip:null,color:'#00f5ff'},
     {icon:'📊',title:'หน้าวันนี้',desc:'บอกทุกอย่างที่ต้องทำ — เคสค้าง, นัดหมาย, โอกาสปิดขาย',tip:'💡 เช็คทุกเช้าก่อนเริ่มงาน!',color:'#ffd700'},
-    {icon:'📋',title:'เคสของฉัน',desc:'เคสทั่วไปที่แอดมินมอบหมายให้คุณ',tip:'อัปเดตสถานะและกำหนดขั้นตอนถัดไปให้ชัดเจน',color:'#ff2d78'},
+    {icon:'📋',title:'เคสของฉัน',desc:'เคสทั่วไปที่แอดมินมอบหมายให้คุณ',tip:'อัปเดตสถานะและรีพอร์ตให้ชัดเจน',color:'#ff2d78'},
     {icon:'📅',title:'Follow-up',desc:'รวมรายการนัดและ Notes ของทุกเคส',tip:'ระบบเตือน SLA 24 / 48 / 72 ชั่วโมงโดยไม่ย้ายเคสอัตโนมัติ',color:'#34d399'},
   ];
   function finish(){try{localStorage.setItem('cp_onboarded_'+currentUser.userId,'1');}catch(e){}onDone();}
