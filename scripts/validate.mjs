@@ -96,7 +96,7 @@ for(const deadAiCode of ['function AdminAIPage','function AIAdvisorPage','functi
 if(!source.includes("case 'checkCaseDuplicates'"))fail('ยังไม่มีตัวตรวจเคสซ้ำ');
 if(!source.includes('expectedVersion'))fail('ยังไม่มี optimistic concurrency');
 if(!source.includes("case 'getTrashCases'")||!source.includes('function AdminTrash'))fail('ยังไม่มีถังขยะและการกู้คืน');
-if(!source.includes('next_action_at'))fail('ยังไม่มีขั้นตอนถัดไปและวันติดตาม');
+if(source.includes('next_action')||source.includes('next_action_at'))fail('ยังมีขั้นตอนถัดไป/กำหนดติดตามที่ถอดออกแล้ว');
 if(!source.includes("AUTH_MODE==='supabase'")||!source.includes('signInWithPassword'))fail('แอปยังไม่รองรับ Supabase Auth cutover');
 if(!adminApp.includes('private_cases:<AdminSentCasesPage')||!adminApp.includes('line_oa:<AdminSentCasesPage'))fail('เคสส่วนตัวและ Line OA ต้องคงเป็นคนละหมวด');
 for(const migration of [
