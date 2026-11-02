@@ -885,7 +885,7 @@ function Modal({title,onClose,children,footer,variant=''}){
   },[onClose]);
   return <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div className={`modal ${variant?`casemyp-v2-modal casemyp-v2-modal-${variant}`:""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="modal-hd"><span id={titleId} style={{fontWeight:700,fontSize:16}}>{title}</span><button type="button" className="btn btn-ghost" style={{padding:'6px 10px',borderRadius:8,display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={onClose} aria-label="ปิดหน้าต่าง"><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
+      <div className="modal-hd"><span id={titleId} style={{fontWeight:700,fontSize:16}}>{title}</span><button type="button" className="btn btn-ghost cp-action-danger" style={{padding:'6px 10px',borderRadius:8,display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={onClose} aria-label="ปิดหน้าต่าง"><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
       <div className="modal-bd">{children}</div>
       {footer&&<div className="modal-ft">{footer}</div>}
     </div>
