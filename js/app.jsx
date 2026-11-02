@@ -1294,7 +1294,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   const defaultBackMonth=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}`;
   const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
   const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',note:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||(currentUser.role==='Admin'&&!backdated?'คิวเพจ':'ปกติ'),clipad:''});
-  const [lineSender,setLineSender]=useState(()=>LINE_SENDERS.includes(currentUser?.name)?currentUser.name:'เกมส์');
+  const [lineSender,setLineSender]=useState(()=>{try{const saved=localStorage.getItem('casemyp:last-line-sender');if(LINE_SENDERS.includes(saved))return saved;}catch(e){}return 'อาท';});
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
   const [duplicates,setDuplicates]=useState([]);
   const [duplicateConfirmed,setDuplicateConfirmed]=useState(false);
@@ -1368,7 +1368,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   return <Modal title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
-      <div className="form-group" style={{gridColumn:'1/-1'}}><label>ผู้ส่งเคสเข้า LINE</label><select value={lineSender} onChange={e=>setLineSender(e.target.value)}>{LINE_SENDERS.map(name=><option key={name} value={name}>{name}</option>)}</select><div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>ระบบจะส่งแจ้งเตือนเคสนี้เข้า LINE ส่วนตัวของผู้ส่งที่ลงทะเบียนกับ Um-Bot</div></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label>ผู้ส่งเคสเข้า LINE</label><select value={lineSender} onChange={e=>{setLineSender(e.target.value);try{localStorage.setItem('casemyp:last-line-sender',e.target.value);}catch(err){}}}>{LINE_SENDERS.map(name=><option key={name} value={name}>{name}</option>)}</select><div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>ระบบจะส่งแจ้งเตือนเคสนี้เข้า LINE ส่วนตัวของผู้ส่งที่ลงทะเบียนกับ Um-Bot</div></div>
       {backdated&&<div style={{gridColumn:'1/-1',background:'linear-gradient(135deg,rgba(88,166,255,.10),rgba(188,140,255,.08))',border:'1px solid rgba(88,166,255,.25)',borderRadius:12,padding:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
         <div style={{gridColumn:'1/-1',fontSize:13,fontWeight:800,color:'var(--blue)'}}>🕒 โหมดเพิ่มเคสย้อนหลัง</div>
         <div className="form-group" style={{marginBottom:0}}><label>เดือนของรหัสเคส</label><input type="month" value={backMonth} onChange={e=>{setBackMonth(e.target.value);if(e.target.value){const day=String(backDate||'').split('-')[2]||'01';setBackDate(e.target.value+'-'+day);}}}/></div>
