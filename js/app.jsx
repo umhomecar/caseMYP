@@ -1320,6 +1320,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   function getCasePrefix(){const raw=backdated&&backMonth?backMonth:'';if(raw&&/^\d{4}-\d{2}$/.test(raw)){const [y,m]=raw.split('-');return y.slice(-2)+m;}const d=new Date();return String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');}
   useEffect(()=>{const pre=getCasePrefix();api('getCases',{all:'true'}).then(r=>{if(r.success){const max=(r.data||[]).filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[backdated,backMonth]);
   async function submit(){
+    if(DESIGN_PREVIEW)return showToast('โหมดตัวอย่าง: ทดลองกรอกได้ แต่ไม่บันทึกข้อมูลจริง','info');
     if(!form.customername)return showToast('กรุณากรอกชื่อลูกค้า','warn');
     if(backdated&&!backDate)return showToast('กรุณาเลือกวันที่ย้อนหลัง','warn');
     setLoading(true);
@@ -1380,8 +1381,9 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       onAdded();onClose();
     }else showToast(r.error||'เกิดข้อผิดพลาด','err');
   }
-  return <Modal variant="case-form" title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+  return <Modal variant="case-form" title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
+    {DESIGN_PREVIEW&&<div className="casemyp-v2-form-demo-note">🩷 ทดลองดูฟอร์มและสีปุ่มได้ ข้อมูลนี้เป็นตัวอย่าง ไม่ถูกส่งหรือบันทึกจริง</div>}
+    <div className="casemyp-v2-case-form-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ผู้ส่งเคสเข้า LINE</label><select value={lineSender} onChange={e=>{setLineSender(e.target.value);try{localStorage.setItem('casemyp:last-line-sender',e.target.value);}catch(err){}}}>{LINE_SENDERS.map(name=><option key={name} value={name}>{name}</option>)}</select><div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>ระบบจะส่งแจ้งเตือนเคสนี้เข้า LINE ส่วนตัวของผู้ส่งที่ลงทะเบียนกับ Um-Bot</div></div>
       {backdated&&<div style={{gridColumn:'1/-1',background:'linear-gradient(135deg,rgba(88,166,255,.10),rgba(188,140,255,.08))',border:'1px solid rgba(88,166,255,.25)',borderRadius:12,padding:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
