@@ -2176,3 +2176,41 @@ body:not(.light) .casemyp-v2-kpi{min-height:106px;padding:19px 17px!important;bo
 @media (hover:hover){body:not(.light) .casemyp-v2-kpi:hover{transform:translateY(-2px);box-shadow:0 17px 34px rgba(3,4,25,.33)}}
 @media(max-width:800px){body:not(.light) .casemyp-v2-dashboard{padding:12px 12px 30px!important}body:not(.light) .casemyp-v2-hero{min-height:150px;padding:25px 21px;border-radius:20px}body:not(.light) .casemyp-v2-hero-art{opacity:.3;width:55%}body:not(.light) .casemyp-v2-hero h1{font-size:27px}body:not(.light) .casemyp-v2-menu-label{display:none}}
 @media(prefers-reduced-motion:reduce){body:not(.light) .casemyp-v2-kpi{transition:none}}
+
+/* ==========================================================
+   CaseMYP 2.0 Phase 2 — Case Center + working case forms
+   CSS-only layout enhancement. No API, queue, or auth changes.
+   ========================================================== */
+body:not(.light) .casemyp-v2-cases{padding:24px 26px 44px!important;max-width:1640px;margin:0 auto;}
+body:not(.light) .casemyp-v2-cases-heading{padding:25px 30px!important;margin-bottom:18px!important;position:relative;overflow:hidden;border:1px solid rgba(183,191,255,.32);border-radius:25px;background:radial-gradient(circle at 85% 0%,rgba(239,108,210,.18),transparent 40%),linear-gradient(115deg,rgba(47,59,114,.96),rgba(55,39,99,.92));box-shadow:0 18px 40px rgba(2,5,30,.29),inset 0 1px rgba(255,255,255,.11);display:flex;gap:18px;align-items:center;justify-content:space-between;}
+body:not(.light) .casemyp-v2-cases-heading:after{content:'✦';position:absolute;right:26%;top:6%;color:rgba(153,222,255,.2);font-size:92px;pointer-events:none;}
+body:not(.light) .casemyp-v2-cases-heading .page-title{font-size:clamp(23px,2.3vw,32px);font-weight:850;line-height:1.35;letter-spacing:-.5px;}
+body:not(.light) .casemyp-v2-title-accent{font-weight:650;background:linear-gradient(100deg,#a9dcff,#d2b3ff,#ffa3dc);color:transparent;background-clip:text;-webkit-background-clip:text;}
+body:not(.light) .casemyp-v2-cases-heading .admin-current-cases-desktop-tools{position:relative;z-index:1;align-items:center;}
+body:not(.light) .casemyp-v2-cases-heading .admin-current-cases-desktop-tools .btn{padding:10px 16px;min-height:41px;}
+body:not(.light) .casemyp-v2-case-filters{padding:14px 16px!important;margin-bottom:17px!important;background:linear-gradient(145deg,rgba(40,47,90,.87),rgba(26,30,61,.85));border:1px solid rgba(197,202,253,.22);border-radius:18px;box-shadow:0 12px 30px rgba(6,7,33,.22);gap:9px!important;}
+body:not(.light) .casemyp-v2-case-filters input,body:not(.light) .casemyp-v2-case-filters select{min-height:40px;}
+body:not(.light) .casemyp-v2-cases-table{overflow:hidden;border-radius:21px!important;box-shadow:0 17px 35px rgba(3,5,28,.24);border:1px solid rgba(195,199,253,.22)!important;}
+body:not(.light) .casemyp-v2-cases-table th{background:#34395d!important;color:#e1e6ff;padding:15px 13px;font-size:12px;letter-spacing:.2px;}
+body:not(.light) .casemyp-v2-cases-table td{padding:15px 13px;border-bottom:1px solid rgba(194,198,255,.12);}
+body:not(.light) .casemyp-v2-cases-table .admin-case-row:hover td{background:rgba(119,127,229,.11);}
+body:not(.light) .casemyp-v2-modal{border-radius:24px!important;background:linear-gradient(155deg,rgba(47,53,99,.98),rgba(25,30,61,.99));border:1px solid rgba(202,206,255,.33)!important;box-shadow:0 30px 80px rgba(4,6,27,.58),inset 0 1px rgba(255,255,255,.12);}
+body:not(.light) .casemyp-v2-modal-case-form{max-width:740px!important;max-height:min(90vh,850px);display:flex;flex-direction:column;overflow:hidden;}
+body:not(.light) .casemyp-v2-modal-case-form .modal-hd{flex:none;padding:19px 24px;background:linear-gradient(100deg,rgba(102,131,255,.14),rgba(221,105,207,.13));font-size:17px;}
+body:not(.light) .casemyp-v2-modal-case-form .modal-bd{overflow-y:auto;min-height:0;padding:22px 24px;}
+body:not(.light) .casemyp-v2-modal-case-form .modal-ft{flex:none;padding:15px 24px;background:rgba(14,19,47,.7);box-shadow:0 -8px 24px rgba(0,0,0,.12);}
+body:not(.light) .casemyp-v2-modal-case-form .form-group label{font-weight:700;color:#dce3ff;font-size:12px;display:block;margin-bottom:7px;}
+body:not(.light) .casemyp-v2-modal-case-form .form-group input,body:not(.light) .casemyp-v2-modal-case-form .form-group select,body:not(.light) .casemyp-v2-modal-case-form .form-group textarea{background:rgba(10,16,45,.52);border-color:rgba(193,200,253,.28);padding:11px 13px;min-height:44px;}
+body:not(.light) .casemyp-v2-modal-edit{width:min(100%,610px)!important;max-width:610px!important;border-radius:23px!important;}
+body:not(.light) .casemyp-v2-modal-edit .btn-primary{background:linear-gradient(110deg,#6a87ff,#ac68eb,#ed79ad);}
+body:not(.light) .casemyp-v2-modal-edit input,body:not(.light) .casemyp-v2-modal-edit select,body:not(.light) .casemyp-v2-modal-edit textarea{min-height:42px;}
+@media(max-width:768px){
+ body:not(.light) .casemyp-v2-cases{padding:12px 11px 28px!important;}
+ body:not(.light) .casemyp-v2-cases-heading{padding:18px 15px!important;border-radius:18px;display:block;}
+ body:not(.light) .casemyp-v2-cases-heading:after{display:none;}
+ body:not(.light) .casemyp-v2-cases-heading .page-title{font-size:22px;}
+ body:not(.light) .casemyp-v2-modal-case-form{max-height:94dvh!important;max-width:100%!important;}
+ body:not(.light) .casemyp-v2-modal-case-form .modal-bd{padding:15px 14px;}
+ body:not(.light) .casemyp-v2-modal-case-form .modal-hd,body:not(.light) .casemyp-v2-modal-case-form .modal-ft{padding:13px 14px;}
+ body:not(.light) .casemyp-v2-modal-edit{width:100%!important;max-width:100%!important;}
+}
