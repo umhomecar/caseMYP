@@ -1816,18 +1816,43 @@ function AdminDashboard({currentUser}){
   const statusMap={};
   rows.forEach(c=>{const st=c.status||'ไม่ระบุสถานะ';statusMap[st]=(statusMap[st]||0)+1;});
   const statuses=Object.entries(statusMap).sort((a,b)=>b[1]-a[1]);
+  const STATUS_GROUPS={
+    'ไปต่อได้':'pass','จอง':'pass','รอเซ็นต์':'pass','รอผล':'pass','อนุมัติ':'pass',
+    'ติดต่อไม่ได้':'fail','รีเจค':'fail','ได้รถจากที่อื่น':'fail',
+    'ปิดเคส':'closed','ปล่อยแล้ว':'sold'
+  };
+  const getGroup=c=>STATUS_GROUPS[String(c.status||'').trim()]||'pending';
+  const groupCounts=items=>{const result={pass:0,fail:0,closed:0,sold:0,pending:0};items.forEach(c=>{result[getGroup(c)]++;});return result;};
+  const overall=groupCounts(rows);
+  const groups=[['pass','ไปต่อได้','#10b981'],['fail','ไปต่อไม่ได้','#ef4444'],['closed','ปิดเคส','#a78bfa'],['sold','ปล่อยแล้ว','#34d399'],['pending','ติดตาม / อื่น ๆ','#f59e0b']];
+  const adOutcomeRows=ads.map(a=>({name:a.name,count:a.rows.length,counts:groupCounts(a.rows)}));
   const palette=['#ffd028','#ff8a38','#ad43bd','#198bd3','#10ab92','#e76588','#8d83ff','#2ec7a0'];
-  const kpis=[['เคสเดือนนี้',rows.length],['จำนวนแอด',ads.length],['รอข้อมูล',statusMap['รอข้อมูล']||0],['กำลังติดต่อ',statusMap['กำลังติดต่อ']||0],['รอมอบหมาย',rows.filter(c=>isUnassignedSales(c.sales)).length],['ปล่อยแล้ว',statusMap['ปล่อยแล้ว']||0]];
+  const kpis=[['เคสทั้งหมด',rows.length],['แอดที่มีเคส',ads.filter(a=>a.name!=='ไม่ระบุแอด').length],['ไปต่อได้',overall.pass],['ไปต่อไม่ได้',overall.fail],['ปิดเคส',overall.closed],['ปล่อยแล้ว',overall.sold],['ติดตาม / อื่น ๆ',overall.pending]];
+
   return <div className="page" style={{padding:24}}>
     <div className="page-hd"><div><div className="page-title">📊 วิเคราะห์แอด</div><div style={{fontSize:12,color:'var(--text2)'}}>แหล่งที่มาของเคสและสถานะ · ทุกเซลส์</div></div><button className="btn btn-ghost" onClick={load}>🔄 รีเฟรช</button></div>
     <div style={{display:'flex',gap:10,marginBottom:18,flexWrap:'wrap'}}><input type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');}}/><select value={chosen} onChange={e=>setChosen(e.target.value)}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select></div>
     {loading?<Loading/>:<>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value],i)=><div key={name} className="card" style={{borderTop:'3px solid '+palette[i%palette.length],padding:14}}><div style={{fontSize:28,fontWeight:800}}>{value}</div><div style={{fontSize:12,color:'var(--text2)'}}>{name}</div></div>)}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(310px,1fr))',gap:14}}>
-        <div className="card"><strong>🎯 เคสมาจากแอดไหนบ้าง</strong><div style={{display:'flex',alignItems:'end',height:245,gap:8,overflowX:'auto',marginTop:20}}>{ads.slice(0,8).map((a,i)=><div key={a.name} style={{minWidth:65,flex:1,textAlign:'center'}}><div style={{color:palette[i%palette.length],fontWeight:800}}>{monthCases.length?Math.round(a.rows.length/monthCases.length*100):0}%</div><div style={{height:Math.max(10,160*a.rows.length/(ads[0]?.rows.length||1)),background:palette[i%palette.length],borderRadius:9,marginTop:8}}/><div style={{fontSize:11,marginTop:8,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={a.name}>{a.name}</div><strong>{a.rows.length}</strong></div>)}</div>{!ads.length&&<p>ยังไม่มีเคสในเดือนนี้</p>}</div>
-        <div className="card"><strong>📊 สถานะของเคส {chosen==='all'?'ทั้งหมด':'ตามแอดที่เลือก'}</strong><div style={{marginTop:18}}>{statuses.map(([st,count],i)=><div key={st} style={{display:'flex',gap:10,alignItems:'center',marginBottom:14}}><span style={{width:110,fontSize:12}}>{st}</span><div style={{flex:1,background:'var(--bg3)',borderRadius:8,height:20}}><div style={{height:'100%',borderRadius:8,background:palette[i%palette.length],width:(rows.length?100*count/rows.length:0)+'%'}}/></div><strong>{count}</strong></div>)}</div></div>
+        <div className="card"><strong>🎯 ผลลัพธ์แยกตามแอด</strong><div style={{fontSize:11,color:'var(--text2)',marginTop:5}}>แต่ละแถวรวมได้เท่ากับจำนวนเคสของแอดนั้น · คลิกชื่อแอดเพื่อเจาะลึก</div>
+          <div style={{marginTop:18,display:'grid',gap:13}}>{adOutcomeRows.map(a=><div key={a.name}>
+            <button onClick={()=>setChosen(a.name.toLocaleLowerCase())} style={{border:0,background:'none',color:'var(--text)',cursor:'pointer',padding:0,fontSize:12,textAlign:'left',marginBottom:5}}>{a.name} — <strong>{a.count} เคส</strong></button>
+            <div style={{display:'flex',height:23,width:'100%',borderRadius:7,overflow:'hidden',background:'var(--bg3)'}}>{groups.map(([key,label,color])=><div key={key} title={label+': '+a.counts[key]} style={{width:(a.count?100*a.counts[key]/a.count:0)+'%',background:color,minWidth:a.counts[key]?2:0}}/>)}</div>
+          </div>)}</div>
+          {!ads.length&&<div style={{padding:20,color:'var(--text2)'}}>ไม่มีเคสในเดือนที่เลือก</div>}
+          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:15}}>{groups.map(([key,label,color])=><span key={key} style={{fontSize:11,color:'var(--text2)'}}><span style={{color}}>●</span> {label}</span>)}</div>
+        </div>
+        <div className="card"><strong>📊 รายละเอียดสถานะ {chosen==='all'?'ทุกแอด':(adMap[chosen]?.name||'')}</strong><div style={{fontSize:11,color:'var(--text2)',marginTop:5}}>ทุกสถานะจริงในระบบ ไม่รวมสถานะต่างชนิดเข้าด้วยกัน</div>
+          <div style={{marginTop:18}}>{statuses.map(([st,count],i)=><div key={st} style={{display:'flex',gap:10,alignItems:'center',marginBottom:12}}><span style={{width:115,fontSize:12}}>{st}</span><div style={{flex:1,background:'var(--bg3)',borderRadius:8,height:20}}><div style={{height:'100%',borderRadius:8,background:palette[i%palette.length],width:(rows.length?100*count/rows.length:0)+'%'}}/></div><strong style={{fontSize:12,minWidth:60,textAlign:'right'}}>{count} ({rows.length?Math.round(count/rows.length*100):0}%)</strong></div>)}</div>
+          {!statuses.length&&<div style={{padding:20,color:'var(--text2)'}}>ไม่มีข้อมูลสถานะ</div>}
+        </div>
       </div>
-      <div className="card" style={{marginTop:16,overflowX:'auto'}}><strong>📋 ตารางสรุปตามแอด</strong><table style={{width:'100%',marginTop:14}}><thead><tr><th>แอด</th><th>เคส</th><th>รอข้อมูล</th><th>กำลังติดต่อ</th><th>ปล่อยแล้ว</th><th>สถานะอื่น</th></tr></thead><tbody>{ads.map(a=>{const w=a.rows.filter(c=>c.status==='รอข้อมูล').length,t=a.rows.filter(c=>c.status==='กำลังติดต่อ').length,s=a.rows.filter(c=>c.status==='ปล่อยแล้ว').length;return <tr key={a.name}><td>{a.name}</td><td>{a.rows.length}</td><td>{w}</td><td>{t}</td><td>{s}</td><td>{a.rows.length-w-t-s}</td></tr>;})}</tbody></table></div>
+      <div className="card" style={{marginTop:16,overflowX:'auto'}}><strong>📋 ตารางผลลัพธ์ของทุกแอด</strong>
+        <table style={{width:'100%',marginTop:14}}><thead><tr><th>แอด</th><th>ได้รับ</th><th>ไปต่อได้</th><th>ไปต่อไม่ได้</th><th>ปิดเคส</th><th>ปล่อยแล้ว</th><th>ติดตาม / อื่น ๆ</th><th>% ไปต่อได้</th></tr></thead>
+          <tbody>{adOutcomeRows.map(a=><tr key={a.name} onClick={()=>setChosen(a.name.toLocaleLowerCase())} style={{cursor:'pointer'}}><td>{a.name}</td><td>{a.count}</td><td>{a.counts.pass}</td><td>{a.counts.fail}</td><td>{a.counts.closed}</td><td>{a.counts.sold}</td><td>{a.counts.pending}</td><td>{a.count?Math.round(a.counts.pass/a.count*100):0}%</td></tr>)}</tbody></table>
+        <div style={{marginTop:12,fontSize:11,color:'var(--text2)'}}>เกณฑ์: ไปต่อได้รวม ไปต่อได้/จอง/รอเซ็นต์/รอผล/อนุมัติ · ไปต่อไม่ได้รวม ติดต่อไม่ได้/รีเจค/ได้รถจากที่อื่น · ปิดเคสและปล่อยแล้วแยกกัน · สถานะที่เหลืออยู่ในติดตาม/อื่น ๆ ตัวเลขทุกกลุ่มไม่ซ้ำกัน</div>
+      </div>
     </>}
   </div>;
 }
