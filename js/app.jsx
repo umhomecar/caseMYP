@@ -9,6 +9,7 @@ import {createClient} from '@supabase/supabase-js';
 // ============================================================
 // ⚙️ CONFIG
 // ============================================================
+const DESIGN_PREVIEW=window.location.pathname==='/design-preview.html';
 const RUNTIME_CONFIG=window.__CASEMYP_CONFIG__||{};
 const SUPA_URL=String(RUNTIME_CONFIG.supabaseUrl||'').trim().replace(/\/+$/,'');
 const SUPA_KEY=String(RUNTIME_CONFIG.supabaseAnonKey||'').trim();
@@ -234,7 +235,20 @@ async function getSearchCaseRows({force=false,sales=''}={}){
 const CACHEABLE=['getCases','getUsers','getBookings','getDashboard','getNotifications','getStandaloneCases','getTrashCases'];
 const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard','getHistory'],bulkAssignCases:['getCases','getDashboard','getHistory'],deleteCase:['getCases','getDashboard','getTrashCases','getHistory'],restoreCase:['getCases','getDashboard','getTrashCases','getHistory'],addBooking:['getBookings'],updateBooking:['getBookings'],deleteBooking:['getBookings'],restoreBooking:['getBookings'],addCaseNote:['getCaseNotes','getSalesNotes','getHistory'],deleteCaseNote:['getCaseNotes','getSalesNotes','getHistory'],addCaseFollowup:['getCaseFollowups','getSalesFollowups','getHistory'],updateFollowupStatus:['getCaseFollowups','getSalesFollowups','getHistory'],deleteFollowup:['getCaseFollowups','getSalesFollowups','getHistory'],addStandaloneCase:['getStandaloneCases'],updateStandaloneCase:['getStandaloneCases'],deleteStandaloneCase:['getStandaloneCases'],restoreStandaloneCase:['getStandaloneCases']};
 
+const PREVIEW_SALES=['แฟ้บ','บอลเล็ก','บอลใหญ่','เพ้นท์','พีร์'];
+function previewCases(){
+  const d=new Date();const date='02/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()+' 11:00:00';
+  const campaigns=['FE','D-max 459','4M','organic','Yaris 359','Jazz 299','City'];
+  const status=['รอข้อมูล','ไปต่อได้','กำลังติดต่อ','เคสเลี้ยง','จอง','ไม่ต่อได้','เคสวัด 50/50'];
+  return Array.from({length:26},(_,i)=>({caseid:'DEMO'+String(i+1).padStart(3,'0'),customername:'ตัวอย่างเคส '+(i+1),contact:'',sales:PREVIEW_SALES[i%5],status:status[i%status.length],createdat:date,attachment:'[CLIP:'+campaigns[i%campaigns.length]+']',sent:'คิวเพจ'}));
+}
 async function api(action,data={}){
+  if(DESIGN_PREVIEW){
+    if(action==='getCases')return{success:true,data:previewCases()};
+    if(action==='getUsers')return{success:true,data:PREVIEW_SALES.map((name,i)=>({userId:'DEMO'+i,name,role:'Sales',status:'active'}))};
+    if(action==='getNotifications')return{success:true,data:[]};
+    return{success:false,error:'โหมดตัวอย่าง: ไม่สามารถบันทึกหรือแก้ไขข้อมูลจริงได้'};
+  }
   const cacheable=CACHEABLE.includes(action);
   const key=cacheKey(action,data);
   if(cacheable){
@@ -1836,7 +1850,7 @@ function AdminDashboard({currentUser,users}){
   const drillRows=drilldown?(drilldown.type==='ad'?(adMap[drilldown.key]?.rows||[]):rows.filter(c=>(c.status||'ไม่ระบุสถานะ')===drilldown.key)):[];
 
   return <div className="page casemyp-v2-dashboard">
-    <section className="casemyp-v2-hero"><div className="casemyp-v2-hero-copy"><div className="casemyp-v2-eyebrow">CASEMYP / PERFORMANCE INSIGHTS</div><h1>Ad Intelligence <span>Dashboard</span></h1><p>สำรวจคุณภาพเคส เปรียบเทียบผลลัพธ์ของแอด และติดตามงานได้ในที่เดียว</p></div><div className="casemyp-v2-hero-art" aria-hidden="true"><div className="casemyp-v2-orbit casemyp-v2-orbit-one"></div><div className="casemyp-v2-orbit casemyp-v2-orbit-two"></div><div className="casemyp-v2-hero-glyph">✦</div></div></section>
+    <section className="casemyp-v2-hero"><div className="casemyp-v2-hero-copy"><div className="casemyp-v2-eyebrow">{DESIGN_PREVIEW?'DESIGN PREVIEW · ข้อมูลสมมติเท่านั้น':'CASEMYP / PERFORMANCE INSIGHTS'}</div><h1>Ad Intelligence <span>Dashboard</span></h1><p>สำรวจคุณภาพเคส เปรียบเทียบผลลัพธ์ของแอด และติดตามงานได้ในที่เดียว</p></div><div className="casemyp-v2-hero-art" aria-hidden="true"><div className="casemyp-v2-orbit casemyp-v2-orbit-one"></div><div className="casemyp-v2-orbit casemyp-v2-orbit-two"></div><div className="casemyp-v2-hero-glyph">✦</div></div></section>
     <div className="ad-dashboard-filters casemyp-v2-toolbar" style={{display:'grid',gridTemplateColumns:'minmax(160px,220px) minmax(180px,1fr) 110px',gap:10,alignItems:'center',marginBottom:14}}><input aria-label="เลือกเดือน" type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}/><select aria-label="เลือกแอด" value={chosen} onChange={e=>{setChosen(e.target.value);setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select><button className="btn btn-ghost" onClick={()=>{setDrilldown(null);load(false);}} style={{height:38,padding:'0 10px'}}>🔄 รีเฟรช</button></div>
     {loading?<Loading/>:<>
       <div className="casemyp-v2-section-caption">OVERVIEW <span>· ภาพรวมผลลัพธ์ของเดือนที่เลือก</span></div><div className="casemyp-v2-kpi-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value,color,bg])=><div key={name} className="card casemyp-v2-kpi" style={{border:'1px solid '+color+'55',borderTop:'3px solid '+color,background:'linear-gradient(160deg,'+bg+',rgba(255,255,255,.015))',padding:'12px 14px',borderRadius:12}}><div style={{fontSize:28,fontWeight:900,color,lineHeight:1.1}}>{value}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:6}}>{name}</div></div>)}</div>
@@ -1861,7 +1875,7 @@ function AdminDashboard({currentUser,users}){
       {drilldown&&!editingCase&&<div role="dialog" aria-modal="true" aria-label={'รายการเคส '+drilldown.label} onClick={()=>setDrilldown(null)} style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.76)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
         <div onClick={event=>event.stopPropagation()} style={{width:'min(680px,100%)',maxHeight:'85vh',overflowY:'auto',background:'#24282f',border:'1px solid #49505a',borderRadius:15,padding:18,boxShadow:'0 20px 60px rgba(0,0,0,.5)'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,marginBottom:14}}><div><strong style={{fontSize:18}}>📋 {drilldown.label}</strong><div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>ทั้งหมด {drillRows.length} เคส · รหัสเคส / เซลส์ผู้รับผิดชอบ</div></div><button className="btn btn-ghost" onClick={()=>setDrilldown(null)} aria-label="ปิดหน้าต่าง">✕ ปิด</button></div>
-          <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>ลำดับ</th><th>รหัสเคส</th><th>เซลส์ผู้รับผิดชอบ</th><th>สถานะ</th></tr></thead><tbody>{drillRows.map((c,i)=><tr key={String(c.caseid||i)} onClick={()=>setEditingCase(c)} style={{cursor:'pointer'}} title="คลิกเพื่อดูและแก้ไขเคส"><td>{i+1}</td><td><button type="button" onClick={()=>setEditingCase(c)} style={{fontWeight:800,color:'#70b5ff',background:'transparent',border:0,cursor:'pointer',textDecoration:'underline',padding:'6px 2px'}} title="เปิดรายละเอียดและแก้ไขเคส">{c.caseid||'-'}</button></td><td>{isUnassignedSales(c.sales)?'รอมอบหมาย':c.sales}</td><td>{c.status||'-'}</td></tr>)}</tbody></table></div>
+          <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>ลำดับ</th><th>รหัสเคส</th><th>เซลส์ผู้รับผิดชอบ</th><th>สถานะ</th></tr></thead><tbody>{drillRows.map((c,i)=><tr key={String(c.caseid||i)} onClick={()=>{if(!DESIGN_PREVIEW)setEditingCase(c);}} style={{cursor:'pointer'}} title="คลิกเพื่อดูและแก้ไขเคส"><td>{i+1}</td><td><button type="button" onClick={()=>{if(!DESIGN_PREVIEW)setEditingCase(c);}} style={{fontWeight:800,color:'#70b5ff',background:'transparent',border:0,cursor:'pointer',textDecoration:'underline',padding:'6px 2px'}} title="เปิดรายละเอียดและแก้ไขเคส">{c.caseid||'-'}</button></td><td>{isUnassignedSales(c.sales)?'รอมอบหมาย':c.sales}</td><td>{c.status||'-'}</td></tr>)}</tbody></table></div>
           {!drillRows.length&&<div style={{padding:20,textAlign:'center'}}>ไม่พบเคส</div>}
         </div>
       </div>}
@@ -2708,7 +2722,7 @@ function AdminLineToggle({compact=false}){
 }
 
 function AdminApp({currentUser,onLogout}){
-  const [page,setPage]=useState('cases');
+  const [page,setPage]=useState(DESIGN_PREVIEW?'dashboard':'cases');
   const [users,setUsers]=useState([]);
   const [showNotif,setShowNotif]=useState(false);
   const [notifCount,setNotifCount]=useState(0);
@@ -2753,7 +2767,7 @@ function AdminApp({currentUser,onLogout}){
   return <div>
     <div className="sidebar">
       <div className="sidebar-logo casemyp-v2-brand"><div className="casemyp-v2-brand-icon">🚘</div><div><div className="casemyp-v2-brand-title">CasePool <span>2.0</span></div><div className="casemyp-v2-brand-sub">MIDNIGHT WORKSPACE</div></div></div><div className="casemyp-v2-menu-label">WORKSPACE</div>
-      <nav className="sidebar-nav">{allNavItems.map(n=>
+      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>n.key==='dashboard'):allNavItems).map(n=>
         <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
@@ -3017,8 +3031,8 @@ function App(){
 }
 
 try{
-  if(SUPA_CONFIG_ERROR)throw new Error(SUPA_CONFIG_ERROR);
-  createRoot(document.getElementById('root')).render(<ErrorBoundary><App/></ErrorBoundary>);
+  if(SUPA_CONFIG_ERROR&&!DESIGN_PREVIEW)throw new Error(SUPA_CONFIG_ERROR);
+  createRoot(document.getElementById('root')).render(<ErrorBoundary>{DESIGN_PREVIEW?<AdminApp currentUser={{name:'ตัวอย่างผู้ดูแล',role:'Admin'}} onLogout={()=>{}}/>:<App/>}</ErrorBoundary>);
 }catch(e){
   const loader=document.getElementById('app-loader');
   if(loader)loader.remove();
