@@ -2214,3 +2214,35 @@ body:not(.light) .casemyp-v2-modal-edit input,body:not(.light) .casemyp-v2-modal
  body:not(.light) .casemyp-v2-modal-case-form .modal-hd,body:not(.light) .casemyp-v2-modal-case-form .modal-ft{padding:13px 14px;}
  body:not(.light) .casemyp-v2-modal-edit{width:100%!important;max-width:100%!important;}
 }
+
+/* CaseMYP 2.0 — approved primary pink action palette (preview only) */
+body:not(.light){
+ --pink-primary:#ec4899;--pink-soft:#f472b6;--pink-deep:#db2777;
+ --blue:#f472b6;--blue2:#db2777;
+}
+body:not(.light) .btn-primary,
+body:not(.light) .casemyp-v2-modal-edit .btn-primary{
+ background:linear-gradient(135deg,#f472b6,#ec4899 55%,#db2777)!important;
+ border-color:rgba(255,177,215,.5)!important;
+ color:#fff!important;
+ box-shadow:0 7px 22px rgba(236,72,153,.28)!important;
+}
+body:not(.light) .btn-primary:hover,
+body:not(.light) .casemyp-v2-modal-edit .btn-primary:hover{
+ background:linear-gradient(135deg,#fb8dcc,#f35aa7 55%,#e33283)!important;
+ box-shadow:0 10px 27px rgba(236,72,153,.42)!important;
+}
+body:not(.light) .btn-primary:disabled{opacity:.55;cursor:not-allowed;box-shadow:none!important;}
+body:not(.light) .btn-ghost:not(.btn-danger):hover{
+ border-color:rgba(244,114,182,.52)!important;background:rgba(236,72,153,.13)!important;
+}
+body:not(.light) input:focus-visible,
+body:not(.light) select:focus-visible,
+body:not(.light) textarea:focus-visible,
+body:not(.light) button:focus-visible{
+ outline-color:#f9a8d4!important;box-shadow:0 0 0 4px rgba(236,72,153,.15)!important;
+}
+body:not(.light) input:focus,
+body:not(.light) select:focus,
+body:not(.light) textarea:focus{border-color:#f472b6!important;}
+/* Destructive controls remain red; infographic bars and status colors unchanged. */
