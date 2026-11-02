@@ -2128,3 +2128,20 @@ body:not(.light) .page-title{color:#faf7ff;letter-spacing:.1px;}
   body:not(.light) .btn,body:not(.light) .nav-item,body:not(.light) input,
   body:not(.light) select,body:not(.light) textarea{transition:none !important;}
 }
+
+/* Phase 2: preserve the approved colorful infographic exactly.
+   Only surrounding glass containers are restyled. */
+body:not(.light) .ad-infographic-chart{
+  background:#242627 !important;
+  border:1px solid rgba(198,202,218,.24) !important;
+  border-radius:14px !important;
+  box-shadow:0 8px 22px rgba(2,5,20,.18) !important;
+}
+body:not(.light) .ad-infographic-chart button{
+  border-radius:0 !important;
+  box-shadow:none !important;
+}
+body:not(.light) .ad-infographic-chart button:focus-visible{
+  outline:2px solid #b0baff;
+  outline-offset:3px;
+}
