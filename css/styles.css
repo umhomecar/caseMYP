@@ -2027,3 +2027,6 @@ body:not(.light) tr:hover td{background:#2f3031 !important;}
   .admin-cases-desktop-table{display:block !important;}
 }
 
+
+/* Ad dashboard compact filter controls */
+@media (max-width: 620px){.ad-dashboard-filters{grid-template-columns:1fr 1fr !important}.ad-dashboard-filters button{grid-column:1/-1}}

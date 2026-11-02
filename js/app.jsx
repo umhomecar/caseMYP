@@ -1806,6 +1806,7 @@ function AdminDashboard({currentUser}){
   const [loading,setLoading]=useState(true);
   const [month,setMonth]=useState(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');});
   const [chosen,setChosen]=useState('all');
+  const [drilldown,setDrilldown]=useState(null);
   const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>setLoading(false));},[]);
   useEffect(()=>{load();},[load]);
   const monthCases=cases.filter(c=>{const t=String(c.createdat||'');const m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m){let y=Number(m[3]);if(y>2400)y-=543;return y+'-'+String(Number(m[2])).padStart(2,'0')===month;}return t.startsWith(month+'-');});
@@ -1827,31 +1828,39 @@ function AdminDashboard({currentUser}){
   const groups=[['pass','ไปต่อได้','#10b981'],['fail','ไปต่อไม่ได้','#ef4444'],['closed','ปิดเคส','#a78bfa'],['sold','ปล่อยแล้ว','#34d399'],['pending','ติดตาม / อื่น ๆ','#f59e0b']];
   const adOutcomeRows=ads.map(a=>({name:a.name,count:a.rows.length,counts:groupCounts(a.rows)}));
   const palette=['#ffd028','#ff8a38','#ad43bd','#198bd3','#10ab92','#e76588','#8d83ff','#2ec7a0'];
-  const kpis=[['เคสทั้งหมด',rows.length],['แอดที่มีเคส',ads.filter(a=>a.name!=='ไม่ระบุแอด').length],['ไปต่อได้',overall.pass],['ไปต่อไม่ได้',overall.fail],['ปิดเคส',overall.closed],['ปล่อยแล้ว',overall.sold],['ติดตาม / อื่น ๆ',overall.pending]];
+  const kpis=[['เคสทั้งหมด',rows.length,'#4da3ff','rgba(77,163,255,.12)'],['แอดที่มีเคส',ads.filter(a=>a.name!=='ไม่ระบุแอด').length,'#b38aff','rgba(179,138,255,.12)'],['ไปต่อได้',overall.pass,'#20ce92','rgba(32,206,146,.12)'],['ไปต่อไม่ได้',overall.fail,'#ff6878','rgba(255,104,120,.12)'],['ปิดเคส',overall.closed,'#ffab3d','rgba(255,171,61,.12)'],['ปล่อยแล้ว',overall.sold,'#24c7c0','rgba(36,199,192,.12)'],['ติดตาม / อื่น ๆ',overall.pending,'#f8cf4c','rgba(248,207,76,.12)']];
+  const drillRows=drilldown?(drilldown.type==='ad'?(adMap[drilldown.key]?.rows||[]):rows.filter(c=>(c.status||'ไม่ระบุสถานะ')===drilldown.key)):[];
 
   return <div className="page" style={{padding:24}}>
-    <div className="page-hd"><div><div className="page-title">📊 วิเคราะห์แอด</div><div style={{fontSize:12,color:'var(--text2)'}}>แหล่งที่มาของเคสและสถานะ · ทุกเซลส์</div></div><button className="btn btn-ghost" onClick={load}>🔄 รีเฟรช</button></div>
-    <div style={{display:'flex',gap:10,marginBottom:18,flexWrap:'wrap'}}><input type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');}}/><select value={chosen} onChange={e=>setChosen(e.target.value)}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select></div>
+    <div className="page-hd"><div><div className="page-title">📊 วิเคราะห์แอด</div><div style={{fontSize:12,color:'var(--text2)'}}>แหล่งที่มาของเคสและสถานะ · ทุกเซลส์</div></div></div>
+    <div className="ad-dashboard-filters" style={{display:'grid',gridTemplateColumns:'minmax(160px,220px) minmax(180px,1fr) 110px',gap:10,alignItems:'center',marginBottom:14}}><input aria-label="เลือกเดือน" type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}/><select aria-label="เลือกแอด" value={chosen} onChange={e=>{setChosen(e.target.value);setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select><button className="btn btn-ghost" onClick={()=>{setDrilldown(null);load();}} style={{height:38,padding:'0 10px'}}>🔄 รีเฟรช</button></div>
     {loading?<Loading/>:<>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value],i)=><div key={name} className="card" style={{borderTop:'3px solid '+palette[i%palette.length],padding:14}}><div style={{fontSize:28,fontWeight:800}}>{value}</div><div style={{fontSize:12,color:'var(--text2)'}}>{name}</div></div>)}</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value,color,bg])=><div key={name} className="card" style={{border:'1px solid '+color+'55',borderTop:'3px solid '+color,background:'linear-gradient(160deg,'+bg+',rgba(255,255,255,.015))',padding:'12px 14px',borderRadius:12}}><div style={{fontSize:28,fontWeight:900,color,lineHeight:1.1}}>{value}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:6}}>{name}</div></div>)}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(330px,1fr))',gap:16}}>
         {[
-          {title:'🎯 Top 5 แอดที่ได้เคสมากที่สุด',subtitle:'สัดส่วนเทียบเคสทั้งหมดในเดือน · เลือกแอดจากตัวกรองด้านบน',items:ads.slice(0,5).map(a=>({label:a.name,count:a.rows.length})),total:monthCases.length,colors:['#ffcb12','#ff7b2d','#b12abb','#158bdb','#00b39f']},
-          {title:'📊 Top 5 สถานะเคส',subtitle:'สัดส่วนตามแอดที่เลือก · ทุกสถานะยังดูได้ในตาราง',items:statuses.slice(0,5).map(([label,count])=>({label,count})),total:rows.length,colors:['#18b4a2','#1c9cdc','#b74ab6','#f58227','#f2cd21']}
+          {title:'🎯 Top 5 แอดที่ได้เคสมากที่สุด',subtitle:'สัดส่วนเทียบเคสทั้งหมดในเดือน · เลือกแอดจากตัวกรองด้านบน',items:ads.slice(0,5).map(a=>({label:a.name,count:a.rows.length,key:a.name.toLocaleLowerCase()})),total:monthCases.length,colors:['#ffcb12','#ff7b2d','#b12abb','#158bdb','#00b39f']},
+          {title:'📊 Top 5 สถานะเคส',subtitle:'สัดส่วนตามแอดที่เลือก · ทุกสถานะยังดูได้ในตาราง',items:statuses.slice(0,5).map(([label,count])=>({label,count,key:label})),total:rows.length,colors:['#18b4a2','#1c9cdc','#b74ab6','#f58227','#f2cd21']}
         ].map((chart,chartIndex)=><div key={chartIndex} className="card" style={{minWidth:0,padding:'20px 18px 16px',background:'linear-gradient(145deg,#252b32,#1b1f25)',border:'1px solid rgba(255,255,255,.11)',borderRadius:16}}>
           <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>{chart.title}</div>
           <div style={{fontSize:11,color:'var(--text2)'}}>{chart.subtitle}</div>
           {chart.items.length?<div style={{display:'flex',alignItems:'end',justifyContent:'space-around',gap:7,height:316,paddingTop:22,overflowX:'auto'}}>
-            {chart.items.map((item,i)=>{const pct=chart.total?Math.round(item.count/chart.total*100):0;const max=Math.max(...chart.items.map(x=>x.count),1);const height=Math.max(24,185*item.count/max);return <div key={item.label} title={item.label+' — '+item.count+' เคส ('+pct+'%)'} style={{minWidth:61,flex:'1 1 0',maxWidth:110,display:'flex',flexDirection:'column',alignItems:'stretch',justifyContent:'end',height:'100%'}}>
+            {chart.items.map((item,i)=>{const pct=chart.total?Math.round(item.count/chart.total*100):0;const max=Math.max(...chart.items.map(x=>x.count),1);const height=Math.max(24,185*item.count/max);return <button type="button" key={item.label} onClick={()=>setDrilldown({type:chartIndex===0?'ad':'status',key:item.key,label:item.label})} title={'ดูรายชื่อ '+item.count+' เคส: '+item.label} style={{border:0,background:'transparent',padding:0,cursor:'pointer',color:'inherit',minWidth:61,flex:'1 1 0',maxWidth:110,display:'flex',flexDirection:'column',alignItems:'stretch',justifyContent:'end',height:'100%'}}>
               <div style={{textAlign:'center',fontSize:22,fontWeight:900,color:chart.colors[i],textShadow:'0 2px 14px rgba(0,0,0,.3)',marginBottom:9}}>{pct}%</div>
               <div style={{height,background:'linear-gradient(155deg,'+chart.colors[i]+','+chart.colors[i]+'bb)',borderRadius:'13px 13px 5px 5px',boxShadow:'0 12px 24px rgba(0,0,0,.24)',display:'flex',alignItems:'end',justifyContent:'center',paddingBottom:10,boxSizing:'border-box'}}><span style={{fontWeight:900,fontSize:18,color:'#fff',textShadow:'0 1px 4px #333'}}>{item.count}</span></div>
               <div style={{height:65,padding:'10px 3px',background:'linear-gradient(#f7f9fc,#d9e1e9)',color:'#222c36',borderRadius:'0 0 10px 10px',textAlign:'center',boxSizing:'border-box',boxShadow:'0 6px 12px rgba(0,0,0,.2)'}}>
                 <div style={{fontSize:11,fontWeight:800,overflowWrap:'anywhere',lineHeight:1.3,maxHeight:42,overflow:'hidden'}}>{item.label}</div>
               </div>
-            </div>;})}
+            </button>;})}
           </div>:<div style={{padding:'56px 10px',textAlign:'center',color:'var(--text2)'}}>ไม่มีข้อมูลในเดือนที่เลือก</div>}
         </div>)}
       </div>
+      {drilldown&&<div role="dialog" aria-modal="true" aria-label={'รายการเคส '+drilldown.label} onClick={()=>setDrilldown(null)} style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.76)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+        <div onClick={event=>event.stopPropagation()} style={{width:'min(680px,100%)',maxHeight:'85vh',overflowY:'auto',background:'#24282f',border:'1px solid #49505a',borderRadius:15,padding:18,boxShadow:'0 20px 60px rgba(0,0,0,.5)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,marginBottom:14}}><div><strong style={{fontSize:18}}>📋 {drilldown.label}</strong><div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>ทั้งหมด {drillRows.length} เคส · รหัสเคส / เซลส์ผู้รับผิดชอบ</div></div><button className="btn btn-ghost" onClick={()=>setDrilldown(null)} aria-label="ปิดหน้าต่าง">✕ ปิด</button></div>
+          <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>ลำดับ</th><th>รหัสเคส</th><th>เซลส์ผู้รับผิดชอบ</th><th>สถานะ</th></tr></thead><tbody>{drillRows.map((c,i)=><tr key={String(c.caseid||i)}><td>{i+1}</td><td style={{fontWeight:800,color:'#70b5ff'}}>{c.caseid||'-'}</td><td>{isUnassignedSales(c.sales)?'รอมอบหมาย':c.sales}</td><td>{c.status||'-'}</td></tr>)}</tbody></table></div>
+          {!drillRows.length&&<div style={{padding:20,textAlign:'center'}}>ไม่พบเคส</div>}
+        </div>
+      </div>}
       <div className="card" style={{marginTop:14}}><strong>📈 รายละเอียดสถานะทั้งหมด {chosen==='all'?'ทุกแอด':(adMap[chosen]?.name||'')}</strong>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:8,marginTop:12}}>{statuses.map(([st,count],i)=><div key={st} style={{border:'1px solid var(--border)',borderRadius:8,padding:10}}><div style={{fontSize:12}}>{st}</div><div style={{display:'flex',alignItems:'baseline',gap:8}}><strong style={{fontSize:20,color:palette[i%palette.length]}}>{count}</strong><span style={{fontSize:11,color:'var(--text2)'}}>{rows.length?Math.round(count/rows.length*100):0}%</span></div></div>)}</div>
       </div>
