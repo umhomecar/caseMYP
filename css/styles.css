@@ -2399,3 +2399,38 @@ body:not(.light) .cp-action-danger:hover:not(:disabled){background:#a9273f!impor
 body:not(.light) .cp-action-line:disabled,
 body:not(.light) .cp-action-save:disabled,
 body:not(.light) .cp-action-copy:disabled{opacity:.55!important;cursor:not-allowed;box-shadow:none!important;}
+
+/* Phase 2 corrective pass — semantic actions MUST override generic button styles.
+   Strong specificity intentionally follows all prior theme rules. */
+body:not(.light) button.btn.cp-action-copy,
+body:not(.light) button.btn.cp-action-copy:not(:disabled),
+body:not(.light) button.btn.cp-action-save,
+body:not(.light) button.btn.cp-action-save:not(:disabled){
+ background:#168fd1!important;border-color:#52b7ec!important;color:#fff!important;
+ box-shadow:0 5px 16px rgba(22,143,209,.22)!important;
+}
+body:not(.light) button.btn.cp-action-line,
+body:not(.light) button.btn.cp-action-line:not(:disabled){
+ background:#0eaa97!important;border-color:#41cebd!important;color:#fff!important;
+ box-shadow:0 5px 16px rgba(14,170,151,.22)!important;
+}
+body:not(.light) button.btn.cp-action-danger,
+body:not(.light) button.btn.cp-action-danger:not(:disabled){
+ background:#bf344a!important;border-color:#e3697b!important;color:#fff!important;
+}
+body:not(.light) button.btn.cp-action-edit,
+body:not(.light) button.btn.cp-action-edit:not(:disabled){
+ background:#f2d21a!important;border-color:#ffea75!important;color:#342e13!important;
+}
+body:not(.light) button.btn.cp-action-refresh,
+body:not(.light) button.btn.cp-action-refresh:not(:disabled){
+ background:#f58227!important;border-color:#ffa764!important;color:#fff!important;
+}
+body:not(.light) button.btn.cp-action-copy:hover:not(:disabled),
+body:not(.light) button.btn.cp-action-save:hover:not(:disabled){background:#117ab5!important;}
+body:not(.light) button.btn.cp-action-line:hover:not(:disabled){background:#0b9786!important;}
+body:not(.light) button.btn.cp-action-danger:hover:not(:disabled){background:#a9273f!important;}
+body:not(.light) button.btn.cp-action-edit:hover:not(:disabled){background:#ddbe0e!important;}
+body:not(.light) button.btn.cp-action-refresh:hover:not(:disabled){background:#df701d!important;}
+body:not(.light) button.btn.cp-action-line:disabled,
+body:not(.light) button.btn.cp-action-save:disabled{opacity:.52!important;box-shadow:none!important;}
