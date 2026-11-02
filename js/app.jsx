@@ -247,7 +247,7 @@ async function api(action,data={}){
     if(action==='getCases')return{success:true,data:previewCases()};
     if(action==='getNotes'||action==='getCaseNotes'||action==='getFollowups'||action==='getCaseFollowups'||action==='getHistory')return{success:true,data:[]};
     if(action==='getUsers')return{success:true,data:PREVIEW_SALES.map((name,i)=>({userId:'DEMO'+i,name,role:'Sales',status:'active'}))};
-    if(action==='getNotifications')return{success:true,data:[]};
+    if(action==='getNotifications'||action==='getBookings')return{success:true,data:[]};
     return{success:false,error:'โหมดตัวอย่าง: ไม่สามารถบันทึกหรือแก้ไขข้อมูลจริงได้'};
   }
   const cacheable=CACHEABLE.includes(action);
@@ -1033,8 +1033,8 @@ function AdminAnalytics({currentUser}){
   const allPeriod=cases.filter(c=>prefixes.some(p=>String(c.caseid||'').startsWith(p)));
   const funnel=[['เข้าระบบ',allPeriod.length],['คุยแล้ว',allPeriod.filter(c=>c.report&&c.report.length>5).length],['ไปต่อได้',allPeriod.filter(c=>['ไปต่อได้','เคสวัด 50/50','จอง','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยแล้ว'].includes(c.status)).length],['จอง',allPeriod.filter(c=>['จอง','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยแล้ว'].includes(c.status)).length],['ปล่อยรถ',allPeriod.filter(c=>c.status==='ปล่อยแล้ว').length]];
   const maxF=funnel[0][1]||1;
-  return<div className="page">
-    <div className="page-hd"><div><div className="page-title">📈 Analytics</div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์เชิงลึก</div></div><button className="btn btn-ghost" style={{fontSize:13}} onClick={()=>{cacheClear(['getCases']);location.reload();}}>🔄</button></div>
+  return<div className="page casemyp-v2-analytics">
+    <div className="page-hd casemyp-v2-report-heading"><div><div className="casemyp-v2-eyebrow">WORKSPACE / REPORTING</div><div className="page-title">📈 Analytics <span className="casemyp-v2-title-accent">· Reports</span></div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์เชิงลึก</div></div><button className="btn btn-ghost cp-action-refresh" style={{fontSize:13}} onClick={()=>{cacheClear(['getCases']);location.reload();}}>🔄</button></div>
     {/* Range Selector */}
     <div style={{display:'flex',gap:6,marginBottom:16}}>
       {[['month','เดือนนี้'],['3month','3 เดือน'],['all','ปีนี้']].map(([k,l])=>
@@ -1901,9 +1901,9 @@ function AdminBookings({currentUser,users}){
   const load=useCallback(()=>{setLoading(true);api('getBookings',{}).then(r=>{if(r.success)setBookings(r.data||[]);setLoading(false);});},[]);
   useEffect(()=>{load();},[load]);
   const OD={bg:'linear-gradient(160deg,#020d18 0%,#041e35 50%,#062840 100%)',neon:'#00d4ff',dim:'rgba(0,212,255,.12)',border:'rgba(0,212,255,.2)',text:'#cce8f4',sub:'rgba(0,212,255,.5)'};
-  return <div className="page" style={{paddingBottom:40}}>
+  return <div className="page casemyp-v2-bookings" style={{paddingBottom:40}}>
     {/* OCEAN HEADER */}
-    <div style={{padding:'24px 28px 20px',borderBottom:'1px solid rgba(0,212,255,.12)'}}>
+    <div className="casemyp-v2-booking-heading" style={{padding:'24px 28px 20px',borderBottom:'1px solid rgba(0,212,255,.12)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <div>
           <div style={{fontSize:10,color:OD.sub,letterSpacing:3,textTransform:'uppercase',marginBottom:4}}>Booking System</div>
@@ -2771,7 +2771,7 @@ function AdminApp({currentUser,onLogout}){
   return <div>
     <div className="sidebar">
       <div className="sidebar-logo casemyp-v2-brand"><div className="casemyp-v2-brand-icon">🚘</div><div><div className="casemyp-v2-brand-title">CasePool <span>2.0</span></div><div className="casemyp-v2-brand-sub">MIDNIGHT WORKSPACE</div></div></div><div className="casemyp-v2-menu-label">WORKSPACE</div>
-      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>n.key==='dashboard'||n.key==='cases'):allNavItems).map(n=>
+      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>['dashboard','cases','analytics','bookings'].includes(n.key)):allNavItems).map(n=>
         <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
