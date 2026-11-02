@@ -328,6 +328,8 @@ async function sbQ(method,table,q={},body=null){
   const baseUrl=`${SUPA_URL}/rest/v1/${table}`;
   const normalParams=[];const rawParts=[];
   Object.entries(q).forEach(([k,v])=>{
+    // limit is a client-side pagination cap for large reads; Range selects each page.
+    if(method==='GET' && Number(q.limit)>1000 && k==='limit')return;
     const s=String(v);
     if(s.includes('%25')||s.includes('%20')){
       // ถ้ามี encoded chars ให้ใส่ตรงๆ ใน URL โดยไม่ encode ซ้ำ
@@ -507,7 +509,7 @@ async function sbApi(action,data){
       if(isSbError(res))return{success:false,error:formatSbError(res)};
       return{success:true};
     }
-    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={deleted_at:'is.null',order:'caseid.desc'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
+    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={deleted_at:'is.null',order:'caseid.desc',limit:'50000'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'checkCaseDuplicates':{
       const rows=await sbQ('GET','cases',{deleted_at:'is.null',order:'updatedat.desc',limit:'10000'});
       if(isSbError(rows))return{success:false,error:formatSbError(rows)};
