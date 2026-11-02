@@ -245,6 +245,7 @@ function previewCases(){
 async function api(action,data={}){
   if(DESIGN_PREVIEW){
     if(action==='getCases')return{success:true,data:previewCases()};
+    if(action==='getNotes'||action==='getCaseNotes'||action==='getFollowups'||action==='getCaseFollowups'||action==='getHistory')return{success:true,data:[]};
     if(action==='getUsers')return{success:true,data:PREVIEW_SALES.map((name,i)=>({userId:'DEMO'+i,name,role:'Sales',status:'active'}))};
     if(action==='getNotifications')return{success:true,data:[]};
     return{success:false,error:'โหมดตัวอย่าง: ไม่สามารถบันทึกหรือแก้ไขข้อมูลจริงได้'};
@@ -1725,6 +1726,7 @@ function AdminCurrentCases({currentUser,users}){
     return rows;
   }
   return <div className="page casemyp-v2-cases">
+    {DESIGN_PREVIEW&&<div className="casemyp-v2-preview-notice">🎨 โหมดตัวอย่าง · ข้อมูลจำลอง ไม่สามารถบันทึกหรือส่ง LINE จริงได้</div>}
     <div className="page-hd casemyp-v2-cases-heading"><div style={{width:'100%'}}><div className="casemyp-v2-eyebrow">WORKSPACE / CASE MANAGEMENT</div><div className="page-title">📋 เคสปัจจุบัน <span className="casemyp-v2-title-accent">· Case Center</span></div><div className="admin-current-cases-desktop-summary" style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div><div className="admin-current-cases-mobile-search"><input value={filter.q} onChange={e=>{const v=e.target.value;setFilter(f=>({...f,q:v}));if(!v.trim())load();}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ค้นหา รหัสเคส ชื่อลูกค้า เบอร์..." inputMode="search"/></div></div><div className="admin-current-cases-desktop-tools" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     <div className="admin-current-cases-desktop-filters casemyp-v2-case-filters" style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
