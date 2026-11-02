@@ -527,7 +527,7 @@ async function sbApi(action,data){
     case 'addCase':{
       const ts=data.createdat||nowTH();
       const updatedTs=data.updatedat||ts;
-      const assignedSales=String(data.sales||'').trim()||UNASSIGNED_SALES;
+      let assignedSales=String(data.sales||'').trim()||UNASSIGNED_SALES;
       const baseRow={customername:data.customername,contact:data.contact||'',report:data.report||'',status:data.status||'รอข้อมูล',sales:assignedSales,createdat:ts,updatedat:updatedTs,sent:data.sent||'ปกติ',attachment:data.attachment||'',version:1};
       const maxAttempts=data.caseid?1:8;
       let lastError=null;
@@ -535,6 +535,7 @@ async function sbApi(action,data){
         const id=data.caseid||await genCaseId(attempt,data.casePrefix||'');
         const inserted=await sbQ('POST','cases',{},{...baseRow,caseid:id});
         if(!isSbError(inserted)){
+          assignedSales=String(safeArray(inserted)[0]?.sales||assignedSales);
           const lineSender=LINE_SENDERS.includes(String(data.lineSender||'').trim())?String(data.lineSender).trim():'';
           const lineSenderDetail=lineSender?' | ผู้ส่ง LINE: '+lineSender:'';
           let historySaved=await sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales)+lineSenderDetail);
@@ -1292,7 +1293,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   const lastMonthDate=new Date(today.getFullYear(),today.getMonth()-1,Math.min(today.getDate(),28));
   const defaultBackMonth=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}`;
   const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
-  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',note:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||'ปกติ',clipad:''});
+  const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',note:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||(currentUser.role==='Admin'&&!backdated?'คิวเพจ':'ปกติ'),clipad:''});
   const [lineSender,setLineSender]=useState(()=>LINE_SENDERS.includes(currentUser?.name)?currentUser.name:'เกมส์');
   const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
   const [duplicates,setDuplicates]=useState([]);
@@ -1379,7 +1380,9 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       <div className="form-group"><label>ติดต่อโดย</label><select value={form.contact_by} onChange={e=>set('contact_by',e.target.value)}>{CONTACT_BY.map(c=><option key={c}>{c}</option>)}</select></div>
       <div className="form-group"><label>ข้อมูลติดต่อ</label>{form.contact_by==='QR Code'?<QrUploader value={form.contact} onChange={v=>set('contact',v)}/>:<div><input value={form.contact} onChange={e=>set('contact',e.target.value)} placeholder="เบอร์ / ไลน์ / ID"/>{form.contact_by==='เบอร์'&&form.contact&&!/^0\d{8,9}$/.test(form.contact.replace(/\D/g,''))&&<div style={{fontSize:11,color:'var(--yellow)',marginTop:3}}>⚠️ เบอร์ไม่ครบ 10 หลัก</div>}</div>}</div>
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-      {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>เซลส์ผู้รับผิดชอบ</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">รอมอบหมายภายหลัง</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>}
+      {currentUser.role==='Admin'&&!backdated&&!forcedSent&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>รูปแบบการส่งเพจ</label><select value={form.sent} onChange={e=>set('sent',e.target.value)}><option value="คิวเพจ">✅ ส่งตามคิวเพจอัตโนมัติ (10:00–17:00 น.)</option><option value="ปกติ">มอบหมายเอง / รอมอบหมาย</option></select><div style={{fontSize:11,color:'var(--text3)',marginTop:5}}>คิววนต่อเนื่องข้ามวัน · นอกเวลาระบบบันทึกเป็นรอมอบหมาย · เคสย้อนหลังไม่กินคิว</div></div>}
+      {currentUser.role==='Admin'&&(backdated||form.sent!=='คิวเพจ')&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>เซลส์ผู้รับผิดชอบ</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">รอมอบหมายภายหลัง</option>{users.filter(u=>u.role==='Sales'&&u.status!=='inactive').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>}
+      {currentUser.role==='Admin'&&!backdated&&form.sent==='คิวเพจ'&&<div style={{gridColumn:'1/-1',fontSize:12,color:'var(--green)',padding:'8px 10px',background:'rgba(16,185,129,.08)',borderRadius:8}}>🔄 ระบบกำหนดเซลส์จากคิวกลางเมื่อบันทึกสำเร็จ ไม่จำเป็นต้องเลือกชื่อเอง</div>}
       {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1',background:'rgba(210,153,34,.06)',border:'1px solid rgba(210,153,34,.25)',borderRadius:8,padding:'10px 12px'}}>
         <label style={{display:'flex',alignItems:'center',gap:6,color:'var(--yellow)',marginBottom:6}}>🎬 ข้อมูลคลิปแอด <span style={{fontSize:11,fontWeight:400,color:'var(--text3)'}}>เห็นเฉพาะ Admin</span></label>
         <input value={form.clipad} onChange={e=>set('clipad',e.target.value)} placeholder="ชื่อแอด / แคมเปญ / คลิป URL..."/>
