@@ -2277,3 +2277,19 @@ body:not(.light) .casemyp-v2-modal .form-group textarea:focus{
  body:not(.light) .casemyp-v2-preview-notice{font-size:11px;margin-bottom:10px}
  body:not(.light) .casemyp-v2-cases-heading .admin-current-cases-desktop-tools .btn{min-height:40px}
 }
+
+/* Phase 2 QA finishing: compact responsive add/edit workflow */
+body:not(.light) .casemyp-v2-form-demo-note{margin:0 0 14px;padding:12px 15px;border-radius:13px;background:rgba(255,197,197,.11);border:1px solid rgba(255,197,197,.35);color:#ffe5eb;font-size:12px;font-weight:650;line-height:1.5;}
+body:not(.light) .casemyp-v2-modal-case-form .modal-ft .btn-primary:disabled{background:linear-gradient(135deg,#ffe0e2,#f5b7c6)!important;color:#653c50!important;opacity:.8;}
+body:not(.light) .casemyp-v2-modal-edit{display:flex;flex-direction:column;max-height:min(92dvh,880px)!important;overflow:hidden;}
+body:not(.light) .casemyp-v2-modal-edit>div:nth-child(2){flex:1;min-height:0;overflow-y:auto!important;max-height:none!important;overscroll-behavior:contain;}
+body:not(.light) .casemyp-v2-modal-edit>div:last-child{flex:none;}
+body:not(.light) .casemyp-v2-modal-edit .btn-primary{color:#542b41!important;}
+@media(max-width:620px){
+ body:not(.light) .casemyp-v2-modal-case-form .casemyp-v2-case-form-grid{grid-template-columns:minmax(0,1fr)!important;}
+ body:not(.light) .casemyp-v2-modal-case-form .casemyp-v2-case-form-grid>.form-group,
+ body:not(.light) .casemyp-v2-modal-case-form .casemyp-v2-case-form-grid>div{grid-column:1/-1!important;min-width:0;}
+ body:not(.light) .casemyp-v2-modal-case-form .modal-ft{gap:8px;}
+ body:not(.light) .casemyp-v2-modal-case-form .modal-ft .btn{flex:1;min-width:0;}
+ body:not(.light) .casemyp-v2-modal-edit{max-height:94dvh!important;}
+}
