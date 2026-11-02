@@ -2242,3 +2242,38 @@ body:not(.light) textarea:focus-visible,body:not(.light) button:focus-visible{
 }
 body:not(.light) input:focus,body:not(.light) select:focus,body:not(.light) textarea:focus{border-color:#ffc5c5!important;}
 /* Destructive actions stay red; approved infographic columns keep their colors. */
+
+/* Phase 2 finishing pass — blush glass case workspace */
+body:not(.light) .casemyp-v2-preview-notice{
+ margin:0 0 14px;padding:11px 16px;border-radius:14px;
+ background:rgba(255,197,197,.09);color:#ffdbdf;
+ border:1px solid rgba(255,197,197,.26);font-size:12px;font-weight:650;
+}
+body:not(.light) .casemyp-v2-case-filters{
+ background:linear-gradient(125deg,rgba(50,54,91,.95),rgba(33,32,60,.92));
+ border-color:rgba(255,202,219,.28);
+}
+body:not(.light) .casemyp-v2-cases-heading{
+ background:radial-gradient(circle at 86% 22%,rgba(255,197,197,.24),transparent 37%),
+ linear-gradient(115deg,#343959,#4a365f 65%,#543e66);
+ border-color:rgba(255,205,218,.32);
+}
+body:not(.light) .casemyp-v2-title-accent{
+ background:linear-gradient(100deg,#ffdada,#ffc5d1,#f8a7bb);
+ color:transparent;background-clip:text;-webkit-background-clip:text;
+}
+body:not(.light) .casemyp-v2-cases-table{background:linear-gradient(160deg,rgba(44,44,66,.91),rgba(31,33,51,.96));}
+body:not(.light) .casemyp-v2-cases-table th{background:#3a3655!important;}
+body:not(.light) .casemyp-v2-cases-table .admin-case-row:hover td{background:rgba(255,197,197,.09);}
+body:not(.light) .casemyp-v2-modal .modal-hd{background:linear-gradient(110deg,rgba(255,197,197,.14),rgba(206,142,196,.09));}
+body:not(.light) .casemyp-v2-modal .modal-ft{border-top:1px solid rgba(255,203,217,.22);}
+body:not(.light) .casemyp-v2-modal .form-group label{color:#ffe4ef;}
+body:not(.light) .casemyp-v2-modal .form-group input:focus,
+body:not(.light) .casemyp-v2-modal .form-group select:focus,
+body:not(.light) .casemyp-v2-modal .form-group textarea:focus{
+ border-color:#ffc5c5!important;box-shadow:0 0 0 3px rgba(255,197,197,.13);
+}
+@media(max-width:768px){
+ body:not(.light) .casemyp-v2-preview-notice{font-size:11px;margin-bottom:10px}
+ body:not(.light) .casemyp-v2-cases-heading .admin-current-cases-desktop-tools .btn{min-height:40px}
+}
