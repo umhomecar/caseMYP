@@ -2767,7 +2767,7 @@ function AdminApp({currentUser,onLogout}){
   return <div>
     <div className="sidebar">
       <div className="sidebar-logo casemyp-v2-brand"><div className="casemyp-v2-brand-icon">🚘</div><div><div className="casemyp-v2-brand-title">CasePool <span>2.0</span></div><div className="casemyp-v2-brand-sub">MIDNIGHT WORKSPACE</div></div></div><div className="casemyp-v2-menu-label">WORKSPACE</div>
-      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>n.key==='dashboard'):allNavItems).map(n=>
+      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>n.key==='dashboard'||n.key==='cases'):allNavItems).map(n=>
         <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
