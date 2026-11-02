@@ -1804,102 +1804,30 @@ function DonutChart({id,labels,values,colors}){const ref=useRef();const inst=use
 function AdminDashboard({currentUser}){
   const [cases,setCases]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [error,setError]=useState('');
-  const [selectedAd,setSelectedAd]=useState('');
   const [month,setMonth]=useState(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');});
-  const load=useCallback(()=>{
-    setLoading(true);setError('');cacheClear(['getCases']);
-    api('getCases',{all:'true'}).then(r=>{
-      if(r.success)setCases(safeArray(r.data));
-      else setError(r.error||'ไม่สามารถโหลดข้อมูลเคสได้');
-      setLoading(false);
-    }).catch(e=>{setError(String(e?.message||'ไม่สามารถโหลดข้อมูลได้'));setLoading(false);});
-  },[]);
+  const [chosen,setChosen]=useState('all');
+  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>setLoading(false));},[]);
   useEffect(()=>{load();},[load]);
-  function caseMonth(value){
-    const str=String(value||'').trim();
-    const th=str.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);
-    if(th){let year=Number(th[3]);if(year>2400)year-=543;return year+'-'+String(Number(th[2])).padStart(2,'0');}
-    const iso=str.match(/^(\\d{4})-(\\d{2})-/);return iso?iso[1]+'-'+iso[2]:'';
-  }
-  const monthCases=cases.filter(c=>caseMonth(c.createdat)===month);
-  const byAd=new Map();
-  monthCases.forEach(c=>{
-    const raw=getClipAd(c.attachment);
-    // Trim whitespace and normalize case, but preserve meaningful campaign names.
-    const key=raw?raw.replace(/\\s+/g,' ').trim().toLocaleLowerCase():'__missing__';
-    if(!byAd.has(key))byAd.set(key,{name:raw?raw.replace(/\\s+/g,' ').trim():'ไม่ระบุแอด',cases:[]});
-    byAd.get(key).cases.push(c);
-  });
-  const adEntries=[...byAd.values()].sort((a,b)=>b.cases.length-a.cases.length||a.name.localeCompare(b.name,'th'));
-  const activeAd=adEntries.find(a=>a.name===selectedAd);
-  const visibleCases=activeAd?activeAd.cases:monthCases;
-  const statuses=new Map();
-  visibleCases.forEach(c=>statuses.set(c.status||'ไม่ระบุสถานะ',(statuses.get(c.status||'ไม่ระบุสถานะ')||0)+1));
-  const statusEntries=[...statuses].sort((a,b)=>b[1]-a[1]);
-  const colors=['#ffcf26','#ff8b35','#bb4ccc','#228fea','#12bda1','#f45c8a','#9f8df1','#4cc9b5'];
-  const statusColors=['#3b82f6','#f59e0b','#10b981','#a855f7','#ef4444','#22d3ee','#f472b6'];
-  const unassigned=visibleCases.filter(c=>isUnassignedSales(c.sales)).length;
-  const waiting=visibleCases.filter(c=>c.status==='รอข้อมูล').length;
-  const contacting=visibleCases.filter(c=>c.status==='กำลังติดต่อ').length;
-  const sold=visibleCases.filter(c=>c.status==='ปล่อยแล้ว').length;
-  const topAds=adEntries.slice(0,8);
-  return <div className="page" style={{padding:'20px 24px 40px'}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',marginBottom:20}}>
-      <div><div className="page-title">📊 วิเคราะห์แอดและสถานะเคส</div><div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>ข้อมูลจากช่องคลิปแอด · นับตามวันที่สร้างเคส · ทุกเซลส์</div></div>
-      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <input aria-label="เลือกเดือน" type="month" value={month} onChange={e=>{setMonth(e.target.value);setSelectedAd('');}} style={{height:36,maxWidth:170}}/>
-        <button className="btn btn-ghost" onClick={load}>🔄 รีเฟรช</button>
-      </div>
-    </div>
-    {error&&<div className="card" style={{color:'var(--red)',marginBottom:12}}>{error}</div>}
+  const monthCases=cases.filter(c=>{const t=String(c.createdat||'');const m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m){let y=Number(m[3]);if(y>2400)y-=543;return y+'-'+String(Number(m[2])).padStart(2,'0')===month;}return t.startsWith(month+'-');});
+  const adMap={};
+  monthCases.forEach(c=>{const raw=getClipAd(c.attachment).trim();const name=raw||'ไม่ระบุแอด';const key=name.toLocaleLowerCase();if(!adMap[key])adMap[key]={name,rows:[]};adMap[key].rows.push(c);});
+  const ads=Object.values(adMap).sort((a,b)=>b.rows.length-a.rows.length);
+  const rows=chosen==='all'?monthCases:(adMap[chosen]?.rows||[]);
+  const statusMap={};
+  rows.forEach(c=>{const st=c.status||'ไม่ระบุสถานะ';statusMap[st]=(statusMap[st]||0)+1;});
+  const statuses=Object.entries(statusMap).sort((a,b)=>b[1]-a[1]);
+  const palette=['#ffd028','#ff8a38','#ad43bd','#198bd3','#10ab92','#e76588','#8d83ff','#2ec7a0'];
+  const kpis=[['เคสเดือนนี้',rows.length],['จำนวนแอด',ads.length],['รอข้อมูล',statusMap['รอข้อมูล']||0],['กำลังติดต่อ',statusMap['กำลังติดต่อ']||0],['รอมอบหมาย',rows.filter(c=>isUnassignedSales(c.sales)).length],['ปล่อยแล้ว',statusMap['ปล่อยแล้ว']||0]];
+  return <div className="page" style={{padding:24}}>
+    <div className="page-hd"><div><div className="page-title">📊 วิเคราะห์แอด</div><div style={{fontSize:12,color:'var(--text2)'}}>แหล่งที่มาของเคสและสถานะ · ทุกเซลส์</div></div><button className="btn btn-ghost" onClick={load}>🔄 รีเฟรช</button></div>
+    <div style={{display:'flex',gap:10,marginBottom:18,flexWrap:'wrap'}}><input type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');}}/><select value={chosen} onChange={e=>setChosen(e.target.value)}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select></div>
     {loading?<Loading/>:<>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>
-        {[['เคสทั้งหมด',visibleCases.length,'#58a6ff'],['จำนวนแอด',activeAd?1:adEntries.filter(a=>a.name!=='ไม่ระบุแอด').length,'#bc8cff'],['รอข้อมูล',waiting,'#f59e0b'],['กำลังติดต่อ',contacting,'#38bdf8'],['รอมอบหมาย',unassigned,'#fb923c'],['ปล่อยแล้ว',sold,'#34d399']].map(([label,value,color])=>
-          <div key={label} className="card" style={{padding:14,background:'rgba(255,255,255,.025)',borderTop:'3px solid '+color}}>
-            <div style={{fontSize:26,fontWeight:900,color}}>{value}</div><div style={{fontSize:12,color:'var(--text2)'}}>{label}</div>
-          </div>
-        )}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value],i)=><div key={name} className="card" style={{borderTop:'3px solid '+palette[i%palette.length],padding:14}}><div style={{fontSize:28,fontWeight:800}}>{value}</div><div style={{fontSize:12,color:'var(--text2)'}}>{name}</div></div>)}</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(310px,1fr))',gap:14}}>
+        <div className="card"><strong>🎯 เคสมาจากแอดไหนบ้าง</strong><div style={{display:'flex',alignItems:'end',height:245,gap:8,overflowX:'auto',marginTop:20}}>{ads.slice(0,8).map((a,i)=><div key={a.name} style={{minWidth:65,flex:1,textAlign:'center'}}><div style={{color:palette[i%palette.length],fontWeight:800}}>{monthCases.length?Math.round(a.rows.length/monthCases.length*100):0}%</div><div style={{height:Math.max(10,160*a.rows.length/(ads[0]?.rows.length||1)),background:palette[i%palette.length],borderRadius:9,marginTop:8}}/><div style={{fontSize:11,marginTop:8,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={a.name}>{a.name}</div><strong>{a.rows.length}</strong></div>)}</div>{!ads.length&&<p>ยังไม่มีเคสในเดือนนี้</p>}</div>
+        <div className="card"><strong>📊 สถานะของเคส {chosen==='all'?'ทั้งหมด':'ตามแอดที่เลือก'}</strong><div style={{marginTop:18}}>{statuses.map(([st,count],i)=><div key={st} style={{display:'flex',gap:10,alignItems:'center',marginBottom:14}}><span style={{width:110,fontSize:12}}>{st}</span><div style={{flex:1,background:'var(--bg3)',borderRadius:8,height:20}}><div style={{height:'100%',borderRadius:8,background:palette[i%palette.length],width:(rows.length?100*count/rows.length:0)+'%'}}/></div><strong>{count}</strong></div>)}</div></div>
       </div>
-      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:14}}>
-        <label style={{fontSize:13}}>เลือกแอดเพื่อดูสถานะ:</label>
-        <select value={selectedAd} onChange={e=>setSelectedAd(e.target.value)} style={{maxWidth:320}}>
-          <option value="">ทุกแอด</option>{adEntries.map(a=><option key={a.name} value={a.name}>{a.name} ({a.cases.length})</option>)}
-        </select>
-        {selectedAd&&<button className="btn btn-ghost" onClick={()=>setSelectedAd('')}>✕ ดูทุกแอด</button>}
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16,marginBottom:18}}>
-        <div className="card" style={{minWidth:0}}>
-          <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>🎯 เคสมาจากแอดไหนบ้าง</div>
-          <div style={{fontSize:11,color:'var(--text2)',marginBottom:16}}>8 อันดับแรก · จำนวนเคสและสัดส่วนจากเคสเดือนที่เลือก</div>
-          {topAds.length?<div style={{display:'flex',gap:9,alignItems:'end',height:265,overflowX:'auto',padding:'12px 4px 0'}}>
-            {topAds.map((a,i)=>{const pct=monthCases.length?Math.round(a.cases.length/monthCases.length*100):0;const height=Math.max(12,a.cases.length/(topAds[0]?.cases.length||1)*175);return <button key={a.name} title={a.name+' — '+a.cases.length+' เคส ('+pct+'%)'} onClick={()=>setSelectedAd(a.name)} style={{flex:'1 0 60px',minWidth:60,maxWidth:110,background:'transparent',color:'inherit',border:'none',cursor:'pointer',padding:0,opacity:(selectedAd && selectedAd!==a.name) ? 0.5 : 1}}>
-              <div style={{color:colors[i%colors.length],fontWeight:900,fontSize:16,marginBottom:5}}>{pct}%</div>
-              <div style={{height,background:'linear-gradient(145deg,'+colors[i%colors.length]+',#262b41)',borderRadius:'12px 12px 4px 4px',display:'flex',alignItems:'end',justifyContent:'center',paddingBottom:8,boxSizing:'border-box',boxShadow:'0 8px 20px rgba(0,0,0,.22)'}}><strong style={{fontSize:14,color:'#fff'}}>{a.cases.length}</strong></div>
-              <div style={{fontSize:11,marginTop:8,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.name}</div>
-            </button>;})}
-          </div>:<div style={{padding:36,textAlign:'center',color:'var(--text2)'}}>ไม่มีเคสในเดือนที่เลือก</div>}
-        </div>
-        <div className="card" style={{minWidth:0}}>
-          <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>📈 สถานะเคส {selectedAd?'— '+selectedAd:'ทั้งหมด'}</div>
-          <div style={{fontSize:11,color:'var(--text2)',marginBottom:16}}>ดูว่าลูกค้าจากแอดอยู่ในขั้นตอนไหน</div>
-          {statusEntries.length?<div style={{display:'grid',gap:13}}>
-            {statusEntries.map(([st,count],i)=>{const pct=visibleCases.length?Math.round(count/visibleCases.length*100):0;return <div key={st} style={{display:'grid',gridTemplateColumns:'105px 1fr 62px',alignItems:'center',gap:8}}>
-              <span style={{fontSize:12,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={st}>{st}</span>
-              <div style={{height:22,background:'rgba(255,255,255,.055)',borderRadius:7,overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',borderRadius:7,background:statusColors[i%statusColors.length],minWidth:count?4:0}}/></div>
-              <strong style={{textAlign:'right',fontSize:12}}>{count} · {pct}%</strong>
-            </div>;})}
-          </div>:<div style={{padding:36,textAlign:'center',color:'var(--text2)'}}>ไม่มีข้อมูลสถานะ</div>}
-        </div>
-      </div>
-      <div className="card" style={{overflowX:'auto'}}>
-        <div style={{fontWeight:800,fontSize:16,marginBottom:14}}>📋 ตารางสรุปผลแอด</div>
-        <table style={{width:'100%'}}><thead><tr><th>แอด</th><th>เคส</th><th>สัดส่วน</th><th>รอข้อมูล</th><th>กำลังติดต่อ</th><th>ปล่อยแล้ว</th><th>สถานะอื่น</th></tr></thead>
-          <tbody>{adEntries.map(a=>{const n=a.cases.length,w=a.cases.filter(c=>c.status==='รอข้อมูล').length,t=a.cases.filter(c=>c.status==='กำลังติดต่อ').length,s=a.cases.filter(c=>c.status==='ปล่อยแล้ว').length;return <tr key={a.name} style={{cursor:'pointer',background:selectedAd===a.name?'rgba(88,166,255,.09)':undefined}} onClick={()=>setSelectedAd(a.name)}><td>{a.name}</td><td>{n}</td><td>{monthCases.length?Math.round(n/monthCases.length*100):0}%</td><td>{w}</td><td>{t}</td><td>{s}</td><td>{n-w-t-s}</td></tr>;})}</tbody>
-        </table>
-        {!adEntries.length&&<div style={{padding:18,textAlign:'center',color:'var(--text2)'}}>ไม่มีข้อมูลเดือนนี้</div>}
-        <div style={{fontSize:11,color:'var(--text2)',marginTop:14}}>หมายเหตุ: รายการที่ไม่มีข้อมูลคลิปแอดจัดอยู่ใน “ไม่ระบุแอด” และ “สถานะอื่น” คือสถานะทั้งหมดนอกเหนือจากสามคอลัมน์ที่แสดง</div>
-      </div>
+      <div className="card" style={{marginTop:16,overflowX:'auto'}}><strong>📋 ตารางสรุปตามแอด</strong><table style={{width:'100%',marginTop:14}}><thead><tr><th>แอด</th><th>เคส</th><th>รอข้อมูล</th><th>กำลังติดต่อ</th><th>ปล่อยแล้ว</th><th>สถานะอื่น</th></tr></thead><tbody>{ads.map(a=>{const w=a.rows.filter(c=>c.status==='รอข้อมูล').length,t=a.rows.filter(c=>c.status==='กำลังติดต่อ').length,s=a.rows.filter(c=>c.status==='ปล่อยแล้ว').length;return <tr key={a.name}><td>{a.name}</td><td>{a.rows.length}</td><td>{w}</td><td>{t}</td><td>{s}</td><td>{a.rows.length-w-t-s}</td></tr>;})}</tbody></table></div>
     </>}
   </div>;
 }
