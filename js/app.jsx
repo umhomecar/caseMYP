@@ -3030,9 +3030,16 @@ function App(){
   return <><ConnectionBanner/>{logoutConfirmModal}<SalesApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
 }
 
+function DesignPreviewApp(){
+  useEffect(()=>{
+    const loader=document.getElementById('app-loader');
+    if(loader){loader.style.pointerEvents='none';loader.style.opacity='0';setTimeout(()=>loader.remove(),350);}
+  },[]);
+  return <AdminApp currentUser={{name:'ตัวอย่างผู้ดูแล',role:'Admin'}} onLogout={()=>{}}/>;
+}
 try{
   if(SUPA_CONFIG_ERROR&&!DESIGN_PREVIEW)throw new Error(SUPA_CONFIG_ERROR);
-  createRoot(document.getElementById('root')).render(<ErrorBoundary>{DESIGN_PREVIEW?<AdminApp currentUser={{name:'ตัวอย่างผู้ดูแล',role:'Admin'}} onLogout={()=>{}}/>:<App/>}</ErrorBoundary>);
+  createRoot(document.getElementById('root')).render(<ErrorBoundary>{DESIGN_PREVIEW?<DesignPreviewApp/>:<App/>}</ErrorBoundary>);
 }catch(e){
   const loader=document.getElementById('app-loader');
   if(loader)loader.remove();
