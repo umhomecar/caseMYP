@@ -1222,7 +1222,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
     <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal" style={{maxWidth:480,borderRadius:14}}>
+      <div className="modal casemyp-v2-modal casemyp-v2-modal-edit" style={{maxWidth:480,borderRadius:14}}>
         <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}><div style={{width:4,height:22,background:'var(--blue)',borderRadius:2,flexShrink:0}}/><span style={{fontWeight:700,fontSize:15}}>ข้อมูลลูกค้า</span><button className="btn btn-ghost" style={{padding:'4px 8px',marginLeft:'auto'}} onClick={onClose}><Ico.x/></button></div>
         <div style={{padding:'16px 20px',overflowY:'auto',maxHeight:'calc(100vh - 320px)'}}>
           <div style={{marginBottom:14,display:'grid',gap:9}}>
