@@ -2293,3 +2293,42 @@ body:not(.light) .casemyp-v2-modal-edit .btn-primary{color:#542b41!important;}
  body:not(.light) .casemyp-v2-modal-case-form .modal-ft .btn{flex:1;min-width:0;}
  body:not(.light) .casemyp-v2-modal-edit{max-height:94dvh!important;}
 }
+
+/* Approved option B: distinct gradients by action, Preview only.
+   Keep infographic columns, status indicators and destructive actions unchanged. */
+body:not(.light) .btn-primary:not(:disabled),
+body:not(.light) .casemyp-v2-modal-edit .btn-primary:not(:disabled){
+  background:linear-gradient(105deg,#f68b2d 0%,#993cba 51%,#1d97d9 100%)!important;
+  border:1px solid rgba(211,193,255,.45)!important;
+  color:#ffffff!important;
+  text-shadow:0 1px 2px rgba(25,17,48,.35)!important;
+  box-shadow:0 8px 22px rgba(116,60,183,.29)!important;
+}
+body:not(.light) .btn-primary:hover:not(:disabled),
+body:not(.light) .casemyp-v2-modal-edit .btn-primary:hover:not(:disabled){
+  background:linear-gradient(105deg,#ffa147 0%,#af50ca 51%,#35b3e9 100%)!important;
+  box-shadow:0 11px 29px rgba(116,60,183,.4)!important;
+}
+body:not(.light) .casemyp-v2-modal-case-form .modal-ft .btn-primary:disabled{
+  background:rgba(134,137,162,.24)!important;color:#b7bad1!important;
+}
+body:not(.light) .casemyp-v2-refresh,
+body:not(.light) .ad-dashboard-filters .casemyp-v2-refresh{
+  background:linear-gradient(110deg,#167bc7,#11b69f)!important;
+  color:#fff!important;border:1px solid rgba(130,231,235,.42)!important;
+  box-shadow:0 6px 17px rgba(21,170,187,.22)!important;
+}
+body:not(.light) .casemyp-v2-refresh:hover{
+  background:linear-gradient(110deg,#2499d9,#22cbb0)!important;
+}
+body:not(.light) .btn-ghost:not(.btn-danger):not(.casemyp-v2-refresh){
+  background:rgba(28,33,58,.7);border-color:rgba(157,131,206,.38);
+}
+body:not(.light) .btn-ghost:not(.btn-danger):not(.casemyp-v2-refresh):hover{
+  background:rgba(116,78,164,.21)!important;border-color:rgba(165,137,236,.64)!important;
+}
+body:not(.light) .btn-primary:focus-visible,
+body:not(.light) .casemyp-v2-refresh:focus-visible{
+  outline-color:#cbb4ff!important;outline-offset:3px;
+}
+/* Explicit red destructive actions retain their warning identity. */
