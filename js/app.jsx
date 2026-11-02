@@ -899,7 +899,7 @@ function SkeletonCards({n=3}){return <div>{Array.from({length:n}).map((_,i)=><di
 function SkeletonRows({n=5,cols=6}){return <>{Array.from({length:n}).map((_,i)=><tr key={i}>{Array.from({length:cols}).map((__,j)=><td key={j}><div className="skeleton" style={{height:14,width:j===0?80:j===cols-1?60:'70%'}}/></td>)}</tr>)}</>;}
 
 function Confirm({msg,onOk,onCancel}){
-  return <div className="overlay"><div className="modal" style={{maxWidth:340}} role="alertdialog" aria-modal="true" aria-label="ยืนยันการทำรายการ"><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}} aria-hidden="true">⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button type="button" className="btn btn-ghost" onClick={onCancel}>ยกเลิก</button><button type="button" className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
+  return <div className="overlay"><div className="modal" style={{maxWidth:340}} role="alertdialog" aria-modal="true" aria-label="ยืนยันการทำรายการ"><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}} aria-hidden="true">⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button type="button" className="btn btn-ghost cp-action-danger" onClick={onCancel}>ยกเลิก</button><button type="button" className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
 }
 
 function HistoryModal({caseId,onClose}){
@@ -1276,7 +1276,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
         </div>
         <div style={{padding:'10px 16px', borderTop:'1px solid var(--border)', paddingBottom:'max(20px, env(safe-area-inset-bottom))'}}>
           <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              <button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setClipAd(getClipAd(caseData.attachment));setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
+              <button className={`btn ${editAll?'cp-action-danger':'cp-action-edit'}`} style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setClipAd(getClipAd(caseData.attachment));setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
               <button className="btn btn-ghost cp-action-danger" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>
               {isAdmin&&<button className="btn btn-ghost cp-action-line" style={{flexBasis:'100%',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:'1px solid rgba(6,199,85,.45)',color:lineCooldownLeft>0?'var(--text3)':'#06c755',opacity:lineCooldownLeft>0?.65:1}} onClick={retryLineNotification} disabled={lineRetrying||saving||lineCooldownLeft>0}>📨 {lineRetrying?'กำลังส่ง LINE...':lineCooldownLeft>0?`รอ ${lineCooldownLeft} วิ แล้วส่งใหม่`:'ส่ง LINE ใหม่'}</button>}
@@ -1381,7 +1381,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       onAdded();onClose();
     }else showToast(r.error||'เกิดข้อผิดพลาด','err');
   }
-  return <Modal variant="case-form" title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
+  return <Modal variant="case-form" title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     {DESIGN_PREVIEW&&<div className="casemyp-v2-form-demo-note">🩷 ทดลองดูฟอร์มและสีปุ่มได้ ข้อมูลนี้เป็นตัวอย่าง ไม่ถูกส่งหรือบันทึกจริง</div>}
     <div className="casemyp-v2-case-form-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
