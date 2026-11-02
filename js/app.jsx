@@ -1834,20 +1834,28 @@ function AdminDashboard({currentUser}){
     <div style={{display:'flex',gap:10,marginBottom:18,flexWrap:'wrap'}}><input type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');}}/><select value={chosen} onChange={e=>setChosen(e.target.value)}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select></div>
     {loading?<Loading/>:<>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value],i)=><div key={name} className="card" style={{borderTop:'3px solid '+palette[i%palette.length],padding:14}}><div style={{fontSize:28,fontWeight:800}}>{value}</div><div style={{fontSize:12,color:'var(--text2)'}}>{name}</div></div>)}</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(310px,1fr))',gap:14}}>
-        <div className="card"><strong>🎯 ผลลัพธ์แยกตามแอด</strong><div style={{fontSize:11,color:'var(--text2)',marginTop:5}}>แต่ละแถวรวมได้เท่ากับจำนวนเคสของแอดนั้น · คลิกชื่อแอดเพื่อเจาะลึก</div>
-          <div style={{marginTop:18,display:'grid',gap:13}}>{adOutcomeRows.map(a=><div key={a.name}>
-            <button onClick={()=>setChosen(a.name.toLocaleLowerCase())} style={{border:0,background:'none',color:'var(--text)',cursor:'pointer',padding:0,fontSize:12,textAlign:'left',marginBottom:5}}>{a.name} — <strong>{a.count} เคส</strong></button>
-            <div style={{display:'flex',height:23,width:'100%',borderRadius:7,overflow:'hidden',background:'var(--bg3)'}}>{groups.map(([key,label,color])=><div key={key} title={label+': '+a.counts[key]} style={{width:(a.count?100*a.counts[key]/a.count:0)+'%',background:color,minWidth:a.counts[key]?2:0}}/>)}</div>
-          </div>)}</div>
-          {!ads.length&&<div style={{padding:20,color:'var(--text2)'}}>ไม่มีเคสในเดือนที่เลือก</div>}
-          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:15}}>{groups.map(([key,label,color])=><span key={key} style={{fontSize:11,color:'var(--text2)'}}><span style={{color}}>●</span> {label}</span>)}</div>
-        </div>
-        <div className="card"><strong>📊 รายละเอียดสถานะ {chosen==='all'?'ทุกแอด':(adMap[chosen]?.name||'')}</strong><div style={{fontSize:11,color:'var(--text2)',marginTop:5}}>ทุกสถานะจริงในระบบ ไม่รวมสถานะต่างชนิดเข้าด้วยกัน</div>
-          <div style={{marginTop:18}}>{statuses.map(([st,count],i)=><div key={st} style={{display:'flex',gap:10,alignItems:'center',marginBottom:12}}><span style={{width:115,fontSize:12}}>{st}</span><div style={{flex:1,background:'var(--bg3)',borderRadius:8,height:20}}><div style={{height:'100%',borderRadius:8,background:palette[i%palette.length],width:(rows.length?100*count/rows.length:0)+'%'}}/></div><strong style={{fontSize:12,minWidth:60,textAlign:'right'}}>{count} ({rows.length?Math.round(count/rows.length*100):0}%)</strong></div>)}</div>
-          {!statuses.length&&<div style={{padding:20,color:'var(--text2)'}}>ไม่มีข้อมูลสถานะ</div>}
-        </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(330px,1fr))',gap:16}}>
+        {[
+          {title:'🎯 Top 5 แอดที่ได้เคสมากที่สุด',subtitle:'สัดส่วนเทียบเคสทั้งหมดในเดือน · เลือกแอดจากตัวกรองด้านบน',items:ads.slice(0,5).map(a=>({label:a.name,count:a.rows.length})),total:monthCases.length,colors:['#ffcb12','#ff7b2d','#b12abb','#158bdb','#00b39f']},
+          {title:'📊 Top 5 สถานะเคส',subtitle:'สัดส่วนตามแอดที่เลือก · ทุกสถานะยังดูได้ในตาราง',items:statuses.slice(0,5).map(([label,count])=>({label,count})),total:rows.length,colors:['#18b4a2','#1c9cdc','#b74ab6','#f58227','#f2cd21']}
+        ].map((chart,chartIndex)=><div key={chartIndex} className="card" style={{minWidth:0,padding:'20px 18px 16px',background:'linear-gradient(145deg,#252b32,#1b1f25)',border:'1px solid rgba(255,255,255,.11)',borderRadius:16}}>
+          <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>{chart.title}</div>
+          <div style={{fontSize:11,color:'var(--text2)'}}>{chart.subtitle}</div>
+          {chart.items.length?<div style={{display:'flex',alignItems:'end',justifyContent:'space-around',gap:7,height:316,paddingTop:22,overflowX:'auto'}}>
+            {chart.items.map((item,i)=>{const pct=chart.total?Math.round(item.count/chart.total*100):0;const max=Math.max(...chart.items.map(x=>x.count),1);const height=Math.max(24,185*item.count/max);return <div key={item.label} title={item.label+' — '+item.count+' เคส ('+pct+'%)'} style={{minWidth:61,flex:'1 1 0',maxWidth:110,display:'flex',flexDirection:'column',alignItems:'stretch',justifyContent:'end',height:'100%'}}>
+              <div style={{textAlign:'center',fontSize:22,fontWeight:900,color:chart.colors[i],textShadow:'0 2px 14px rgba(0,0,0,.3)',marginBottom:9}}>{pct}%</div>
+              <div style={{height,background:'linear-gradient(155deg,'+chart.colors[i]+','+chart.colors[i]+'bb)',borderRadius:'13px 13px 5px 5px',boxShadow:'0 12px 24px rgba(0,0,0,.24)',display:'flex',alignItems:'end',justifyContent:'center',paddingBottom:10,boxSizing:'border-box'}}><span style={{fontWeight:900,fontSize:18,color:'#fff',textShadow:'0 1px 4px #333'}}>{item.count}</span></div>
+              <div style={{height:65,padding:'10px 3px',background:'linear-gradient(#f7f9fc,#d9e1e9)',color:'#222c36',borderRadius:'0 0 10px 10px',textAlign:'center',boxSizing:'border-box',boxShadow:'0 6px 12px rgba(0,0,0,.2)'}}>
+                <div style={{fontSize:11,fontWeight:800,overflowWrap:'anywhere',lineHeight:1.3,maxHeight:42,overflow:'hidden'}}>{item.label}</div>
+              </div>
+            </div>;})}
+          </div>:<div style={{padding:'56px 10px',textAlign:'center',color:'var(--text2)'}}>ไม่มีข้อมูลในเดือนที่เลือก</div>}
+        </div>)}
       </div>
+      <div className="card" style={{marginTop:14}}><strong>📈 รายละเอียดสถานะทั้งหมด {chosen==='all'?'ทุกแอด':(adMap[chosen]?.name||'')}</strong>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:8,marginTop:12}}>{statuses.map(([st,count],i)=><div key={st} style={{border:'1px solid var(--border)',borderRadius:8,padding:10}}><div style={{fontSize:12}}>{st}</div><div style={{display:'flex',alignItems:'baseline',gap:8}}><strong style={{fontSize:20,color:palette[i%palette.length]}}>{count}</strong><span style={{fontSize:11,color:'var(--text2)'}}>{rows.length?Math.round(count/rows.length*100):0}%</span></div></div>)}</div>
+      </div>
+
       <div className="card" style={{marginTop:16,overflowX:'auto'}}><strong>📋 ตารางผลลัพธ์ของทุกแอด</strong>
         <table style={{width:'100%',marginTop:14}}><thead><tr><th>แอด</th><th>ได้รับ</th><th>ไปต่อได้</th><th>ไปต่อไม่ได้</th><th>ปิดเคส</th><th>ปล่อยแล้ว</th><th>ติดตาม / อื่น ๆ</th><th>% ไปต่อได้</th></tr></thead>
           <tbody>{adOutcomeRows.map(a=><tr key={a.name} onClick={()=>setChosen(a.name.toLocaleLowerCase())} style={{cursor:'pointer'}}><td>{a.name}</td><td>{a.count}</td><td>{a.counts.pass}</td><td>{a.counts.fail}</td><td>{a.counts.closed}</td><td>{a.counts.sold}</td><td>{a.counts.pending}</td><td>{a.count?Math.round(a.counts.pass/a.count*100):0}%</td></tr>)}</tbody></table>
