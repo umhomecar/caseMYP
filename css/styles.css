@@ -2434,3 +2434,32 @@ body:not(.light) button.btn.cp-action-edit:hover:not(:disabled){background:#ddbe
 body:not(.light) button.btn.cp-action-refresh:hover:not(:disabled){background:#df701d!important;}
 body:not(.light) button.btn.cp-action-line:disabled,
 body:not(.light) button.btn.cp-action-save:disabled{opacity:.52!important;box-shadow:none!important;}
+
+/* Phase 3: reporting and bookings share CaseMYP Midnight Glass surfaces. */
+body:not(.light) .casemyp-v2-analytics,
+body:not(.light) .casemyp-v2-bookings{padding:24px 26px 44px!important;max-width:1600px;margin:0 auto;}
+body:not(.light) .casemyp-v2-report-heading,
+body:not(.light) .casemyp-v2-booking-heading{
+ background:radial-gradient(circle at 88% 10%,rgba(255,197,197,.22),transparent 34%),linear-gradient(120deg,#343b68,#4b355f 70%,#3b315e);
+ border:1px solid rgba(204,196,255,.27)!important;border-radius:24px;
+ padding:26px 30px!important;margin-bottom:18px;
+ box-shadow:0 15px 40px rgba(4,6,25,.3),inset 0 1px rgba(255,255,255,.11);
+}
+body:not(.light) .casemyp-v2-analytics .page-title{font-size:clamp(23px,2.4vw,32px);letter-spacing:-.4px;font-weight:850}
+body:not(.light) .casemyp-v2-analytics .card,
+body:not(.light) .casemyp-v2-bookings .card{
+ background:linear-gradient(145deg,rgba(49,52,86,.87),rgba(27,32,58,.9));
+ border-color:rgba(196,200,255,.22);border-radius:19px;
+ box-shadow:0 14px 30px rgba(4,7,28,.22),inset 0 1px rgba(255,255,255,.06);
+}
+body:not(.light) .casemyp-v2-analytics th,
+body:not(.light) .casemyp-v2-bookings th{background:#383857!important;color:#e8e7ff}
+body:not(.light) .casemyp-v2-analytics input,
+body:not(.light) .casemyp-v2-bookings input,
+body:not(.light) .casemyp-v2-bookings select{border-radius:12px}
+@media(max-width:768px){
+ body:not(.light) .casemyp-v2-analytics,
+ body:not(.light) .casemyp-v2-bookings{padding:12px 12px 32px!important}
+ body:not(.light) .casemyp-v2-report-heading,
+ body:not(.light) .casemyp-v2-booking-heading{padding:19px 15px!important;border-radius:18px}
+}
