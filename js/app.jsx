@@ -1588,7 +1588,8 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
 function AdminCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [filter,setFilter]=useState({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
+  const currentMonthFilters=()=>{const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0');return{sales:'all',status:'',q:'',dateFrom:`${y}-${m}-01`,dateTo:`${y}-${m}-${String(new Date(y,d.getMonth()+1,0).getDate()).padStart(2,'0')}`};};
+  const [filter,setFilter]=useState(currentMonthFilters);
   const [sortDir,setSortDir]=useState('desc');
   const [sel,setSel]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
@@ -1611,8 +1612,20 @@ function AdminCurrentCases({currentUser,users}){
     setLoading(false);
   }).catch(()=>{setLoading(false);showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);});},[]);
   useEffect(()=>{load();},[load]);
-  async function search(){if(!filter.q){load();return;}setLoading(true);try{const r=await api('searchCases',{q:filter.q});if(r.success)setCases(safeArray(r.data));else showToast('ค้นหาไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',4500);}catch(e){showToast('ค้นหาไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',4500);}setLoading(false);}
-  function parseD2(s){const m=String(s||'').match(/(\d+)\/(\d+)\/(\d+)/);if(!m)return null;return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}
+  // Keep the complete loaded dataset: searching must not overwrite the list.
+  function search(){/* Search is applied immediately by the shared local filter. */}
+  function parseD2(value){
+    const raw=String(value||'').trim();
+    const th=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if(th){
+      let year=Number(th[3]);if(year>2400)year-=543;
+      const d=new Date(year,Number(th[2])-1,Number(th[1]));
+      return d.getFullYear()===year&&d.getMonth()===Number(th[2])-1&&d.getDate()===Number(th[1])?d:null;
+    }
+    const iso=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso){const d=new Date(Number(iso[1]),Number(iso[2])-1,Number(iso[3]));return isNaN(d.getTime())?null:d;}
+    return null;
+  }
   const filtered=safeArray(cases).filter(c=>{
     const q=String(filter.q||'').trim().toLowerCase();
     if(q){
@@ -1622,12 +1635,12 @@ function AdminCurrentCases({currentUser,users}){
     if(filter.sales===UNASSIGNED_SALES&&!isUnassignedSales(c.sales))return false;
     if(filter.sales!=='all'&&filter.sales!==UNASSIGNED_SALES&&c.sales!==filter.sales)return false;
     if(filter.status&&c.status!==filter.status)return false;
-    if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom))return false;}
-    if(filter.dateTo){const d=parseD2(c.createdat);const to=new Date(filter.dateTo);to.setHours(23,59,59);if(!d||d>to)return false;}
+    if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom+'T00:00:00'))return false;}
+    if(filter.dateTo){const d=parseD2(c.createdat);const to=new Date(filter.dateTo+'T00:00:00');to.setHours(23,59,59,999);if(!d||d>to)return false;}
     return true;
   }).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const salesList=users.filter(u=>u.role==='Sales');
-  const unassignedCount=safeArray(cases).filter(c=>isUnassignedSales(c.sales)).length;
+  const unassignedCount=filtered.filter(c=>isUnassignedSales(c.sales)).length;
   async function assignSelected(){
     if(!selectedIds.size||!bulkSales)return showToast('กรุณาเลือกเคสและเซลส์','warn');
     setBulkSaving(true);
@@ -1718,7 +1731,7 @@ function AdminCurrentCases({currentUser,users}){
       <input type="date" value={filter.dateFrom||''} onChange={e=>setFilter(f=>({...f,dateFrom:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
       <span style={{fontSize:12,color:'var(--text3)'}}>—</span>
       <input type="date" value={filter.dateTo||''} onChange={e=>setFilter(f=>({...f,dateTo:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
-      {(filter.dateFrom||filter.dateTo)&&<button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>setFilter(f=>({...f,dateFrom:'',dateTo:''}))}>✕ ล้างวันที่</button>}
+      <button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>{setFilter(currentMonthFilters());setSelectedIds(new Set());}}>↺ ล้างตัวกรอง (เดือนปัจจุบัน)</button>
     </div>
     {selectedIds.size>0&&<div className="card" style={{padding:'10px 12px',marginBottom:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',borderColor:'rgba(88,166,255,.4)'}}><strong style={{fontSize:13}}>เลือกแล้ว {selectedIds.size} เคส</strong><select value={bulkSales} onChange={e=>setBulkSales(e.target.value)} style={{maxWidth:240}}><option value="">-- เลือกเซลส์ผู้รับผิดชอบ --</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" onClick={assignSelected} disabled={!bulkSales||bulkSaving}>{bulkSaving?'กำลังมอบหมาย...':'มอบหมายพร้อมกัน'}</button><button className="btn btn-ghost" onClick={()=>setSelectedIds(new Set())}>ยกเลิกการเลือก</button></div>}
     <div className="admin-cases-mobile-list">
