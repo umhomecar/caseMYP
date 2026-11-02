@@ -509,7 +509,7 @@ async function sbApi(action,data){
       if(isSbError(res))return{success:false,error:formatSbError(res)};
       return{success:true};
     }
-    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const q={deleted_at:'is.null',order:'caseid.desc',limit:'50000'};if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
+    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const dashboardMonth=String(data.dashboardMonth||'');if(dashboardMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(dashboardMonth))return{success:false,error:'เดือนไม่ถูกต้อง'};const q={deleted_at:'is.null',order:'caseid.desc',limit:dashboardMonth?'5000':'50000'};if(dashboardMonth)q.caseid=`like.${dashboardMonth.slice(2,4)+dashboardMonth.slice(5,7)}*`;else if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
     case 'checkCaseDuplicates':{
       const rows=await sbQ('GET','cases',{deleted_at:'is.null',order:'updatedat.desc',limit:'10000'});
       if(isSbError(rows))return{success:false,error:formatSbError(rows)};
@@ -1808,8 +1808,8 @@ function AdminDashboard({currentUser,users}){
   const [chosen,setChosen]=useState('all');
   const [drilldown,setDrilldown]=useState(null);
   const [editingCase,setEditingCase]=useState(null);
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>setLoading(false));},[]);
-  useEffect(()=>{load();},[load]);
+  const load=useCallback((showSpinner=false)=>{if(showSpinner)setLoading(true);cacheClear(['getCases']);return api('getCases',{dashboardMonth:month}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>{showToast('โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);});},[month]);
+  useEffect(()=>{load(true);},[load]);
   const monthCases=cases.filter(c=>{const t=String(c.createdat||'');const m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m){let y=Number(m[3]);if(y>2400)y-=543;return y+'-'+String(Number(m[2])).padStart(2,'0')===month;}return t.startsWith(month+'-');});
   const adMap={};
   monthCases.forEach(c=>{const raw=getClipAd(c.attachment).trim();const name=raw||'ไม่ระบุแอด';const key=name.toLocaleLowerCase();if(!adMap[key])adMap[key]={name,rows:[]};adMap[key].rows.push(c);});
@@ -1834,7 +1834,7 @@ function AdminDashboard({currentUser,users}){
 
   return <div className="page" style={{padding:24}}>
     <div className="page-hd"><div><div className="page-title">📊 วิเคราะห์แอด</div><div style={{fontSize:12,color:'var(--text2)'}}>แหล่งที่มาของเคสและสถานะ · ทุกเซลส์</div></div></div>
-    <div className="ad-dashboard-filters" style={{display:'grid',gridTemplateColumns:'minmax(160px,220px) minmax(180px,1fr) 110px',gap:10,alignItems:'center',marginBottom:14}}><input aria-label="เลือกเดือน" type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}/><select aria-label="เลือกแอด" value={chosen} onChange={e=>{setChosen(e.target.value);setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select><button className="btn btn-ghost" onClick={()=>{setDrilldown(null);load();}} style={{height:38,padding:'0 10px'}}>🔄 รีเฟรช</button></div>
+    <div className="ad-dashboard-filters" style={{display:'grid',gridTemplateColumns:'minmax(160px,220px) minmax(180px,1fr) 110px',gap:10,alignItems:'center',marginBottom:14}}><input aria-label="เลือกเดือน" type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}/><select aria-label="เลือกแอด" value={chosen} onChange={e=>{setChosen(e.target.value);setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select><button className="btn btn-ghost" onClick={()=>{setDrilldown(null);load(false);}} style={{height:38,padding:'0 10px'}}>🔄 รีเฟรช</button></div>
     {loading?<Loading/>:<>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value,color,bg])=><div key={name} className="card" style={{border:'1px solid '+color+'55',borderTop:'3px solid '+color,background:'linear-gradient(160deg,'+bg+',rgba(255,255,255,.015))',padding:'12px 14px',borderRadius:12}}><div style={{fontSize:28,fontWeight:900,color,lineHeight:1.1}}>{value}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:6}}>{name}</div></div>)}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(330px,1fr))',gap:16}}>
@@ -1862,7 +1862,7 @@ function AdminDashboard({currentUser,users}){
           {!drillRows.length&&<div style={{padding:20,textAlign:'center'}}>ไม่พบเคส</div>}
         </div>
       </div>}
-      {editingCase&&<CaseModal caseData={editingCase} users={users} currentUser={currentUser} onClose={()=>{setEditingCase(null);load();}} onUpdated={()=>{load();}}/>}
+      {editingCase&&<CaseModal caseData={editingCase} users={users} currentUser={currentUser} onClose={()=>{setEditingCase(null);}} onUpdated={()=>{load(false);}}/>}
       <div className="card" style={{marginTop:14}}><strong>📈 รายละเอียดสถานะทั้งหมด {chosen==='all'?'ทุกแอด':(adMap[chosen]?.name||'')}</strong>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:8,marginTop:12}}>{statuses.map(([st,count],i)=><div key={st} style={{border:'1px solid var(--border)',borderRadius:8,padding:10}}><div style={{fontSize:12}}>{st}</div><div style={{display:'flex',alignItems:'baseline',gap:8}}><strong style={{fontSize:20,color:palette[i%palette.length]}}>{count}</strong><span style={{fontSize:11,color:'var(--text2)'}}>{rows.length?Math.round(count/rows.length*100):0}%</span></div></div>)}</div>
       </div>
