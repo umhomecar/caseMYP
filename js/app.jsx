@@ -1844,7 +1844,7 @@ function AdminDashboard({currentUser,users}){
         {[
           {title:'🎯 Top 5 แอดที่ได้เคสมากที่สุด',subtitle:'สัดส่วนเทียบเคสทั้งหมดในเดือน · เลือกแอดจากตัวกรองด้านบน',items:ads.slice(0,5).map(a=>({label:a.name,count:a.rows.length,key:a.name.toLocaleLowerCase()})),total:monthCases.length,colors:['#ffcb12','#ff7b2d','#b12abb','#158bdb','#00b39f']},
           {title:'📊 Top 5 สถานะเคส',subtitle:'สัดส่วนตามแอดที่เลือก · ทุกสถานะยังดูได้ในตาราง',items:statuses.slice(0,5).map(([label,count])=>({label,count,key:label})),total:rows.length,colors:['#18b4a2','#1c9cdc','#b74ab6','#f58227','#f2cd21']}
-        ].map((chart,chartIndex)=><div key={chartIndex} className="card" style={{minWidth:0,padding:'20px 18px 16px',background:'linear-gradient(145deg,#252b32,#1b1f25)',border:'1px solid rgba(255,255,255,.11)',borderRadius:16}}>
+        ].map((chart,chartIndex)=><div key={chartIndex} className="card ad-infographic-chart" style={{minWidth:0,padding:'20px 18px 16px',background:'linear-gradient(145deg,#252b32,#1b1f25)',border:'1px solid rgba(255,255,255,.11)',borderRadius:16}}>
           <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>{chart.title}</div>
           <div style={{fontSize:11,color:'var(--text2)'}}>{chart.subtitle}</div>
           {chart.items.length?<div style={{display:'flex',alignItems:'end',justifyContent:'space-around',gap:7,height:316,paddingTop:22,overflowX:'auto'}}>
