@@ -2332,3 +2332,34 @@ body:not(.light) .casemyp-v2-refresh:focus-visible{
   outline-color:#cbb4ff!important;outline-offset:3px;
 }
 /* Explicit red destructive actions retain their warning identity. */
+
+/* CaseMYP 2.0 — solid single-color buttons, no gradients */
+body:not(.light) .btn-primary:not(:disabled),
+body:not(.light) .casemyp-v2-modal-edit .btn-primary:not(:disabled){
+ background:#0eaa97!important;color:#fff!important;border:1px solid #45c9b7!important;
+ text-shadow:none!important;box-shadow:0 5px 14px rgba(14,170,151,.18)!important;
+}
+body:not(.light) .btn-primary:hover:not(:disabled),
+body:not(.light) .casemyp-v2-modal-edit .btn-primary:hover:not(:disabled){
+ background:#0c9585!important;box-shadow:0 7px 18px rgba(14,170,151,.27)!important;
+}
+body:not(.light) .casemyp-v2-cases-heading .btn-primary,
+body:not(.light) .casemyp-v2-cases-heading .btn-primary:hover:not(:disabled){
+ background:#f58227!important;border-color:#ffa45d!important;color:#fff!important;
+ box-shadow:0 5px 14px rgba(245,130,39,.2)!important;
+}
+body:not(.light) .casemyp-v2-cases-heading .btn-primary:hover:not(:disabled){background:#dc711f!important;}
+body:not(.light) .casemyp-v2-refresh,
+body:not(.light) .ad-dashboard-filters .casemyp-v2-refresh{
+ background:#168fd1!important;border:1px solid #46b3e9!important;color:#fff!important;
+ box-shadow:0 5px 14px rgba(22,143,209,.18)!important;
+}
+body:not(.light) .casemyp-v2-refresh:hover{background:#117cba!important;}
+body:not(.light) .btn-ghost:not(.btn-danger):not(.casemyp-v2-refresh){
+ background:#40305e!important;border:1px solid #76509f!important;color:#f5eaff!important;
+}
+body:not(.light) .btn-ghost:not(.btn-danger):not(.casemyp-v2-refresh):hover{
+ background:#5b3a80!important;border-color:#9d6cbe!important;
+}
+body:not(.light) .btn-danger{background:#b82c45!important;color:white!important;}
+body:not(.light) .btn-primary:disabled{background:#414455!important;color:#c4c6d1!important;border-color:#585b69!important;box-shadow:none!important;}
