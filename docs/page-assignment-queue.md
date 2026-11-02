@@ -23,3 +23,10 @@
 
 ## Deployment gate
 **Do not merge into main or turn on auto-assignment** until the real CaseMYP database is accessible and above tests pass. Current connected Supabase accounts only showed unrelated projects, so the queue cannot safely be installed in production at this time.
+
+## Database verification — 2026-11-02
+- Connected project account: Umhomecar, project `umMYP` (`lhmycnzarbcmweavhnxh`), active.
+- Verified real schema via Supabase `list_tables`: `public.cases` (~1633 rows), `public.users` (~10), `public.history`, `public.notifications`. All reported with RLS enabled. `cases.caseid` is text PK; `cases.sales` text; `cases.version` integer; `users.name`, `users.role`, `users.status` exist.
+- SQL inspection via `execute_sql` is currently blocked by tool security validation. Do not assume verified exact sales names/production connection solely from table existence.
+- No SQL migrations applied, no live records modified, no auto-assignment activated.
+- **Critical access:** client supports legacy auth using public Supabase anon key; do not expose security-definer RPC to untrusted clients. Verify actual auth and RLS before choosing architecture and enabling queue.
