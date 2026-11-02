@@ -2363,3 +2363,39 @@ body:not(.light) .btn-ghost:not(.btn-danger):not(.casemyp-v2-refresh):hover{
 }
 body:not(.light) .btn-danger{background:#b82c45!important;color:white!important;}
 body:not(.light) .btn-primary:disabled{background:#414455!important;color:#c4c6d1!important;border-color:#585b69!important;box-shadow:none!important;}
+
+/* CaseMYP 2.0 semantic solid-color actions — user-approved 6 rules */
+body:not(.light) .cp-action-save,
+body:not(.light) .cp-action-copy,
+body:not(.light) .casemyp-v2-modal-edit .cp-action-save,
+body:not(.light) .casemyp-v2-modal-edit .cp-action-copy{
+ background:#168fd1!important;border:1px solid #52b7ec!important;color:#fff!important;text-shadow:none!important;
+ box-shadow:0 5px 16px rgba(22,143,209,.2)!important;
+}
+body:not(.light) .cp-action-save:hover:not(:disabled),
+body:not(.light) .cp-action-copy:hover:not(:disabled){background:#117ab5!important;}
+body:not(.light) .casemyp-v2-refresh,
+body:not(.light) .cp-action-refresh,
+body:not(.light) .ad-dashboard-filters .casemyp-v2-refresh{
+ background:#f58227!important;border:1px solid #ffa764!important;color:#fff!important;box-shadow:0 5px 16px rgba(245,130,39,.19)!important;
+}
+body:not(.light) .cp-action-refresh:hover:not(:disabled){background:#df701d!important;}
+body:not(.light) .cp-action-line,
+body:not(.light) .casemyp-v2-modal-edit .cp-action-line{
+ background:#0eaa97!important;border:1px solid #41cebd!important;color:white!important;opacity:1;
+ box-shadow:0 5px 16px rgba(14,170,151,.18)!important;
+}
+body:not(.light) .cp-action-line:hover:not(:disabled){background:#0b9786!important;}
+body:not(.light) .cp-action-edit,
+body:not(.light) .casemyp-v2-modal-edit .cp-action-edit{
+ background:#f2d21a!important;border:1px solid #ffea75!important;color:#342e13!important;box-shadow:0 5px 16px rgba(242,210,26,.15)!important;
+}
+body:not(.light) .cp-action-edit:hover:not(:disabled){background:#ddbe0e!important;}
+body:not(.light) .cp-action-danger,
+body:not(.light) .casemyp-v2-modal-edit .cp-action-danger{
+ background:#bf344a!important;border:1px solid #e3697b!important;color:#fff!important;
+}
+body:not(.light) .cp-action-danger:hover:not(:disabled){background:#a9273f!important;}
+body:not(.light) .cp-action-line:disabled,
+body:not(.light) .cp-action-save:disabled,
+body:not(.light) .cp-action-copy:disabled{opacity:.55!important;cursor:not-allowed;box-shadow:none!important;}
