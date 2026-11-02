@@ -1801,12 +1801,13 @@ function BarChart({id,labels,datasets,horizontal=false}){const ref=useRef();cons
 
 function DonutChart({id,labels,values,colors}){const ref=useRef();const inst=useRef();useChartJs(()=>{inst.current?.destroy();if(!ref.current)return;inst.current=new Chart(ref.current,{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:colors,borderWidth:2,borderColor:'var(--bg2)',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:12,padding:10,font:{size:11}}},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw} (${Math.round(c.raw/(c.dataset.data.reduce((a,b)=>a+b,0)||1)*100)}%)`}}}}});},  [labels,values]);useEffect(()=>()=>inst.current?.destroy(),[]);return <canvas ref={ref}/>;}
 
-function AdminDashboard({currentUser}){
+function AdminDashboard({currentUser,users}){
   const [cases,setCases]=useState([]);
   const [loading,setLoading]=useState(true);
   const [month,setMonth]=useState(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');});
   const [chosen,setChosen]=useState('all');
   const [drilldown,setDrilldown]=useState(null);
+  const [editingCase,setEditingCase]=useState(null);
   const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>setLoading(false));},[]);
   useEffect(()=>{load();},[load]);
   const monthCases=cases.filter(c=>{const t=String(c.createdat||'');const m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m){let y=Number(m[3]);if(y>2400)y-=543;return y+'-'+String(Number(m[2])).padStart(2,'0')===month;}return t.startsWith(month+'-');});
@@ -1857,10 +1858,11 @@ function AdminDashboard({currentUser}){
       {drilldown&&<div role="dialog" aria-modal="true" aria-label={'รายการเคส '+drilldown.label} onClick={()=>setDrilldown(null)} style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.76)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
         <div onClick={event=>event.stopPropagation()} style={{width:'min(680px,100%)',maxHeight:'85vh',overflowY:'auto',background:'#24282f',border:'1px solid #49505a',borderRadius:15,padding:18,boxShadow:'0 20px 60px rgba(0,0,0,.5)'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,marginBottom:14}}><div><strong style={{fontSize:18}}>📋 {drilldown.label}</strong><div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>ทั้งหมด {drillRows.length} เคส · รหัสเคส / เซลส์ผู้รับผิดชอบ</div></div><button className="btn btn-ghost" onClick={()=>setDrilldown(null)} aria-label="ปิดหน้าต่าง">✕ ปิด</button></div>
-          <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>ลำดับ</th><th>รหัสเคส</th><th>เซลส์ผู้รับผิดชอบ</th><th>สถานะ</th></tr></thead><tbody>{drillRows.map((c,i)=><tr key={String(c.caseid||i)}><td>{i+1}</td><td style={{fontWeight:800,color:'#70b5ff'}}>{c.caseid||'-'}</td><td>{isUnassignedSales(c.sales)?'รอมอบหมาย':c.sales}</td><td>{c.status||'-'}</td></tr>)}</tbody></table></div>
+          <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>ลำดับ</th><th>รหัสเคส</th><th>เซลส์ผู้รับผิดชอบ</th><th>สถานะ</th></tr></thead><tbody>{drillRows.map((c,i)=><tr key={String(c.caseid||i)} onClick={()=>setEditingCase(c)} style={{cursor:'pointer'}} title="คลิกเพื่อดูและแก้ไขเคส"><td>{i+1}</td><td><button type="button" onClick={()=>setEditingCase(c)} style={{fontWeight:800,color:'#70b5ff',background:'transparent',border:0,cursor:'pointer',textDecoration:'underline',padding:'6px 2px'}} title="เปิดรายละเอียดและแก้ไขเคส">{c.caseid||'-'}</button></td><td>{isUnassignedSales(c.sales)?'รอมอบหมาย':c.sales}</td><td>{c.status||'-'}</td></tr>)}</tbody></table></div>
           {!drillRows.length&&<div style={{padding:20,textAlign:'center'}}>ไม่พบเคส</div>}
         </div>
       </div>}
+      {editingCase&&<CaseModal caseData={editingCase} users={users} currentUser={currentUser} onClose={()=>{setEditingCase(null);load();}} onUpdated={()=>{load();}}/>}
       <div className="card" style={{marginTop:14}}><strong>📈 รายละเอียดสถานะทั้งหมด {chosen==='all'?'ทุกแอด':(adMap[chosen]?.name||'')}</strong>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:8,marginTop:12}}>{statuses.map(([st,count],i)=><div key={st} style={{border:'1px solid var(--border)',borderRadius:8,padding:10}}><div style={{fontSize:12}}>{st}</div><div style={{display:'flex',alignItems:'baseline',gap:8}}><strong style={{fontSize:20,color:palette[i%palette.length]}}>{count}</strong><span style={{fontSize:11,color:'var(--text2)'}}>{rows.length?Math.round(count/rows.length*100):0}%</span></div></div>)}</div>
       </div>
@@ -2717,7 +2719,7 @@ function AdminApp({currentUser,onLogout}){
     cases:<AdminCurrentCases currentUser={currentUser} users={users}/>,
     private_cases:<AdminSentCasesPage currentUser={currentUser} users={users} caseType="private" title="เคสส่วนตัว" icon="🔒"/>,
     line_oa:<AdminSentCasesPage currentUser={currentUser} users={users} caseType="line_oa" title="Line OA" icon="💬"/>,
-    dashboard:<AdminDashboard currentUser={currentUser}/>,
+    dashboard:<AdminDashboard currentUser={currentUser} users={users}/>,
     analytics:<AdminAnalytics currentUser={currentUser}/>,
     bookings:<AdminBookings currentUser={currentUser} users={users}/>,
     trash:<AdminTrash currentUser={currentUser}/>,
