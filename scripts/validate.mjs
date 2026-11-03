@@ -164,6 +164,16 @@ for(const selector of ['.cp-action-copy','.cp-action-save','.cp-action-line','.c
 }
 if(!source.includes('const PREVIEW_SALES=[\'แฟ้บ\',\'บอล\',\'พี่บอล\',\'เพ้นท์\',\'พีร์\']'))
   fail('Demo sales names changed unexpectedly');
+const salesCases=section('function SalesCurrentCases(', '\\nfunction ');
+const bookingsPage=section('function AdminBookings(', '\\nfunction ');
+for(const [name,body] of [['Analytics',analytics],['Bookings',bookingsPage],['Sales cases',salesCases]]){
+  if(!body.includes('const [loadError,setLoadError]=useState')||!body.includes('role="alert"')||!body.includes('onClick={load}'))
+    fail(name+' needs an error state, visible alert and retry button');
+  if(!body.includes('.catch(')||!body.includes('.finally(()=>setLoading(false))'))
+    fail(name+' must stop loading when the request fails');
+}
+if(salesCases.includes('catch(()=>{setCases([])')||bookingsPage.includes('else setBookings([])'))
+  fail('Network errors must not erase previously loaded case/booking data');
 console.log('Phase 4 regression contracts passed: case create/edit, preview isolation, analytics and action colors');
 
 console.log('Validation passed: source, production bundle, public output, accessibility and dead-feature checks');
