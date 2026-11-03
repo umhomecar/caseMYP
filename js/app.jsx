@@ -247,7 +247,8 @@ async function api(action,data={}){
     if(action==='getCases')return{success:true,data:previewCases()};
     if(action==='getNotes'||action==='getCaseNotes'||action==='getFollowups'||action==='getCaseFollowups'||action==='getHistory')return{success:true,data:[]};
     if(action==='getUsers')return{success:true,data:PREVIEW_SALES.map((name,i)=>({userId:'DEMO'+i,name,role:'Sales',status:'active'}))};
-    if(action==='getNotifications'||action==='getBookings')return{success:true,data:[]};
+    if(action==='getNotifications'||action==='getBookings'||action==='getStandaloneCases')return{success:true,data:[]};
+    if(action==='getTrashCases')return{success:true,data:{cases:[],bookings:[],standalone:[]}};
     return{success:false,error:'โหมดตัวอย่าง: ไม่สามารถบันทึกหรือแก้ไขข้อมูลจริงได้'};
   }
   const cacheable=CACHEABLE.includes(action);
@@ -2771,7 +2772,7 @@ function AdminApp({currentUser,onLogout}){
   return <div>
     <div className="sidebar">
       <div className="sidebar-logo casemyp-v2-brand"><div className="casemyp-v2-brand-icon">🚘</div><div><div className="casemyp-v2-brand-title">CasePool <span>2.0</span></div><div className="casemyp-v2-brand-sub">MIDNIGHT WORKSPACE</div></div></div><div className="casemyp-v2-menu-label">WORKSPACE</div>
-      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>['dashboard','cases','analytics','bookings'].includes(n.key)):allNavItems).map(n=>
+      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>['dashboard','cases','analytics','bookings','users','private_cases','line_oa','trash'].includes(n.key)):allNavItems).map(n=>
         <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
