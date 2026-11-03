@@ -174,6 +174,14 @@ for(const [name,body] of [['Analytics',analytics],['Bookings',bookingsPage],['Sa
 }
 if(salesCases.includes('catch(()=>{setCases([])')||bookingsPage.includes('else setBookings([])'))
   fail('Network errors must not erase previously loaded case/booking data');
+// Merge readiness: transient failures must not erase successfully loaded cases.
+const standalonePage=section('function AdminSentCasesPage(', '\nfunction ');
+for(const [name,body] of [['Current cases',caseCenter],['Private/LINE cases',standalonePage]]){
+  if(!body.includes('const [loadError,setLoadError]=useState')||!body.includes('role="alert"')||!body.includes('ลองใหม่'))
+    fail(name+' must show a persistent recoverable load error');
+}
+if(standalonePage.includes('setRows([])')||caseCenter.includes('setCases([])'))
+  fail('Case list load failures must not wipe previously fetched records');
 console.log('Phase 4 regression contracts passed: case create/edit, preview isolation, analytics and action colors');
 
 console.log('Validation passed: source, production bundle, public output, accessibility and dead-feature checks');
