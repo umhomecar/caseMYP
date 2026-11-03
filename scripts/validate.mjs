@@ -145,6 +145,10 @@ if(!editModal.includes('expectedVersion:Number(caseData.version)||1'))
   fail('Case editing must preserve optimistic concurrency');
 if(!editModal.includes("api('updateCase'")||!editModal.includes('onUpdated(optimisticData)'))
   fail('Case editor save and state refresh contract changed');
+const getCasesHandler=section("case 'getCases':", "case 'checkCaseDuplicates':");
+if(!getCasesHandler.includes("if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]}")||
+   !getCasesHandler.includes("return{success:true,data:safeArray(rows)}"))
+  fail('getCases must distinguish an empty dataset from a failed Supabase request');
 if(!caseCenter.includes("api('getCases'")||!caseCenter.includes('casemyp-v2-case-filters'))
   fail('Current-case filtering or read path is missing');
 if(!caseCenter.includes('const load=useCallback((background=false)=>{if(!background)setLoading(true)')||!caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
