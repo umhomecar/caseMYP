@@ -1520,6 +1520,7 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
 function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [loadError,setLoadError]=useState('');
   const [q,setQ]=useState('');
   const [salesFilter,setSalesFilter]=useState('all');
   const [statusFilter,setStatusFilter]=useState('');
@@ -1531,10 +1532,11 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const theme=caseType==='private'
     ?{accent:'#ec4899',rgb:'236,72,153'}
     :{accent:'#22c55e',rgb:'34,197,94'};
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getStandaloneCases']);api('getStandaloneCases',{caseType}).then(r=>{
-    if(r.success)setRows(safeArray(r.data));else{setRows([]);showToast('โหลดข้อมูล '+title+' ไม่สำเร็จ: '+(r.error||'กรุณารัน SQL สร้างตาราง standalone_cases ก่อน'),'err',6000);}
-    setLoading(false);
-  }).catch(e=>{setRows([]);setLoading(false);showToast('โหลดข้อมูลไม่สำเร็จ','err');});},[caseType,title]);
+  const load=useCallback(()=>{setLoading(true);setLoadError('');cacheClear(['getStandaloneCases']);api('getStandaloneCases',{caseType}).then(r=>{
+    if(r.success)setRows(safeArray(r.data));
+    else setLoadError(r.error||'โหลดข้อมูล '+title+' ไม่สำเร็จ');
+  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูล '+title+' ไม่สำเร็จ'))
+    .finally(()=>setLoading(false));},[caseType,title]);
   useEffect(()=>{load();},[load]);
   function rowDate(v){
     const d=new Date(v||'');
@@ -1573,6 +1575,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
       </div>
     </div>
 
+    {loadError&&<div className="card" role="alert" style={{padding:14,marginBottom:12,color:'var(--red)'}}>⚠️ {loadError} — {rows.length?'ยังแสดงข้อมูลที่โหลดไว้ก่อนหน้า':'ยังไม่สามารถโหลดรายการได้'} <button type="button" className="btn cp-action-refresh" onClick={load} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <div className="sent-filter-row">
       <div className="sent-search-wrap">
         <span>🔍</span>
@@ -1636,6 +1639,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
 function AdminCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [loadError,setLoadError]=useState('');
   const currentMonthFilters=()=>{const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0');return{sales:'all',status:'',q:'',dateFrom:`${y}-${m}-01`,dateTo:`${y}-${m}-${String(new Date(y,d.getMonth()+1,0).getDate()).padStart(2,'0')}`};};
   const [filter,setFilter]=useState(currentMonthFilters);
   const [sortDir,setSortDir]=useState('desc');
@@ -1649,16 +1653,16 @@ function AdminCurrentCases({currentUser,users}){
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [bulkSales,setBulkSales]=useState('');
   const [bulkSaving,setBulkSaving]=useState(false);
-  const load=useCallback((background=false)=>{if(!background)setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
+  const load=useCallback((background=false)=>{if(!background)setLoading(true);setLoadError('');cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
     if(r.success){
       const casesData=safeArray(r.data);
       setCases(casesData);
       if(r.stale)showToast('กำลังแสดงข้อมูลสำรองล่าสุด','warn',3500);
     }else{
-      showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);
+      setLoadError(r.error||'โหลดเคสล่าสุดไม่สำเร็จ');
     }
     setLoading(false);
-  }).catch(()=>{setLoading(false);showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);});},[]);
+  }).catch(e=>{setLoading(false);setLoadError(e?.message||'เชื่อมต่อข้อมูลเคสไม่สำเร็จ');});},[]);
   useEffect(()=>{load();},[load]);
   // Keep the complete loaded dataset: searching must not overwrite the list.
   function search(){/* Search is applied immediately by the shared local filter. */}
@@ -1758,6 +1762,7 @@ function AdminCurrentCases({currentUser,users}){
   return <div className="page casemyp-v2-cases">
     {DESIGN_PREVIEW&&<div className="casemyp-v2-preview-notice">🎨 โหมดตัวอย่าง · ข้อมูลจำลอง ไม่สามารถบันทึกหรือส่ง LINE จริงได้</div>}
     <div className="page-hd casemyp-v2-cases-heading"><div style={{width:'100%'}}><div className="casemyp-v2-eyebrow">WORKSPACE / CASE MANAGEMENT</div><div className="page-title">📋 เคสปัจจุบัน <span className="casemyp-v2-title-accent">· Case Center</span></div><div className="admin-current-cases-desktop-summary" style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div><div className="admin-current-cases-mobile-search"><input value={filter.q} onChange={e=>{const v=e.target.value;setFilter(f=>({...f,q:v}));if(!v.trim())load();}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ค้นหา รหัสเคส ชื่อลูกค้า เบอร์..." inputMode="search"/></div></div><div className="admin-current-cases-desktop-tools" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary cp-action-add" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    {loadError&&<div className="card" role="alert" style={{padding:14,marginBottom:12,color:'var(--red)'}}>⚠️ {loadError} — {cases.length?'ยังแสดงข้อมูลที่โหลดไว้ก่อนหน้า':'ยังไม่สามารถโหลดรายการได้'} <button type="button" className="btn cp-action-refresh" onClick={()=>load()} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <div className="admin-current-cases-desktop-filters casemyp-v2-case-filters" style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
