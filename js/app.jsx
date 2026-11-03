@@ -248,6 +248,7 @@ async function api(action,data={}){
     if(action==='getNotes'||action==='getCaseNotes'||action==='getFollowups'||action==='getCaseFollowups'||action==='getHistory')return{success:true,data:[]};
     if(action==='getUsers')return{success:true,data:PREVIEW_SALES.map((name,i)=>({userId:'DEMO'+i,name,role:'Sales',status:'active'}))};
     if(action==='getNotifications'||action==='getBookings'||action==='getStandaloneCases')return{success:true,data:[]};
+    if(action==='getLineNotificationSetting')return{success:true,enabled:false};
     if(action==='getTrashCases')return{success:true,data:{cases:[],bookings:[],standalone:[]}};
     return{success:false,error:'โหมดตัวอย่าง: ไม่สามารถบันทึกหรือแก้ไขข้อมูลจริงได้'};
   }
@@ -340,6 +341,11 @@ function mapCaseNote(r){return{id:r.id,caseid:r.caseid,sales:r.sales,note:r.note
 function mapCaseFollowup(r){return{id:r.id,caseid:r.caseid,sales:r.sales,customername:r.customername||'',due_date:r.due_date||'',date:r.due_date||'',note:r.note||'',status:r.status||'pending',createdat:r.createdat||'',createdDisplay:formatTextDateToTHBE(r.createdat||''),dueDisplay:formatYMDToTHBE(r.due_date||''),doneat:r.doneat||'',deletedat:r.deletedat||'',notified_on:r.notified_on||''};}
 
 async function sbQ(method,table,q={},body=null){
+  // QA guard: the standalone design preview must never access Supabase.
+  if(DESIGN_PREVIEW){
+    if(String(method).toUpperCase()==='GET')return[];
+    return{error:'READ_ONLY_PREVIEW',message:'Design preview cannot modify database records'};
+  }
   // แยก raw params (ที่มี % อยู่แล้ว) ออกจาก normal params
   const baseUrl=`${SUPA_URL}/rest/v1/${table}`;
   const normalParams=[];const rawParts=[];
