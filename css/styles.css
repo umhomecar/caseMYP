@@ -2587,3 +2587,37 @@ body:not(.light) .casemyp-v2-cases .casemyp-v2-case-filters{
 @media(prefers-reduced-motion:reduce){
   body:not(.light) button.btn.cp-tool-button{transition:none!important;}
 }
+
+/* Final toolbar alignment — Dashboard / Reporting / Case Center / LINE OA */
+body:not(.light) .ad-dashboard-filters.casemyp-v2-toolbar{
+  grid-template-columns:minmax(155px,220px) minmax(140px,1fr) 40px!important;
+  gap:10px!important;
+  align-items:center!important;
+}
+body:not(.light) .ad-dashboard-filters.casemyp-v2-toolbar button.cp-tool-button{
+  width:40px!important;height:40px!important;min-width:40px!important;
+  padding:0!important;border-radius:12px!important;
+  font-size:19px!important;
+}
+body:not(.light) .casemyp-v2-cases-heading button.btn.cp-action-add,
+body:not(.light) .casemyp-v2-cases-heading button.btn.cp-action-add:not(:disabled){
+  background:#168fd1!important;border:1px solid #52b7ec!important;
+  color:#fff!important;box-shadow:0 5px 16px rgba(22,143,209,.2)!important;
+}
+body:not(.light) .casemyp-v2-cases-heading button.btn.cp-action-add:hover:not(:disabled){
+  background:#117ab5!important;
+}
+body:not(.light) .casemyp-v2-analytics button.cp-tool-button,
+body:not(.light) .casemyp-v2-trash button.cp-tool-button{
+  flex:0 0 40px!important;width:40px!important;height:40px!important;
+}
+@media(max-width:620px){
+  body:not(.light) .ad-dashboard-filters.casemyp-v2-toolbar{
+    grid-template-columns:minmax(115px,1fr) minmax(100px,1fr) 40px!important;
+    gap:7px!important;padding:10px!important;
+  }
+  body:not(.light) .ad-dashboard-filters.casemyp-v2-toolbar select,
+  body:not(.light) .ad-dashboard-filters.casemyp-v2-toolbar input{
+    min-width:0!important;width:100%!important;
+  }
+}
