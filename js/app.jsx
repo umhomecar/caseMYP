@@ -9,6 +9,7 @@ import {createClient} from '@supabase/supabase-js';
 // ============================================================
 // ⚙️ CONFIG
 // ============================================================
+const DESIGN_PREVIEW=window.location.pathname==='/design-preview.html';
 const RUNTIME_CONFIG=window.__CASEMYP_CONFIG__||{};
 const SUPA_URL=String(RUNTIME_CONFIG.supabaseUrl||'').trim().replace(/\/+$/,'');
 const SUPA_KEY=String(RUNTIME_CONFIG.supabaseAnonKey||'').trim();
@@ -234,7 +235,23 @@ async function getSearchCaseRows({force=false,sales=''}={}){
 const CACHEABLE=['getCases','getUsers','getBookings','getDashboard','getNotifications','getStandaloneCases','getTrashCases'];
 const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard','getHistory'],bulkAssignCases:['getCases','getDashboard','getHistory'],deleteCase:['getCases','getDashboard','getTrashCases','getHistory'],restoreCase:['getCases','getDashboard','getTrashCases','getHistory'],addBooking:['getBookings'],updateBooking:['getBookings'],deleteBooking:['getBookings'],restoreBooking:['getBookings'],addCaseNote:['getCaseNotes','getSalesNotes','getHistory'],deleteCaseNote:['getCaseNotes','getSalesNotes','getHistory'],addCaseFollowup:['getCaseFollowups','getSalesFollowups','getHistory'],updateFollowupStatus:['getCaseFollowups','getSalesFollowups','getHistory'],deleteFollowup:['getCaseFollowups','getSalesFollowups','getHistory'],addStandaloneCase:['getStandaloneCases'],updateStandaloneCase:['getStandaloneCases'],deleteStandaloneCase:['getStandaloneCases'],restoreStandaloneCase:['getStandaloneCases']};
 
+const PREVIEW_SALES=['แฟ้บ','บอล','พี่บอล','เพ้นท์','พีร์'];
+function previewCases(){
+  const d=new Date();const date='02/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()+' 11:00:00';
+  const campaigns=['FE','D-max 459','4M','organic','Yaris 359','Jazz 299','City'];
+  const status=['รอข้อมูล','ไปต่อได้','กำลังติดต่อ','เคสเลี้ยง','จอง','ไม่ต่อได้','เคสวัด 50/50'];
+  return Array.from({length:26},(_,i)=>({caseid:'DEMO'+String(i+1).padStart(3,'0'),customername:'ตัวอย่างเคส '+(i+1),contact:'',sales:PREVIEW_SALES[i%5],status:status[i%status.length],createdat:date,attachment:'[CLIP:'+campaigns[i%campaigns.length]+']',sent:'คิวเพจ'}));
+}
 async function api(action,data={}){
+  if(DESIGN_PREVIEW){
+    if(action==='getCases')return{success:true,data:previewCases()};
+    if(action==='getNotes'||action==='getCaseNotes'||action==='getFollowups'||action==='getCaseFollowups'||action==='getHistory')return{success:true,data:[]};
+    if(action==='getUsers')return{success:true,data:PREVIEW_SALES.map((name,i)=>({userId:'DEMO'+i,name,role:'Sales',status:'active'}))};
+    if(action==='getNotifications'||action==='getBookings'||action==='getStandaloneCases')return{success:true,data:[]};
+    if(action==='getLineNotificationSetting')return{success:true,enabled:false};
+    if(action==='getTrashCases')return{success:true,data:{cases:[],bookings:[],standalone:[]}};
+    return{success:false,error:'โหมดตัวอย่าง: ไม่สามารถบันทึกหรือแก้ไขข้อมูลจริงได้'};
+  }
   const cacheable=CACHEABLE.includes(action);
   const key=cacheKey(action,data);
   if(cacheable){
@@ -324,6 +341,11 @@ function mapCaseNote(r){return{id:r.id,caseid:r.caseid,sales:r.sales,note:r.note
 function mapCaseFollowup(r){return{id:r.id,caseid:r.caseid,sales:r.sales,customername:r.customername||'',due_date:r.due_date||'',date:r.due_date||'',note:r.note||'',status:r.status||'pending',createdat:r.createdat||'',createdDisplay:formatTextDateToTHBE(r.createdat||''),dueDisplay:formatYMDToTHBE(r.due_date||''),doneat:r.doneat||'',deletedat:r.deletedat||'',notified_on:r.notified_on||''};}
 
 async function sbQ(method,table,q={},body=null){
+  // QA guard: the standalone design preview must never access Supabase.
+  if(DESIGN_PREVIEW){
+    if(String(method).toUpperCase()==='GET')return[];
+    return{error:'READ_ONLY_PREVIEW',message:'Design preview cannot modify database records'};
+  }
   // แยก raw params (ที่มี % อยู่แล้ว) ออกจาก normal params
   const baseUrl=`${SUPA_URL}/rest/v1/${table}`;
   const normalParams=[];const rawParts=[];
@@ -509,7 +531,7 @@ async function sbApi(action,data){
       if(isSbError(res))return{success:false,error:formatSbError(res)};
       return{success:true};
     }
-    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const dashboardMonth=String(data.dashboardMonth||'');if(dashboardMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(dashboardMonth))return{success:false,error:'เดือนไม่ถูกต้อง'};const q={deleted_at:'is.null',order:'caseid.desc',limit:dashboardMonth?'5000':'50000'};if(dashboardMonth)q.caseid=`like.${dashboardMonth.slice(2,4)+dashboardMonth.slice(5,7)}*`;else if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);return{success:true,data:rows||[]};}
+    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const dashboardMonth=String(data.dashboardMonth||'');if(dashboardMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(dashboardMonth))return{success:false,error:'เดือนไม่ถูกต้อง'};const q={deleted_at:'is.null',order:'caseid.desc',limit:dashboardMonth?'5000':'50000'};if(dashboardMonth)q.caseid=`like.${dashboardMonth.slice(2,4)+dashboardMonth.slice(5,7)}*`;else if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows)};}
     case 'checkCaseDuplicates':{
       const rows=await sbQ('GET','cases',{deleted_at:'is.null',order:'updatedat.desc',limit:'10000'});
       if(isSbError(rows))return{success:false,error:formatSbError(rows)};
@@ -861,7 +883,7 @@ const Ico = {
 
 function StatusBadge({status}){return <span className={`badge ${getStatusClass(status)}`}>{status||'-'}</span>;}
 
-function Modal({title,onClose,children,footer}){
+function Modal({title,onClose,children,footer,variant=''}){
   const titleId=useRef('modal-title-'+Math.random().toString(36).slice(2)).current;
   useEffect(()=>{
     const onKeyDown=e=>{if(e.key==='Escape')onClose();};
@@ -869,8 +891,8 @@ function Modal({title,onClose,children,footer}){
     return()=>document.removeEventListener('keydown',onKeyDown);
   },[onClose]);
   return <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-    <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="modal-hd"><span id={titleId} style={{fontWeight:700,fontSize:16}}>{title}</span><button type="button" className="btn btn-ghost" style={{padding:'6px 10px',borderRadius:8,display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={onClose} aria-label="ปิดหน้าต่าง"><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
+    <div className={`modal ${variant?`casemyp-v2-modal casemyp-v2-modal-${variant}`:""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div className="modal-hd"><span id={titleId} style={{fontWeight:700,fontSize:16}}>{title}</span><button type="button" className="btn btn-ghost cp-action-danger" style={{padding:'6px 10px',borderRadius:8,display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={onClose} aria-label="ปิดหน้าต่าง"><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
       <div className="modal-bd">{children}</div>
       {footer&&<div className="modal-ft">{footer}</div>}
     </div>
@@ -884,7 +906,7 @@ function SkeletonCards({n=3}){return <div>{Array.from({length:n}).map((_,i)=><di
 function SkeletonRows({n=5,cols=6}){return <>{Array.from({length:n}).map((_,i)=><tr key={i}>{Array.from({length:cols}).map((__,j)=><td key={j}><div className="skeleton" style={{height:14,width:j===0?80:j===cols-1?60:'70%'}}/></td>)}</tr>)}</>;}
 
 function Confirm({msg,onOk,onCancel}){
-  return <div className="overlay"><div className="modal" style={{maxWidth:340}} role="alertdialog" aria-modal="true" aria-label="ยืนยันการทำรายการ"><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}} aria-hidden="true">⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button type="button" className="btn btn-ghost" onClick={onCancel}>ยกเลิก</button><button type="button" className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
+  return <div className="overlay"><div className="modal" style={{maxWidth:340}} role="alertdialog" aria-modal="true" aria-label="ยืนยันการทำรายการ"><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}} aria-hidden="true">⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button type="button" className="btn btn-ghost cp-action-danger" onClick={onCancel}>ยกเลิก</button><button type="button" className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
 }
 
 function HistoryModal({caseId,onClose}){
@@ -1002,30 +1024,49 @@ function TemplateSelector({value, onChange}){
 function AdminAnalytics({currentUser}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);
   const [range,setRange]=useState('month'); // month|3month|all
-  useEffect(()=>{api('getCases',{all:'true'}).then(cr=>{if(cr.success)setCases(cr.data||[]);setLoading(false);});},[]);
+  const [loadError,setLoadError]=useState('');
+  const load=useCallback(()=>{
+    setLoading(true);setLoadError('');
+    return api('getCases',{all:'true'}).then(cr=>{
+      if(cr.success)setCases(safeArray(cr.data));
+      else setLoadError(cr.error||'โหลดรายงานไม่สำเร็จ');
+    }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูลรายงานไม่สำเร็จ'))
+      .finally(()=>setLoading(false));
+  },[]);
+  useEffect(()=>{load();},[load]);
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
+  // Real case IDs encode YYMM; only Preview DEMO IDs use their simulated creation dates.
+  const belongsToPeriod=(row,preList)=>{
+    const id=String(row.caseid||'');
+    if(preList.some(p=>id.startsWith(p)))return true;
+    if(!DESIGN_PREVIEW||!/^DEMO\d+$/.test(id))return false;
+    const m=String(row.createdat||'').match(/^\d{2}\/(\d{2})\/(\d{4})/);
+    return !!m&&preList.includes(m[2].slice(-2)+m[1]);
+  };
   function getMonthPre(monthsAgo){const d=new Date();d.setMonth(d.getMonth()-monthsAgo);return String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');}
   const monthCount=range==='month'?1:range==='3month'?3:12;
   const prefixes=Array.from({length:monthCount},(_,i)=>getMonthPre(monthCount-1-i));
   const MONTH_LABELS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   function monthLabel(pre){const y=2000+parseInt(pre.slice(0,2)),m=parseInt(pre.slice(2,4))-1;return MONTH_LABELS[m]+(monthCount>3?' '+String(y+543).slice(-2):'');}
   // รวม stats ต่อเดือน
-  const monthStats=prefixes.map(pre=>{const mc=cases.filter(c=>String(c.caseid||'').startsWith(pre));return{pre,label:monthLabel(pre),total:mc.length,sold:mc.filter(c=>c.status==='ปล่อยแล้ว').length,active:mc.filter(c=>!CLOSED.includes(c.status)).length,wr:mc.length>0?Math.round(mc.filter(c=>c.status==='ปล่อยแล้ว').length/mc.length*100):0};});
+  const monthStats=prefixes.map(pre=>{const mc=cases.filter(c=>belongsToPeriod(c,[pre]));return{pre,label:monthLabel(pre),total:mc.length,sold:mc.filter(c=>c.status==='ปล่อยแล้ว').length,active:mc.filter(c=>!CLOSED.includes(c.status)).length,wr:mc.length>0?Math.round(mc.filter(c=>c.status==='ปล่อยแล้ว').length/mc.length*100):0};});
   // สถิติแต่ละเซลส์
   const salesNames=[...new Set(cases.map(c=>c.sales).filter(Boolean))];
-  const salesStats=salesNames.map(name=>{const mc=cases.filter(c=>c.sales===name&&prefixes.some(p=>String(c.caseid||'').startsWith(p)));const sold=mc.filter(c=>c.status==='ปล่อยแล้ว').length;const score=calculateCaseScore;return{name,total:mc.length,sold,wr:mc.length>0?Math.round(sold/mc.length*100):0};}).sort((a,b)=>b.sold-a.sold);
+  const salesStats=salesNames.map(name=>{const mc=cases.filter(c=>c.sales===name&&belongsToPeriod(c,prefixes));const sold=mc.filter(c=>c.status==='ปล่อยแล้ว').length;const score=calculateCaseScore;return{name,total:mc.length,sold,wr:mc.length>0?Math.round(sold/mc.length*100):0};}).sort((a,b)=>b.sold-a.sold);
   // Funnel
-  const allPeriod=cases.filter(c=>prefixes.some(p=>String(c.caseid||'').startsWith(p)));
+  const allPeriod=cases.filter(c=>belongsToPeriod(c,prefixes));
   const funnel=[['เข้าระบบ',allPeriod.length],['คุยแล้ว',allPeriod.filter(c=>c.report&&c.report.length>5).length],['ไปต่อได้',allPeriod.filter(c=>['ไปต่อได้','เคสวัด 50/50','จอง','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยแล้ว'].includes(c.status)).length],['จอง',allPeriod.filter(c=>['จอง','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยแล้ว'].includes(c.status)).length],['ปล่อยรถ',allPeriod.filter(c=>c.status==='ปล่อยแล้ว').length]];
   const maxF=funnel[0][1]||1;
-  return<div className="page">
-    <div className="page-hd"><div><div className="page-title">📈 Analytics</div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์เชิงลึก</div></div><button className="btn btn-ghost" style={{fontSize:13}} onClick={()=>{cacheClear(['getCases']);location.reload();}}>🔄</button></div>
+  return<div className="page casemyp-v2-analytics">
+    <div className="page-hd casemyp-v2-report-heading"><div><div className="casemyp-v2-eyebrow">WORKSPACE / REPORTING</div><div className="page-title">📈 Analytics <span className="casemyp-v2-title-accent">· Reports</span></div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์เชิงลึก</div></div><button className="btn cp-tool-button cp-action-refresh" title="รีเฟรชรายงาน" aria-label="รีเฟรชรายงาน" onClick={()=>{cacheClear(['getCases']);location.reload();}}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.5-4.7L3 9"/><path d="M3 4v5h5"/><path d="M4 13a8 8 0 0 0 14.5 4.7L21 15"/><path d="M16 15h5v5"/></svg></button></div>
+    {DESIGN_PREVIEW&&<div className="casemyp-v2-preview-notice">🎨 ข้อมูลรายงานนี้เป็นเคสตัวอย่าง DEMO ไม่ใช่ยอดงานจริง</div>}
     {/* Range Selector */}
     <div style={{display:'flex',gap:6,marginBottom:16}}>
       {[['month','เดือนนี้'],['3month','3 เดือน'],['all','ปีนี้']].map(([k,l])=>
         <button key={k} onClick={()=>setRange(k)} style={{padding:'6px 16px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:range===k?'var(--blue2)':'var(--bg3)',color:range===k?'#fff':'var(--text2)'}}>{l}</button>)}
     </div>
-    {loading?<Loading/>:<>
+    {loadError&&<div role="alert" className="card" style={{marginBottom:14,color:'var(--red)',padding:14}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={()=>{cacheClear(['getCases']);load();}} style={{marginLeft:10}}>ลองใหม่</button></div>}
+    {loading?<Loading/>:loadError&&!cases.length?null:<>
       {/* Summary Stats */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
         {[['📋 เคสทั้งหมด',allPeriod.length,'var(--blue)'],['🚗 ปล่อยแล้ว',allPeriod.filter(c=>c.status==='ปล่อยแล้ว').length,'var(--green)'],['🔥 Win Rate',allPeriod.length>0?Math.round(allPeriod.filter(c=>c.status==='ปล่อยแล้ว').length/allPeriod.length*100)+'%':'-','var(--yellow)'],['📥 รอมอบหมาย',allPeriod.filter(c=>isUnassignedSales(c.sales)).length,'var(--purple)']].map(([l,v,c])=>
@@ -1051,7 +1092,7 @@ function AdminAnalytics({currentUser}){
       {/* Sales Funnel */}
       <div className="card" style={{marginBottom:14}}>
         <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>🎯 Sales Funnel</div>
-        {funnel.map(([label,val],i)=>{const pct=Math.round(val/maxF*100);const convPct=i>0&&funnel[i-1][1]>0?Math.round(val/funnel[i-1][1]*100):100;return<div key={i} style={{marginBottom:10}}>
+        {funnel.map(([label,val],i)=>{const pct=Math.round(val/maxF*100);const convPct=i>0&&funnel[i-1][1]>0?Math.round(val/funnel[i-1][1]*100):0;return<div key={i} style={{marginBottom:10}}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
             <span style={{fontSize:13,fontWeight:600}}>{['📥','💬','⬆️','📋','🚗'][i]} {label}</span>
             <span style={{fontSize:12,color:'var(--text2)'}}>{val} คน {i>0&&<span style={{color:convPct>=50?'var(--green)':'var(--yellow)'}}>({convPct}%)</span>}</span>
@@ -1208,13 +1249,13 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
   return <>
     <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal" style={{maxWidth:480,borderRadius:14}}>
-        <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}><div style={{width:4,height:22,background:'var(--blue)',borderRadius:2,flexShrink:0}}/><span style={{fontWeight:700,fontSize:15}}>ข้อมูลลูกค้า</span><button className="btn btn-ghost" style={{padding:'4px 8px',marginLeft:'auto'}} onClick={onClose}><Ico.x/></button></div>
+      <div className="modal casemyp-v2-modal casemyp-v2-modal-edit" style={{maxWidth:480,borderRadius:14}}>
+        <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}><div style={{width:4,height:22,background:'var(--blue)',borderRadius:2,flexShrink:0}}/><span style={{fontWeight:700,fontSize:15}}>ข้อมูลลูกค้า</span><button className="btn btn-ghost cp-action-danger" style={{padding:'4px 8px',marginLeft:'auto'}} onClick={onClose}><Ico.x/></button></div>
         <div style={{padding:'16px 20px',overflowY:'auto',maxHeight:'calc(100vh - 320px)'}}>
           <div style={{marginBottom:14,display:'grid',gap:9}}>
-            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>รหัสเคส: </span><span style={{fontWeight:700,color:'var(--blue)'}}>{caseId}</span><button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseId)}>คัดลอก</button></div>
-            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ชื่อเฟส: </span>{editAll?<input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="ชื่อลูกค้า" style={{flex:1,minWidth:180}}/>:<><span style={{fontWeight:600}}>{customerName||'-'}</span>{customerName&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(customerName)}>คัดลอก</button>}</>}</div>
-            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ติดต่อ: </span>{editAll?(isQR?<div style={{width:'100%',marginTop:6}}><QrUploader value={contact} onChange={setContact} caseId={caseId}/></div>:<input value={contact} onChange={e=>setContact(e.target.value)} placeholder="เบอร์ / ไลน์ / ID" style={{flex:1,minWidth:180}}/>):isQR?<div style={{marginTop:6,width:'100%'}}><img src={contactRaw} alt="QR" style={{maxWidth:'100%',maxHeight:220,borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',display:'block'}} onError={e=>{e.target.style.display='none';}}/></div>:<><span style={{fontWeight:600}}>{contactVal||'-'}</span>{contactVal&&<button className="btn btn-primary" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(contactVal)}>คัดลอก</button>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`tel:${contactVal}`} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`https://line.me/ti/p/~${contactVal}`} target="_blank" rel="noopener" className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none'}}>💬 Line</a>}</>}</div>
+            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>รหัสเคส: </span><span style={{fontWeight:700,color:'var(--blue)'}}>{caseId}</span><button className="btn btn-primary cp-action-copy" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseId)}>คัดลอก</button></div>
+            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ชื่อเฟส: </span>{editAll?<input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="ชื่อลูกค้า" style={{flex:1,minWidth:180}}/>:<><span style={{fontWeight:600}}>{customerName||'-'}</span>{customerName&&<button className="btn btn-primary cp-action-copy" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(customerName)}>คัดลอก</button>}</>}</div>
+            <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ติดต่อ: </span>{editAll?(isQR?<div style={{width:'100%',marginTop:6}}><QrUploader value={contact} onChange={setContact} caseId={caseId}/></div>:<input value={contact} onChange={e=>setContact(e.target.value)} placeholder="เบอร์ / ไลน์ / ID" style={{flex:1,minWidth:180}}/>):isQR?<div style={{marginTop:6,width:'100%'}}><img src={contactRaw} alt="QR" style={{maxWidth:'100%',maxHeight:220,borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',display:'block'}} onError={e=>{e.target.style.display='none';}}/></div>:<><span style={{fontWeight:600}}>{contactVal||'-'}</span>{contactVal&&<button className="btn btn-primary cp-action-copy" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(contactVal)}>คัดลอก</button>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`tel:${contactVal}`} className="contact-action-btn" style={{background:'rgba(63,185,80,.15)',color:'var(--green)',textDecoration:'none'}}><Ico.phone/>โทร</a>}{contactVal&&/^\d{9,10}$/.test(contactVal.replace(/\D/g,''))&&<a href={`https://line.me/ti/p/~${contactVal}`} target="_blank" rel="noopener" className="contact-action-btn" style={{background:'rgba(0,200,83,.15)',color:'#06c755',textDecoration:'none'}}>💬 Line</a>}</>}</div>
             {isAdmin&&<div style={{fontSize:14,display:'flex',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)',paddingTop:editAll?9:0}}>ข้อมูลคลิปแอด: </span>{editAll?<input value={clipAd} onChange={e=>setClipAd(e.target.value)} placeholder="ชื่อแอด / แคมเปญ / คลิป URL..." style={{flex:1,minWidth:180}}/>:<span style={{fontWeight:600,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{clipAd||'-'}</span>}</div>}
           </div>
           <div className="form-group"><label>สถานะ:</label><select value={status} onChange={e=>setStatus(e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
@@ -1261,12 +1302,12 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
         </div>
         <div style={{padding:'10px 16px', borderTop:'1px solid var(--border)', paddingBottom:'max(20px, env(safe-area-inset-bottom))'}}>
           <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              <button className="btn btn-primary" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setClipAd(getClipAd(caseData.attachment));setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
+              <button className={`btn ${editAll?'cp-action-danger':'cp-action-edit'}`} style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setClipAd(getClipAd(caseData.attachment));setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
-              <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>
-              {isAdmin&&<button className="btn btn-ghost" style={{flexBasis:'100%',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:'1px solid rgba(6,199,85,.45)',color:lineCooldownLeft>0?'var(--text3)':'#06c755',opacity:lineCooldownLeft>0?.65:1}} onClick={retryLineNotification} disabled={lineRetrying||saving||lineCooldownLeft>0}>📨 {lineRetrying?'กำลังส่ง LINE...':lineCooldownLeft>0?`รอ ${lineCooldownLeft} วิ แล้วส่งใหม่`:'ส่ง LINE ใหม่'}</button>}
+              <button className="btn btn-ghost cp-action-danger" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>
+              {isAdmin&&<button className="btn btn-ghost cp-action-line" style={{flexBasis:'100%',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:'1px solid rgba(6,199,85,.45)',color:lineCooldownLeft>0?'var(--text3)':'#06c755',opacity:lineCooldownLeft>0?.65:1}} onClick={retryLineNotification} disabled={lineRetrying||saving||lineCooldownLeft>0}>📨 {lineRetrying?'กำลังส่ง LINE...':lineCooldownLeft>0?`รอ ${lineCooldownLeft} วิ แล้วส่งใหม่`:'ส่ง LINE ใหม่'}</button>}
             </div>
-          <button className="btn btn-primary" style={{width:'100%',justifyContent:'center',padding:'11px',fontSize:14,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}} onClick={save} disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกและปิด'}</button>
+          <button className="btn btn-primary cp-action-save" style={{width:'100%',justifyContent:'center',padding:'11px',fontSize:14,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}} onClick={save} disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกและปิด'}</button>
           
         </div>
       </div>
@@ -1305,6 +1346,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   function getCasePrefix(){const raw=backdated&&backMonth?backMonth:'';if(raw&&/^\d{4}-\d{2}$/.test(raw)){const [y,m]=raw.split('-');return y.slice(-2)+m;}const d=new Date();return String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');}
   useEffect(()=>{const pre=getCasePrefix();api('getCases',{all:'true'}).then(r=>{if(r.success){const max=(r.data||[]).filter(c=>String(c.caseid).startsWith(pre)).reduce((m,c)=>{const n=parseInt(String(c.caseid).slice(4))||0;return n>m?n:m;},0);setPreviewId(pre+String(max+1).padStart(3,'0'));}else{setPreviewId(pre+'???');}});},[backdated,backMonth]);
   async function submit(){
+    if(DESIGN_PREVIEW)return showToast('โหมดตัวอย่าง: ทดลองกรอกได้ แต่ไม่บันทึกข้อมูลจริง','info');
     if(!form.customername)return showToast('กรุณากรอกชื่อลูกค้า','warn');
     if(backdated&&!backDate)return showToast('กรุณาเลือกวันที่ย้อนหลัง','warn');
     setLoading(true);
@@ -1365,8 +1407,9 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       onAdded();onClose();
     }else showToast(r.error||'เกิดข้อผิดพลาด','err');
   }
-  return <Modal title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+  return <Modal variant="case-form" title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
+    {DESIGN_PREVIEW&&<div className="casemyp-v2-form-demo-note">🩷 ทดลองดูฟอร์มและสีปุ่มได้ ข้อมูลนี้เป็นตัวอย่าง ไม่ถูกส่งหรือบันทึกจริง</div>}
+    <div className="casemyp-v2-case-form-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ผู้ส่งเคสเข้า LINE</label><select value={lineSender} onChange={e=>{setLineSender(e.target.value);try{localStorage.setItem('casemyp:last-line-sender',e.target.value);}catch(err){}}}>{LINE_SENDERS.map(name=><option key={name} value={name}>{name}</option>)}</select><div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>ระบบจะส่งแจ้งเตือนเคสนี้เข้า LINE ส่วนตัวของผู้ส่งที่ลงทะเบียนกับ Um-Bot</div></div>
       {backdated&&<div style={{gridColumn:'1/-1',background:'linear-gradient(135deg,rgba(88,166,255,.10),rgba(188,140,255,.08))',border:'1px solid rgba(88,166,255,.25)',borderRadius:12,padding:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
@@ -1401,7 +1444,7 @@ function AddBookingModal({currentUser,users,onClose,onAdded}){
   const [form,setForm]=useState({caseId:'',sales:currentUser.role==='Admin'?'':currentUser.name,customer:'',facebook:'',ads:'',brand:'',model:'',plate:'',status:'จองแล้ว',note:''});
   const [loading,setLoading]=useState(false);const set=(k,v)=>setForm(f=>({...f,[k]:v}));const models=form.brand?CAR_MODELS[form.brand]||[]:[];
   async function submit(){if(!form.caseId.trim()||!form.customer.trim()||!form.sales.trim())return showToast('กรุณากรอกรหัสเคส ชื่อลูกค้า และเลือกเซลส์','warn');setLoading(true);const r=await api('addBooking',{...form});setLoading(false);if(r.success){showToast('เพิ่มการจองแล้ว','ok');onAdded();onClose();}else showToast(r.error||'เกิดข้อผิดพลาด','err');}
-  return <Modal title="📋 เพิ่มการจอง" onClose={onClose} footer={<><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'บันทึก...':'บันทึก'}</button></>}>
+  return <Modal variant="case-form" title="📋 เพิ่มการจอง" onClose={onClose} footer={<><button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary cp-action-save" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'บันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group"><label>รหัสเคส *</label><input value={form.caseId} onChange={e=>set('caseId',e.target.value)} placeholder="เช่น 2603001"/></div>
       {currentUser.role==='Admin'?<div className="form-group"><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือก --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>:<div className="form-group"><label>เซลส์ *</label><input value={form.sales} readOnly/></div>}
@@ -1454,10 +1497,10 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
     if(r.success){showToast('ย้ายข้อมูลไปถังขยะแล้ว','ok');onSaved();onClose();}
     else showToast(r.error||'ลบไม่สำเร็จ','err',5000);
   }
-  return <><Modal title={(isEdit?'✏️ แก้ไข ':'➕ เพิ่ม ')+title} onClose={onClose} footer={<>
+  return <><Modal variant="standalone-form" title={(isEdit?'✏️ แก้ไข ':'➕ เพิ่ม ')+title} onClose={onClose} footer={<>
     {isEdit&&<button className="btn btn-danger" onClick={()=>setConfirmDelete(true)} disabled={loading} style={{marginRight:'auto'}}>ลบ</button>}
-    <button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button>
-    <button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button>
+    <button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button>
+    <button className="btn btn-primary cp-action-save" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{loading?'กำลังบันทึก...':'บันทึก'}</button>
   </>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อ *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อลูกค้า / ชื่อบัญชี / ชื่อเคส"/></div>
@@ -1477,6 +1520,7 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
 function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [loadError,setLoadError]=useState('');
   const [q,setQ]=useState('');
   const [salesFilter,setSalesFilter]=useState('all');
   const [statusFilter,setStatusFilter]=useState('');
@@ -1488,10 +1532,11 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const theme=caseType==='private'
     ?{accent:'#ec4899',rgb:'236,72,153'}
     :{accent:'#22c55e',rgb:'34,197,94'};
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getStandaloneCases']);api('getStandaloneCases',{caseType}).then(r=>{
-    if(r.success)setRows(safeArray(r.data));else{setRows([]);showToast('โหลดข้อมูล '+title+' ไม่สำเร็จ: '+(r.error||'กรุณารัน SQL สร้างตาราง standalone_cases ก่อน'),'err',6000);}
-    setLoading(false);
-  }).catch(e=>{setRows([]);setLoading(false);showToast('โหลดข้อมูลไม่สำเร็จ','err');});},[caseType,title]);
+  const load=useCallback(()=>{setLoading(true);setLoadError('');cacheClear(['getStandaloneCases']);api('getStandaloneCases',{caseType}).then(r=>{
+    if(r.success)setRows(safeArray(r.data));
+    else setLoadError(r.error||'โหลดข้อมูล '+title+' ไม่สำเร็จ');
+  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูล '+title+' ไม่สำเร็จ'))
+    .finally(()=>setLoading(false));},[caseType,title]);
   useEffect(()=>{load();},[load]);
   function rowDate(v){
     const d=new Date(v||'');
@@ -1519,8 +1564,8 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   });
   function openAdd(){setModalItem(null);setShowModal(true);}
   function openEdit(r){setModalItem(r);setShowModal(true);}
-  return <div className={`page admin-sent-page admin-sent-${caseType}`} style={{'--sent-accent':theme.accent,'--sent-accent-rgb':theme.rgb}}>
-    <div className="page-hd">
+  return <div className={`page admin-sent-page admin-sent-${caseType} casemyp-v2-sent`} style={{'--sent-accent':theme.accent,'--sent-accent-rgb':theme.rgb}}>
+    <div className="page-hd casemyp-v2-secondary-heading">
       <div>
         <div className="page-title sent-page-title" style={{display:'flex',alignItems:'center',gap:10}}><span>{icon}</span>{title}</div>
         <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · ข้อมูลแยกจากเคสปัจจุบันและไม่มีรหัสเคส</div>
@@ -1530,6 +1575,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
       </div>
     </div>
 
+    {loadError&&<div className="card" role="alert" style={{padding:14,marginBottom:12,color:'var(--red)'}}>⚠️ {loadError} — {rows.length?'ยังแสดงข้อมูลที่โหลดไว้ก่อนหน้า':'ยังไม่สามารถโหลดรายการได้'} <button type="button" className="btn cp-action-refresh" onClick={load} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <div className="sent-filter-row">
       <div className="sent-search-wrap">
         <span>🔍</span>
@@ -1541,9 +1587,11 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
       <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
         <option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
       </select>
-      <button className="btn btn-ghost sent-icon-btn" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงตามวันที่สร้าง">{sortDir==='desc'?'↓':'↑'}</button>
-      <button className="btn btn-ghost sent-icon-btn" onClick={load} title="โหลดข้อมูลใหม่">🔄</button>
-      <span className="sent-result-count">{filtered.length} เคส</span>
+      <div className="cp-list-tools" role="group" aria-label="เครื่องมือจัดการรายการ">
+        <button type="button" className="btn btn-ghost cp-tool-button cp-tool-sort" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงตามวันที่สร้าง" aria-label="เรียงตามวันที่สร้าง">{sortDir==='desc'?'↓':'↑'}</button>
+        <button type="button" className="btn cp-tool-button cp-action-refresh" onClick={load} title="รีเฟรชรายการ" aria-label="รีเฟรชรายการ">↻</button>
+        <span className="cp-count-pill" aria-live="polite">{filtered.length} เคส</span>
+      </div>
     </div>
 
     <div className="sent-date-row">
@@ -1591,6 +1639,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
 function AdminCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [loadError,setLoadError]=useState('');
   const currentMonthFilters=()=>{const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0');return{sales:'all',status:'',q:'',dateFrom:`${y}-${m}-01`,dateTo:`${y}-${m}-${String(new Date(y,d.getMonth()+1,0).getDate()).padStart(2,'0')}`};};
   const [filter,setFilter]=useState(currentMonthFilters);
   const [sortDir,setSortDir]=useState('desc');
@@ -1604,16 +1653,16 @@ function AdminCurrentCases({currentUser,users}){
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [bulkSales,setBulkSales]=useState('');
   const [bulkSaving,setBulkSaving]=useState(false);
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
+  const load=useCallback((background=false)=>{if(!background)setLoading(true);setLoadError('');cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
     if(r.success){
       const casesData=safeArray(r.data);
       setCases(casesData);
       if(r.stale)showToast('กำลังแสดงข้อมูลสำรองล่าสุด','warn',3500);
     }else{
-      showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);
+      setLoadError(r.error||'โหลดเคสล่าสุดไม่สำเร็จ');
     }
     setLoading(false);
-  }).catch(()=>{setLoading(false);showToast('โหลดข้อมูลล่าสุดไม่สำเร็จ — ยังแสดงข้อมูลเดิมอยู่','err',5000);});},[]);
+  }).catch(e=>{setLoading(false);setLoadError(e?.message||'เชื่อมต่อข้อมูลเคสไม่สำเร็จ');});},[]);
   useEffect(()=>{load();},[load]);
   // Keep the complete loaded dataset: searching must not overwrite the list.
   function search(){/* Search is applied immediately by the shared local filter. */}
@@ -1710,9 +1759,11 @@ function AdminCurrentCases({currentUser,users}){
     if(exportFilter.dateTo){const to=new Date(exportFilter.dateTo);to.setHours(23,59,59);rows=rows.filter(c=>{const d=parseD(c.createdat);return d&&d<=to;});}
     return rows;
   }
-  return <div className="page">
-    <div className="page-hd"><div style={{width:'100%'}}><div className="page-title">📋 เคสทั่วไป</div><div className="admin-current-cases-desktop-summary" style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div><div className="admin-current-cases-mobile-search"><input value={filter.q} onChange={e=>{const v=e.target.value;setFilter(f=>({...f,q:v}));if(!v.trim())load();}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ค้นหา รหัสเคส ชื่อลูกค้า เบอร์..." inputMode="search"/></div></div><div className="admin-current-cases-desktop-tools" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
-    <div className="admin-current-cases-desktop-filters" style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
+  return <div className="page casemyp-v2-cases">
+    {DESIGN_PREVIEW&&<div className="casemyp-v2-preview-notice">🎨 โหมดตัวอย่าง · ข้อมูลจำลอง ไม่สามารถบันทึกหรือส่ง LINE จริงได้</div>}
+    <div className="page-hd casemyp-v2-cases-heading"><div style={{width:'100%'}}><div className="casemyp-v2-eyebrow">WORKSPACE / CASE MANAGEMENT</div><div className="page-title">📋 เคสปัจจุบัน <span className="casemyp-v2-title-accent">· Case Center</span></div><div className="admin-current-cases-desktop-summary" style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div><div className="admin-current-cases-mobile-search"><input value={filter.q} onChange={e=>{const v=e.target.value;setFilter(f=>({...f,q:v}));if(!v.trim())load();}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ค้นหา รหัสเคส ชื่อลูกค้า เบอร์..." inputMode="search"/></div></div><div className="admin-current-cases-desktop-tools" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary cp-action-add" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    {loadError&&<div className="card" role="alert" style={{padding:14,marginBottom:12,color:'var(--red)'}}>⚠️ {loadError} — {cases.length?'ยังแสดงข้อมูลที่โหลดไว้ก่อนหน้า':'ยังไม่สามารถโหลดรายการได้'} <button type="button" className="btn cp-action-refresh" onClick={()=>load()} style={{marginLeft:10}}>ลองใหม่</button></div>}
+    <div className="admin-current-cases-desktop-filters casemyp-v2-case-filters" style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
         <input value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ชื่อ เบอร์ รหัสเคส" style={{paddingLeft:28,fontSize:13,height:34}}/>
@@ -1723,10 +1774,12 @@ function AdminCurrentCases({currentUser,users}){
       <select value={filter.status} onChange={e=>setFilter(f=>({...f,status:e.target.value}))} style={{fontSize:13,height:34,padding:'0 8px',borderRadius:8,flex:'0 0 auto',maxWidth:120}}>
         <option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
       </select>
-      <button className="btn btn-ghost" style={{height:34,padding:'0 10px',fontSize:13}} onClick={search}><Ico.search/></button>
-      <button className="btn btn-ghost" style={{height:34,padding:'0 10px',fontSize:13}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงลำดับ">{sortDir==='desc'?'↓':'↑'}</button>
-      <button className="btn btn-ghost" style={{height:34,padding:'0 10px',fontSize:13}} onClick={()=>{cacheClear(['getCases','getDashboard']);load();}} title="ล้าง Cache แล้วโหลดใหม่">🔄</button>
-      <span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>{filtered.length} เคส</span>
+      <div className="cp-list-tools" role="group" aria-label="เครื่องมือจัดการรายการ">
+        <button type="button" className="btn btn-ghost cp-tool-button cp-tool-sort" onClick={search} title="ค้นหา" aria-label="ค้นหา"><Ico.search/></button>
+        <button type="button" className="btn btn-ghost cp-tool-button cp-tool-sort" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงลำดับ" aria-label="เรียงลำดับ">{sortDir==='desc'?'↓':'↑'}</button>
+        <button type="button" className="btn cp-tool-button cp-action-refresh" onClick={()=>{cacheClear(['getCases','getDashboard']);load();}} title="รีเฟรชรายการ" aria-label="รีเฟรชรายการ">↻</button>
+        <span className="cp-count-pill" aria-live="polite">{filtered.length} เคส</span>
+      </div>
     </div>
     {/* Date range filter row */}
     <div className="admin-current-cases-desktop-date" style={{display:'flex',gap:6,marginBottom:10,alignItems:'center',flexWrap:'wrap'}}>
@@ -1744,8 +1797,8 @@ function AdminCurrentCases({currentUser,users}){
         <strong className="admin-mobile-case-sales">{isUnassignedSales(c.sales)?UNASSIGNED_SALES:c.sales}</strong>
       </div>)}
     </div>
-    <div className="card admin-cases-desktop-table" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th style={{width:38}}><input type="checkbox" checked={filtered.length>0&&filtered.every(c=>selectedIds.has(String(c.caseid)))} onChange={e=>setSelectedIds(e.target.checked?new Set(filtered.map(c=>String(c.caseid))):new Set())} aria-label="เลือกทุกเคส"/></th><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>ข้อมูลคลิปแอด</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={8}/>:filtered.length===0?<tr><td colSpan={8} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const clipAd=getClipAd(c.attachment);return<tr key={i} className="clickable admin-case-row" role="button" tabIndex={0} onClick={()=>setSel(c)} onKeyDown={e=>activateOnKey(e,()=>setSel(c))}><td className="admin-case-col-select" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(String(c.caseid))} onChange={e=>setSelectedIds(prev=>{const next=new Set(prev);e.target.checked?next.add(String(c.caseid)):next.delete(String(c.caseid));return next;})} aria-label={`เลือกเคส ${c.caseid}`}/></td><td className="admin-case-col-id" data-label="รหัสเคส"><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td className="admin-case-col-customer" data-label="ชื่อลูกค้า" style={{fontWeight:500}}>{c.customername}</td><td className="admin-case-col-contact" data-label="ติดต่อ" style={{fontSize:13,color:'var(--text2)'}}>{displayContact(c.contact)}</td><td className="admin-case-col-clip" data-label="ข้อมูลคลิปแอด" title={clipAd||''} style={{fontSize:12,color:clipAd?'var(--text2)':'var(--text3)',maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{clipAd||'-'}</td><td className="admin-case-col-status" data-label="สถานะ"><StatusBadge status={c.status}/></td><td className="admin-case-col-sales" data-label="เซลส์"><span style={{color:isUnassignedSales(c.sales)?'var(--yellow)':'var(--purple)'}}>{isUnassignedSales(c.sales)?UNASSIGNED_SALES:c.sales}</span></td><td className="admin-case-col-updated" data-label="อัปเดต" style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td></tr>;})}</tbody></table></div></div>
-    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
+    <div className="card admin-cases-desktop-table casemyp-v2-cases-table" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th style={{width:38}}><input type="checkbox" checked={filtered.length>0&&filtered.every(c=>selectedIds.has(String(c.caseid)))} onChange={e=>setSelectedIds(e.target.checked?new Set(filtered.map(c=>String(c.caseid))):new Set())} aria-label="เลือกทุกเคส"/></th><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>ข้อมูลคลิปแอด</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={8}/>:filtered.length===0?<tr><td colSpan={8} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const clipAd=getClipAd(c.attachment);return<tr key={i} className="clickable admin-case-row" role="button" tabIndex={0} onClick={()=>setSel(c)} onKeyDown={e=>activateOnKey(e,()=>setSel(c))}><td className="admin-case-col-select" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(String(c.caseid))} onChange={e=>setSelectedIds(prev=>{const next=new Set(prev);e.target.checked?next.add(String(c.caseid)):next.delete(String(c.caseid));return next;})} aria-label={`เลือกเคส ${c.caseid}`}/></td><td className="admin-case-col-id" data-label="รหัสเคส"><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td className="admin-case-col-customer" data-label="ชื่อลูกค้า" style={{fontWeight:500}}>{c.customername}</td><td className="admin-case-col-contact" data-label="ติดต่อ" style={{fontSize:13,color:'var(--text2)'}}>{displayContact(c.contact)}</td><td className="admin-case-col-clip" data-label="ข้อมูลคลิปแอด" title={clipAd||''} style={{fontSize:12,color:clipAd?'var(--text2)':'var(--text3)',maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{clipAd||'-'}</td><td className="admin-case-col-status" data-label="สถานะ"><StatusBadge status={c.status}/></td><td className="admin-case-col-sales" data-label="เซลส์"><span style={{color:isUnassignedSales(c.sales)?'var(--yellow)':'var(--purple)'}}>{isUnassignedSales(c.sales)?UNASSIGNED_SALES:c.sales}</span></td><td className="admin-case-col-updated" data-label="อัปเดต" style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td></tr>;})}</tbody></table></div></div>
+    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={()=>load(true)}/>}
     {showExport&&<div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setShowExport(false);}}>
       <div className="modal" style={{maxWidth:460,borderRadius:14}}>
         <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}>
@@ -1789,8 +1842,8 @@ function AdminCurrentCases({currentUser,users}){
         </div>
       </div>
     </div>}
-    {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={load}/>}
-    {showBackdate&&<AddCaseModal backdated users={users} currentUser={currentUser} onClose={()=>setShowBackdate(false)} onAdded={load}/>}
+    {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={()=>load(true)}/>}
+    {showBackdate&&<AddCaseModal backdated users={users} currentUser={currentUser} onClose={()=>setShowBackdate(false)} onAdded={()=>load(true)}/>}
     {showAddBook&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAddBook(false)} onAdded={()=>{}}/>}
     {/* FAB มือถือ */}
     <button className="fab" onClick={()=>setShowAdd(true)} title="เพิ่มลูกค้า">＋</button>
@@ -1835,16 +1888,16 @@ function AdminDashboard({currentUser,users}){
   const kpis=[['เคสทั้งหมด',rows.length,'#4da3ff','rgba(77,163,255,.12)'],['แอดที่มีเคส',ads.filter(a=>a.name!=='ไม่ระบุแอด').length,'#b38aff','rgba(179,138,255,.12)'],['ไปต่อได้',overall.pass,'#20ce92','rgba(32,206,146,.12)'],['ไปต่อไม่ได้',overall.fail,'#ff6878','rgba(255,104,120,.12)'],['ปิดเคส',overall.closed,'#ffab3d','rgba(255,171,61,.12)'],['ปล่อยแล้ว',overall.sold,'#24c7c0','rgba(36,199,192,.12)'],['ติดตาม / อื่น ๆ',overall.pending,'#f8cf4c','rgba(248,207,76,.12)']];
   const drillRows=drilldown?(drilldown.type==='ad'?(adMap[drilldown.key]?.rows||[]):rows.filter(c=>(c.status||'ไม่ระบุสถานะ')===drilldown.key)):[];
 
-  return <div className="page" style={{padding:24}}>
-    <div className="page-hd"><div><div className="page-title">📊 วิเคราะห์แอด</div><div style={{fontSize:12,color:'var(--text2)'}}>แหล่งที่มาของเคสและสถานะ · ทุกเซลส์</div></div></div>
-    <div className="ad-dashboard-filters" style={{display:'grid',gridTemplateColumns:'minmax(160px,220px) minmax(180px,1fr) 110px',gap:10,alignItems:'center',marginBottom:14}}><input aria-label="เลือกเดือน" type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}/><select aria-label="เลือกแอด" value={chosen} onChange={e=>{setChosen(e.target.value);setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select><button className="btn btn-ghost" onClick={()=>{setDrilldown(null);load(false);}} style={{height:38,padding:'0 10px'}}>🔄 รีเฟรช</button></div>
+  return <div className="page casemyp-v2-dashboard">
+    <section className="casemyp-v2-hero"><div className="casemyp-v2-hero-copy"><div className="casemyp-v2-eyebrow">{DESIGN_PREVIEW?'DESIGN PREVIEW · ข้อมูลสมมติเท่านั้น':'CASEMYP / PERFORMANCE INSIGHTS'}</div><h1>Ad Intelligence <span>Dashboard</span></h1><p>สำรวจคุณภาพเคส เปรียบเทียบผลลัพธ์ของแอด และติดตามงานได้ในที่เดียว</p></div><div className="casemyp-v2-hero-art" aria-hidden="true"><div className="casemyp-v2-orbit casemyp-v2-orbit-one"></div><div className="casemyp-v2-orbit casemyp-v2-orbit-two"></div><div className="casemyp-v2-hero-glyph">✦</div></div></section>
+    <div className="ad-dashboard-filters casemyp-v2-toolbar" style={{display:'grid',gridTemplateColumns:'minmax(160px,220px) minmax(180px,1fr) 40px',gap:10,alignItems:'center',marginBottom:14}}><input aria-label="เลือกเดือน" type="month" value={month} onChange={e=>{setMonth(e.target.value);setChosen('all');setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}/><select aria-label="เลือกแอด" value={chosen} onChange={e=>{setChosen(e.target.value);setDrilldown(null);}} style={{height:38,minWidth:0,width:'100%',boxSizing:'border-box'}}><option value="all">ทุกแอด</option>{ads.map(a=><option key={a.name} value={a.name.toLocaleLowerCase()}>{a.name}</option>)}</select><button type="button" className="btn cp-tool-button cp-action-refresh" aria-label="รีเฟรชแดชบอร์ด" title="รีเฟรชแดชบอร์ด" onClick={()=>{setDrilldown(null);load(false);}}>↻</button></div>
     {loading?<Loading/>:<>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value,color,bg])=><div key={name} className="card" style={{border:'1px solid '+color+'55',borderTop:'3px solid '+color,background:'linear-gradient(160deg,'+bg+',rgba(255,255,255,.015))',padding:'12px 14px',borderRadius:12}}><div style={{fontSize:28,fontWeight:900,color,lineHeight:1.1}}>{value}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:6}}>{name}</div></div>)}</div>
+      <div className="casemyp-v2-section-caption">OVERVIEW <span>· ภาพรวมผลลัพธ์ของเดือนที่เลือก</span></div><div className="casemyp-v2-kpi-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10,marginBottom:18}}>{kpis.map(([name,value,color,bg])=><div key={name} className="card casemyp-v2-kpi" style={{border:'1px solid '+color+'55',borderTop:'3px solid '+color,background:'linear-gradient(160deg,'+bg+',rgba(255,255,255,.015))',padding:'12px 14px',borderRadius:12}}><div style={{fontSize:28,fontWeight:900,color,lineHeight:1.1}}>{value}</div><div style={{fontSize:12,color:'var(--text2)',marginTop:6}}>{name}</div></div>)}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(330px,1fr))',gap:16}}>
         {[
           {title:'🎯 Top 5 แอดที่ได้เคสมากที่สุด',subtitle:'สัดส่วนเทียบเคสทั้งหมดในเดือน · เลือกแอดจากตัวกรองด้านบน',items:ads.slice(0,5).map(a=>({label:a.name,count:a.rows.length,key:a.name.toLocaleLowerCase()})),total:monthCases.length,colors:['#ffcb12','#ff7b2d','#b12abb','#158bdb','#00b39f']},
           {title:'📊 Top 5 สถานะเคส',subtitle:'สัดส่วนตามแอดที่เลือก · ทุกสถานะยังดูได้ในตาราง',items:statuses.slice(0,5).map(([label,count])=>({label,count,key:label})),total:rows.length,colors:['#18b4a2','#1c9cdc','#b74ab6','#f58227','#f2cd21']}
-        ].map((chart,chartIndex)=><div key={chartIndex} className="card" style={{minWidth:0,padding:'20px 18px 16px',background:'linear-gradient(145deg,#252b32,#1b1f25)',border:'1px solid rgba(255,255,255,.11)',borderRadius:16}}>
+        ].map((chart,chartIndex)=><div key={chartIndex} className="card ad-infographic-chart" style={{minWidth:0,padding:'20px 18px 16px',background:'linear-gradient(145deg,#252b32,#1b1f25)',border:'1px solid rgba(255,255,255,.11)',borderRadius:16}}>
           <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>{chart.title}</div>
           <div style={{fontSize:11,color:'var(--text2)'}}>{chart.subtitle}</div>
           {chart.items.length?<div style={{display:'flex',alignItems:'end',justifyContent:'space-around',gap:7,height:316,paddingTop:22,overflowX:'auto'}}>
@@ -1861,7 +1914,7 @@ function AdminDashboard({currentUser,users}){
       {drilldown&&!editingCase&&<div role="dialog" aria-modal="true" aria-label={'รายการเคส '+drilldown.label} onClick={()=>setDrilldown(null)} style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.76)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
         <div onClick={event=>event.stopPropagation()} style={{width:'min(680px,100%)',maxHeight:'85vh',overflowY:'auto',background:'#24282f',border:'1px solid #49505a',borderRadius:15,padding:18,boxShadow:'0 20px 60px rgba(0,0,0,.5)'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,marginBottom:14}}><div><strong style={{fontSize:18}}>📋 {drilldown.label}</strong><div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>ทั้งหมด {drillRows.length} เคส · รหัสเคส / เซลส์ผู้รับผิดชอบ</div></div><button className="btn btn-ghost" onClick={()=>setDrilldown(null)} aria-label="ปิดหน้าต่าง">✕ ปิด</button></div>
-          <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>ลำดับ</th><th>รหัสเคส</th><th>เซลส์ผู้รับผิดชอบ</th><th>สถานะ</th></tr></thead><tbody>{drillRows.map((c,i)=><tr key={String(c.caseid||i)} onClick={()=>setEditingCase(c)} style={{cursor:'pointer'}} title="คลิกเพื่อดูและแก้ไขเคส"><td>{i+1}</td><td><button type="button" onClick={()=>setEditingCase(c)} style={{fontWeight:800,color:'#70b5ff',background:'transparent',border:0,cursor:'pointer',textDecoration:'underline',padding:'6px 2px'}} title="เปิดรายละเอียดและแก้ไขเคส">{c.caseid||'-'}</button></td><td>{isUnassignedSales(c.sales)?'รอมอบหมาย':c.sales}</td><td>{c.status||'-'}</td></tr>)}</tbody></table></div>
+          <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>ลำดับ</th><th>รหัสเคส</th><th>เซลส์ผู้รับผิดชอบ</th><th>สถานะ</th></tr></thead><tbody>{drillRows.map((c,i)=><tr key={String(c.caseid||i)} onClick={()=>{if(!DESIGN_PREVIEW)setEditingCase(c);}} style={{cursor:'pointer'}} title="คลิกเพื่อดูและแก้ไขเคส"><td>{i+1}</td><td><button type="button" onClick={()=>{if(!DESIGN_PREVIEW)setEditingCase(c);}} style={{fontWeight:800,color:'#70b5ff',background:'transparent',border:0,cursor:'pointer',textDecoration:'underline',padding:'6px 2px'}} title="เปิดรายละเอียดและแก้ไขเคส">{c.caseid||'-'}</button></td><td>{isUnassignedSales(c.sales)?'รอมอบหมาย':c.sales}</td><td>{c.status||'-'}</td></tr>)}</tbody></table></div>
           {!drillRows.length&&<div style={{padding:20,textAlign:'center'}}>ไม่พบเคส</div>}
         </div>
       </div>}
@@ -1880,12 +1933,16 @@ function AdminDashboard({currentUser,users}){
 }
 function AdminBookings({currentUser,users}){
   const [bookings,setBookings]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);
-  const load=useCallback(()=>{setLoading(true);api('getBookings',{}).then(r=>{if(r.success)setBookings(r.data||[]);setLoading(false);});},[]);
+  const [loadError,setLoadError]=useState('');
+  const load=useCallback(()=>{setLoading(true);setLoadError('');api('getBookings',{}).then(r=>{
+    if(r.success)setBookings(safeArray(r.data));
+    else setLoadError(r.error||'โหลดรายการจองไม่สำเร็จ');
+  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อรายการจองไม่สำเร็จ')).finally(()=>setLoading(false));},[]);
   useEffect(()=>{load();},[load]);
   const OD={bg:'linear-gradient(160deg,#020d18 0%,#041e35 50%,#062840 100%)',neon:'#00d4ff',dim:'rgba(0,212,255,.12)',border:'rgba(0,212,255,.2)',text:'#cce8f4',sub:'rgba(0,212,255,.5)'};
-  return <div className="page" style={{paddingBottom:40}}>
+  return <div className="page casemyp-v2-bookings" style={{paddingBottom:40}}>
     {/* OCEAN HEADER */}
-    <div style={{padding:'24px 28px 20px',borderBottom:'1px solid rgba(0,212,255,.12)'}}>
+    <div className="casemyp-v2-booking-heading" style={{padding:'24px 28px 20px',borderBottom:'1px solid rgba(0,212,255,.12)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <div>
           <div style={{fontSize:10,color:OD.sub,letterSpacing:3,textTransform:'uppercase',marginBottom:4}}>Booking System</div>
@@ -1897,6 +1954,7 @@ function AdminBookings({currentUser,users}){
         <button onClick={()=>setShowAdd(true)} style={{background:`linear-gradient(135deg,#006699,#00d4ff)`,border:'none',borderRadius:10,color:'#fff',padding:'10px 18px',cursor:'pointer',fontSize:14,fontWeight:700,boxShadow:'0 4px 14px rgba(0,212,255,.3)'}}>+ เพิ่มการจอง</button>
       </div>
     </div>
+    {loadError&&<div className="card" role="alert" style={{margin:'12px 28px',padding:14,color:'var(--red)'}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={load} style={{marginLeft:10}}>ลองใหม่</button></div>}
     {/* TABLE */}
     <div style={{padding:'20px 28px 80px'}}>
       <div style={{background:'rgba(0,212,255,.04)',border:'1px solid rgba(0,212,255,.15)',borderRadius:14,overflow:'hidden'}}>
@@ -1908,7 +1966,7 @@ function AdminBookings({currentUser,users}){
               </tr>
             </thead>
             <tbody>
-              {loading?<SkeletonRows n={5} cols={9}/>:bookings.length===0?
+              {loading?<SkeletonRows n={5} cols={9}/>:loadError&&!bookings.length?<tr><td colSpan={9} style={{padding:32,textAlign:'center',color:'var(--text2)'}}>โหลดรายการจองไม่สำเร็จ กรุณาลองใหม่</td></tr>:bookings.length===0?
                 <tr><td colSpan={9} style={{textAlign:'center',padding:40,color:OD.sub}}>ไม่มีการจอง</td></tr>:
                 bookings.map((b,i)=><tr key={i} style={{borderBottom:'1px solid rgba(0,212,255,.06)',cursor:'pointer',transition:'background .15s'}}
                   onClick={()=>setSel(b)}
@@ -1984,9 +2042,9 @@ function AdminUsers({currentUser}){
     if(r.success)load();else showToast('เปลี่ยนสถานะผู้ใช้ไม่สำเร็จ: '+(r.error||''),'err');
   }
   const AU={bg:'linear-gradient(160deg,#080818 0%,#100828 50%,#0d1830 100%)',p:'#a78bfa',b:'#60a5fa',g:'#34d399',dim:'rgba(139,92,246,.1)',border:'rgba(139,92,246,.2)',text:'#e2e8f0',sub:'#6b7280'};
-  return <div className="page" style={{paddingBottom:40}}>
+  return <div className="page casemyp-v2-users" style={{paddingBottom:40}}>
     {/* AURORA HEADER */}
-    <div style={{padding:'24px 28px 20px',position:'relative',overflow:'hidden'}}>
+    <div className="casemyp-v2-secondary-heading" style={{padding:'24px 28px 20px',position:'relative',overflow:'hidden'}}>
       <div style={{position:'absolute',top:0,left:0,right:0,height:1,background:'linear-gradient(90deg,transparent,#8b5cf6,#3b82f6,#10b981,transparent)'}}/>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <div>
@@ -2032,7 +2090,7 @@ function AdminUsers({currentUser}){
     </div>
 
     {/* Add User Modal */}
-    {showAdd&&<Modal title="➕ เพิ่มผู้ใช้ใหม่" onClose={()=>setShowAdd(false)} footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={addUser}>บันทึก</button></>}>
+    {showAdd&&<Modal variant="user-form" title="➕ เพิ่มผู้ใช้ใหม่" onClose={()=>setShowAdd(false)} footer={<><button className="btn btn-ghost cp-action-danger" onClick={()=>setShowAdd(false)}>ยกเลิก</button><button className="btn btn-primary cp-action-save" onClick={addUser} disabled={DESIGN_PREVIEW}>บันทึก</button></>}>
       <div style={{display:'grid',gap:12}}>
         <div className="form-group"><label>Username</label><input value={form.username} onChange={e=>set('username',e.target.value)} placeholder="ตัวอักษรภาษาอังกฤษ"/></div>
         <div className="form-group"><label>รหัสผ่าน</label><input value={form.password} onChange={e=>set('password',e.target.value)}/></div>
@@ -2042,7 +2100,7 @@ function AdminUsers({currentUser}){
     </Modal>}
 
     {/* Edit User Modal */}
-    {editUser&&<Modal title={`✏️ แก้ไข — ${editUser.username}`} onClose={()=>setEditUser(null)} footer={<><button className="btn btn-ghost" onClick={()=>setEditUser(null)}>ยกเลิก</button><button className="btn btn-primary" onClick={saveEdit} disabled={saving}>{saving?'กำลังบันทึก...':'💾 บันทึก'}</button></>}>
+    {editUser&&<Modal variant="user-form" title={`✏️ แก้ไข — ${editUser.username}`} onClose={()=>setEditUser(null)} footer={<><button className="btn btn-ghost cp-action-danger" onClick={()=>setEditUser(null)}>ยกเลิก</button><button className="btn btn-primary cp-action-save" onClick={saveEdit} disabled={saving||DESIGN_PREVIEW}>{saving?'กำลังบันทึก...':'💾 บันทึก'}</button></>}>
       <div style={{display:'grid',gap:12}}>
         <div style={{display:'flex',alignItems:'center',gap:16,background:'var(--bg3)',borderRadius:10,padding:'12px 14px'}}>
           <div style={{width:64,height:64,borderRadius:'50%',background:'var(--bg2)',border:'2px solid var(--border)',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>
@@ -2249,20 +2307,25 @@ function TodayFollowupBanner({currentUser}){
 
 function SalesCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
+  const [loadError,setLoadError]=useState('');
   const CLOSED_STATUSES=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'];
-  const load=useCallback(()=>{setLoading(true);api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[currentUser.name]);
+  const load=useCallback(()=>{setLoading(true);setLoadError('');api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{
+    if(r.success)setCases(safeArray(r.data));
+    else setLoadError(r.error||'โหลดเคสไม่สำเร็จ');
+  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อเคสไม่สำเร็จ')).finally(()=>setLoading(false));},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   const filtered=cases.filter(c=>{
     if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){return caseMatchesSearch(c,q);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   return <div className="page">
     <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส{closedCount>0&&<span style={{marginLeft:8,color:'var(--text3)'}}>· ปิดแล้ว {closedCount}</span>}</div></div><button className="btn btn-ghost" onClick={load} style={{padding:'6px 10px'}}>🔄</button></div>
+    {loadError&&<div className="card" role="alert" style={{marginBottom:12,padding:14,color:'var(--red)'}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={load} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <TodayFollowupBanner currentUser={currentUser}/>
     <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:180}}><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)',pointerEvents:'none',fontSize:14}}>🔍</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหาชื่อ เบอร์ รหัสเคส..." style={{paddingLeft:32,fontSize:13}}/></div>{q&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>setQ('')}>✕ ล้าง</button>}</div>
     <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>setShowClosed(v=>!v)}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
     {/* Sort by Score button */}
     {!loading&&!q&&!filterStatus&&<div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}><button className="btn btn-ghost" style={{fontSize:11,padding:'4px 10px',borderRadius:20,border:'1px solid var(--border)'}} onClick={()=>setSortDir(s=>s==='score'?'desc':'score')}>{sortDir==='score'?'🧠 เรียงตามคะแนน ✓':'🧠 เรียงตามคะแนน'}</button></div>}
-    {loading?<SkeletonCards n={4}/>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=>{
+    {loading?<SkeletonCards n={4}/>:loadError&&!cases.length?<div style={{padding:32,textAlign:'center',color:'var(--text2)'}}>โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่</div>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=>{
       const score=calculateCaseScore(c);
       const alert=getCaseAlert(c);
       const suggestion=getCaseSuggestion(c);
@@ -2607,8 +2670,8 @@ function AdminTeam({users,currentUser}){
     {k:'broadcast',label:'📢 Broadcast',neon:'#a855f7'},
   ];
   const cur=TABS.find(t=>t.k===tab)||TABS[0];
-  return <div className="page">
-    <div className="page-hd"><div><div className="page-title">🎯 TEAM HQ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Followup · Target · Broadcast</div></div></div>
+  return <div className="page casemyp-v2-team">
+    <div className="page-hd casemyp-v2-secondary-heading"><div><div className="page-title">🎯 TEAM HQ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Followup · Target · Broadcast</div></div></div>
     <div style={{display:'flex',gap:4,marginBottom:18,borderBottom:'1px solid var(--border)',paddingBottom:10}}>
       {TABS.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'7px 16px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,background:tab===t.k?t.neon:'var(--bg3)',color:tab===t.k?'#000':'var(--text2)',transition:'all .2s'}}>{t.label}</button>)}
     </div>
@@ -2642,8 +2705,8 @@ function AdminTrash({currentUser}){
     {key:'standalone',title:'🔒 เคสส่วนตัว / 💬 Line OA',rows:safeArray(items.standalone),name:r=>`${r.case_type==='line_oa'?'Line OA':'เคสส่วนตัว'} — ${r.name||'-'}`}
   ];
   const total=groups.reduce((sum,g)=>sum+g.rows.length,0);
-  return <div className="page">
-    <div className="page-hd"><div><div className="page-title">🗑️ ถังขยะ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>กู้คืนได้ภายใน 30 วัน และแยกประเภทข้อมูลเหมือนเดิม</div></div><button className="btn btn-ghost" onClick={load}>🔄</button></div>
+  return <div className="page casemyp-v2-trash">
+    <div className="page-hd casemyp-v2-secondary-heading"><div><div className="page-title">🗑️ ถังขยะ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>กู้คืนได้ภายใน 30 วัน และแยกประเภทข้อมูลเหมือนเดิม</div></div><button className="btn cp-tool-button cp-action-refresh" title="รีเฟรชถังขยะ" aria-label="รีเฟรชถังขยะ" onClick={load}>↻</button></div>
     {loading?<Loading/>:total===0?<div className="card" style={{textAlign:'center',padding:50,color:'var(--text2)'}}>ถังขยะว่าง</div>:groups.map(g=>g.rows.length?<div className="card" key={g.key} style={{marginBottom:14}}>
       <div style={{fontWeight:800,marginBottom:10}}>{g.title} <span style={{color:'var(--text3)',fontSize:12}}>({g.rows.length})</span></div>
       {g.rows.map(row=>{const key=g.key+':'+(row.caseid||row.id);return <div key={key} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderTop:'1px solid var(--border)'}}>
@@ -2708,7 +2771,7 @@ function AdminLineToggle({compact=false}){
 }
 
 function AdminApp({currentUser,onLogout}){
-  const [page,setPage]=useState('cases');
+  const [page,setPage]=useState(DESIGN_PREVIEW?'dashboard':'cases');
   const [users,setUsers]=useState([]);
   const [showNotif,setShowNotif]=useState(false);
   const [notifCount,setNotifCount]=useState(0);
@@ -2752,8 +2815,8 @@ function AdminApp({currentUser,onLogout}){
 
   return <div>
     <div className="sidebar">
-      <div className="sidebar-logo"><div style={{fontWeight:800,fontSize:18,color:'var(--blue)'}}>🚗 CasePool</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Admin Panel</div></div>
-      <nav className="sidebar-nav">{allNavItems.map(n=>
+      <div className="sidebar-logo casemyp-v2-brand"><div className="casemyp-v2-brand-icon">🚘</div><div><div className="casemyp-v2-brand-title">CasePool <span>2.0</span></div><div className="casemyp-v2-brand-sub">MIDNIGHT WORKSPACE</div></div></div><div className="casemyp-v2-menu-label">WORKSPACE</div>
+      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>['dashboard','cases','analytics','bookings','users','private_cases','line_oa','trash'].includes(n.key)):allNavItems).map(n=>
         <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
@@ -3016,9 +3079,16 @@ function App(){
   return <><ConnectionBanner/>{logoutConfirmModal}<SalesApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
 }
 
+function DesignPreviewApp(){
+  useEffect(()=>{
+    const loader=document.getElementById('app-loader');
+    if(loader){loader.style.pointerEvents='none';loader.style.opacity='0';setTimeout(()=>loader.remove(),350);}
+  },[]);
+  return <AdminApp currentUser={{name:'ตัวอย่างผู้ดูแล',role:'Admin'}} onLogout={()=>{}}/>;
+}
 try{
-  if(SUPA_CONFIG_ERROR)throw new Error(SUPA_CONFIG_ERROR);
-  createRoot(document.getElementById('root')).render(<ErrorBoundary><App/></ErrorBoundary>);
+  if(SUPA_CONFIG_ERROR&&!DESIGN_PREVIEW)throw new Error(SUPA_CONFIG_ERROR);
+  createRoot(document.getElementById('root')).render(<ErrorBoundary>{DESIGN_PREVIEW?<DesignPreviewApp/>:<App/>}</ErrorBoundary>);
 }catch(e){
   const loader=document.getElementById('app-loader');
   if(loader)loader.remove();

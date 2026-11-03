@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="th" style="background:#0d1117;">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>CaseMYP 2.0 — React Design Preview</title>
+
+  <meta name="theme-color" content="#0d1117"/>
+  <meta name="color-scheme" content="dark"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="CasePool"/>
+
+  <link rel="icon" href="https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png">
+  <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/umhomecar03-cmyk/umhomecar/main/do.png">
+  <link rel="manifest" href="./manifest.json">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+
+  <!-- ★ Critical loader CSS inline — แสดงทันทีไม่ต้องรอ styles.css -->
+  <style>
+    html,body{margin:0;padding:0;background:#0d1117 !important;color:#e6edf3;font-family:'Sarabun',sans-serif;
+      touch-action:manipulation;
+      -webkit-text-size-adjust:100%;
+    }
+    #app-loader{
+      position:fixed;inset:0;background:#0d1117;
+      display:flex;align-items:center;justify-content:center;
+      z-index:8000;flex-direction:column;gap:12px;
+      transition:opacity .3s ease;
+    }
+    #app-loader .loader-car{font-size:46px;}
+    #app-loader .loader-title{color:#58a6ff;font-size:20px;font-weight:800;letter-spacing:.5px;}
+    #app-loader .loader-sub{color:#8b949e;font-size:12px;margin-top:2px;}
+    #app-loader .loader-spinner{
+      width:36px;height:36px;
+      border:3px solid #30363d;border-top-color:#58a6ff;
+      border-radius:50%;animation:spin .7s linear infinite;margin-top:8px;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+
+  <link rel="stylesheet" href="./css/styles.css"/>
+  <script src="./js/preload.js"></script>
+</head>
+<body>
+  <!-- loader แสดงทันทีก่อน JS โหลด -->
+  <div id="app-loader">
+    <div class="loader-car">🚗</div>
+    <div class="loader-title">CasePool</div>
+    <div class="loader-sub">กำลังโหลดระบบ...</div>
+    <div class="loader-spinner"></div>
+  </div>
+
+  <div id="root"></div>
+
+  <noscript>กรุณาเปิดใช้งาน JavaScript เพื่อใช้ระบบ CasePool</noscript>
+  <script>window.__CASEMYP_CONFIG__={supabaseUrl:"",supabaseAnonKey:"",deployEnvironment:"design-preview",authMode:"legacy"};</script>
+  <script src="./js/app.bundle.js"></script>
+</body>
+</html>

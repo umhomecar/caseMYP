@@ -16,6 +16,15 @@ const publicFiles=['index.html','manifest.json','css/styles.css','js/preload.js'
 const runtimeConfigPath=path.join(root,'public/runtime-config.js');
 
 parse(source,{sourceType:'module',plugins:['jsx']});
+// Design preview isolation and single-source React rendering contract.
+const previewHtml=read('design-preview.html');
+if(!previewHtml.includes('./js/app.bundle.js'))fail('Design preview must render the production React bundle');
+if(!source.includes("const DESIGN_PREVIEW=window.location.pathname==='/design-preview.html'"))fail('Design preview path isolation is missing');
+if(!source.includes("if(DESIGN_PREVIEW){\n    if(String(method).toUpperCase()==='GET')return[];"))fail('Design preview direct DB reads are not isolated');
+if(!source.includes("READ_ONLY_PREVIEW"))fail('Design preview does not reject DB mutations');
+if(!source.includes("if(action==='getLineNotificationSetting')return{success:true,enabled:false};"))fail('Design preview LINE status is not isolated');
+
+
 parseCss(css,{positions:true});
 
 if(!fs.existsSync(bundlePath))fail('ไม่พบ public/js/app.bundle.js');
@@ -113,5 +122,89 @@ for(const file of publicFiles){
   if(!fs.existsSync(deployPath))fail(`ไม่พบ public/${file}`);
   if(!fs.readFileSync(sourcePath).equals(fs.readFileSync(deployPath)))fail(`public/${file} ไม่ตรงกับ source`);
 }
+
+
+// Phase 4: non-destructive regression contracts for redesign.
+// These do not write cases, consume queue slots or send LINE notifications.
+const section=(from,to)=>{
+  const start=source.indexOf(from);
+  const end=source.indexOf(to,start+from.length);
+  if(start<0||end<start)fail('Regression section missing: '+from);
+  return source.slice(start,end);
+};
+const createModal=section('function AddCaseModal(', '\nfunction ');
+const editModal=section('function CaseModal(', '\nfunction ');
+const caseCenter=section('function AdminCurrentCases(', '\nfunction ');
+const analytics=section('function AdminAnalytics(', '\nfunction ');
+
+if(!createModal.includes("api('checkCaseDuplicates'")||!createModal.includes("api('addCase'"))
+  fail('Case creation lost duplicate verification or save path');
+if(!createModal.includes("if(DESIGN_PREVIEW)return")||!createModal.includes("disabled={loading||DESIGN_PREVIEW}"))
+  fail('Design preview creation form must remain read-only');
+if(!editModal.includes('expectedVersion:Number(caseData.version)||1'))
+  fail('Case editing must preserve optimistic concurrency');
+if(!editModal.includes("api('updateCase'")||!editModal.includes('onUpdated(optimisticData)'))
+  fail('Case editor save and state refresh contract changed');
+const getCasesHandler=section("case 'getCases':", "case 'checkCaseDuplicates':");
+if(!getCasesHandler.includes("if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]}")||
+   !getCasesHandler.includes("return{success:true,data:safeArray(rows)}"))
+  fail('getCases must distinguish an empty dataset from a failed Supabase request');
+if(!caseCenter.includes("api('getCases'")||!caseCenter.includes('casemyp-v2-case-filters'))
+  fail('Current-case filtering or read path is missing');
+if(!caseCenter.includes('const load=useCallback((background=false)=>{if(!background)setLoading(true)')||!caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
+  fail('Case create/edit must refresh in background without hiding the case list');
+if(!analytics.includes('belongsToPeriod(c,prefixes)')||!analytics.includes('const convPct='))
+  fail('Analytics period selection or funnel conversion missing');
+if(!source.includes("if(action==='getCases')return{success:true,data:previewCases()};"))
+  fail('Design preview mock data path is missing');
+if(!source.includes("if(DESIGN_PREVIEW){\n    if(String(method).toUpperCase()==='GET')return[];"))
+  fail('Design preview must isolate raw Supabase access');
+for(const selector of ['.cp-action-copy','.cp-action-save','.cp-action-line','.cp-action-danger','.cp-action-edit','.cp-action-refresh']){
+  if(!css.includes(selector))fail('Missing semantic action style: '+selector);
+}
+if(!source.includes('const PREVIEW_SALES=[\'แฟ้บ\',\'บอล\',\'พี่บอล\',\'เพ้นท์\',\'พีร์\']'))
+  fail('Demo sales names changed unexpectedly');
+const salesCases=section('function SalesCurrentCases(', '\nfunction ');
+const bookingsPage=section('function AdminBookings(', '\nfunction ');
+for(const [name,body] of [['Analytics',analytics],['Bookings',bookingsPage],['Sales cases',salesCases]]){
+  if(!body.includes('const [loadError,setLoadError]=useState')||!body.includes('role="alert"')||!(body.includes('onClick={load}')||body.includes('load();}}')))
+    fail(name+' needs an error state, visible alert and retry button');
+  if(!body.includes('.catch(')||!body.includes('.finally(()=>setLoading(false))'))
+    fail(name+' must stop loading when the request fails');
+}
+if(salesCases.includes('catch(()=>{setCases([])')||bookingsPage.includes('else setBookings([])'))
+  fail('Network errors must not erase previously loaded case/booking data');
+// Merge readiness: transient failures must not erase successfully loaded cases.
+const standalonePage=section('function AdminSentCasesPage(', '\nfunction ');
+for(const [name,body] of [['Current cases',caseCenter],['Private/LINE cases',standalonePage]]){
+  if(!body.includes('const [loadError,setLoadError]=useState')||!body.includes('role="alert"')||!body.includes('ลองใหม่'))
+    fail(name+' must show a persistent recoverable load error');
+}
+if(standalonePage.includes('setRows([])')||caseCenter.includes('setCases([])'))
+  fail('Case list load failures must not wipe previously fetched records');
+// Static role-boundary contracts. These are NOT a substitute for live RLS verification.
+const appShell=section('function App(', '\nfunction ');
+const salesShell=section('function SalesApp(', '\nfunction ');
+const loginHandler=section("case 'login':", "case 'getAuthProfile':");
+const rlsCutover=read('supabase/production/20260729_02_auth_rls_after_account_link.sql');
+if(!appShell.includes("if(user.role==='Admin')return")||!appShell.includes('<SalesApp currentUser={user}'))
+  fail('Admin and Sales UI route separation is missing');
+if(!salesCases.includes("api('getCases',{sales:currentUser.name,all:'true'})"))
+  fail('Sales case list lost its assigned-sales scope');
+if(!source.includes("api('searchCases',{q:term,sales:currentUser.name})")||
+   !source.includes("if(sales)query.sales=`eq.${sales}`"))
+  fail('Sales global search must remain scoped at the database query');
+if(!loginHandler.includes("status:'eq.active'"))
+  fail('Login must reject inactive accounts');
+for(const rule of [
+  'sales read assigned cases', 'sales update assigned cases',
+  'sales read own bookings', 'notifications scoped to recipient',
+  'admin manages standalone cases', 'active users without auth_user_id'
+]){
+  if(!rlsCutover.includes(rule))fail('RLS cutover migration missing safeguard: '+rule);
+}
+console.log('Static authorization contracts passed; live database RLS and role matrix remain unverified');
+
+console.log('Phase 4 regression contracts passed: case create/edit, preview isolation, analytics and action colors');
 
 console.log('Validation passed: source, production bundle, public output, accessibility and dead-feature checks');
