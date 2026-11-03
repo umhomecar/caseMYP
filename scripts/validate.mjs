@@ -123,4 +123,41 @@ for(const file of publicFiles){
   if(!fs.readFileSync(sourcePath).equals(fs.readFileSync(deployPath)))fail(`public/${file} ไม่ตรงกับ source`);
 }
 
+
+// Phase 4: non-destructive regression contracts for redesign.
+// These do not write cases, consume queue slots or send LINE notifications.
+const section=(from,to)=>{
+  const start=source.indexOf(from);
+  const end=source.indexOf(to,start+from.length);
+  if(start<0||end<start)fail('Regression section missing: '+from);
+  return source.slice(start,end);
+};
+const createModal=section('function AddCaseModal(', '\nfunction ');
+const editModal=section('function CaseModal(', '\nfunction ');
+const caseCenter=section('function AdminCurrentCases(', '\nfunction ');
+const analytics=section('function AdminAnalytics(', '\nfunction ');
+
+if(!createModal.includes("api('checkCaseDuplicates'")||!createModal.includes("api('addCase'"))
+  fail('Case creation lost duplicate verification or save path');
+if(!createModal.includes("if(DESIGN_PREVIEW)return")||!createModal.includes("disabled={loading||DESIGN_PREVIEW}"))
+  fail('Design preview creation form must remain read-only');
+if(!editModal.includes('expectedVersion:Number(caseData.version)||1'))
+  fail('Case editing must preserve optimistic concurrency');
+if(!editModal.includes("api('updateCase'")||!editModal.includes('onUpdated(optimisticData)'))
+  fail('Case editor save and state refresh contract changed');
+if(!caseCenter.includes("api('getCases'")||!caseCenter.includes('casemyp-v2-case-filters'))
+  fail('Current-case filtering or read path is missing');
+if(!analytics.includes('belongsToPeriod(c,prefixes)')||!analytics.includes('const convPct='))
+  fail('Analytics period selection or funnel conversion missing');
+if(!source.includes("if(action==='getCases')return{success:true,data:previewCases()};"))
+  fail('Design preview mock data path is missing');
+if(!source.includes("if(DESIGN_PREVIEW){\n    if(String(method).toUpperCase()==='GET')return[];"))
+  fail('Design preview must isolate raw Supabase access');
+for(const selector of ['.cp-action-copy','.cp-action-save','.cp-action-line','.cp-action-danger','.cp-action-edit','.cp-action-refresh']){
+  if(!css.includes(selector))fail('Missing semantic action style: '+selector);
+}
+if(!source.includes('const PREVIEW_SALES=[\'แฟ้บ\',\'บอล\',\'พี่บอล\',\'เพ้นท์\',\'พีร์\']'))
+  fail('Demo sales names changed unexpectedly');
+console.log('Phase 4 regression contracts passed: case create/edit, preview isolation, analytics and action colors');
+
 console.log('Validation passed: source, production bundle, public output, accessibility and dead-feature checks');
