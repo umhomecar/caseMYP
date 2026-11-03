@@ -1024,7 +1024,16 @@ function TemplateSelector({value, onChange}){
 function AdminAnalytics({currentUser}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);
   const [range,setRange]=useState('month'); // month|3month|all
-  useEffect(()=>{api('getCases',{all:'true'}).then(cr=>{if(cr.success)setCases(cr.data||[]);setLoading(false);});},[]);
+  const [loadError,setLoadError]=useState('');
+  const load=useCallback(()=>{
+    setLoading(true);setLoadError('');
+    return api('getCases',{all:'true'}).then(cr=>{
+      if(cr.success)setCases(safeArray(cr.data));
+      else setLoadError(cr.error||'โหลดรายงานไม่สำเร็จ');
+    }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูลรายงานไม่สำเร็จ'))
+      .finally(()=>setLoading(false));
+  },[]);
+  useEffect(()=>{load();},[load]);
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   // Real case IDs encode YYMM; only Preview DEMO IDs use their simulated creation dates.
   const belongsToPeriod=(row,preList)=>{
@@ -1056,7 +1065,8 @@ function AdminAnalytics({currentUser}){
       {[['month','เดือนนี้'],['3month','3 เดือน'],['all','ปีนี้']].map(([k,l])=>
         <button key={k} onClick={()=>setRange(k)} style={{padding:'6px 16px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:range===k?'var(--blue2)':'var(--bg3)',color:range===k?'#fff':'var(--text2)'}}>{l}</button>)}
     </div>
-    {loading?<Loading/>:<>
+    {loadError&&<div role="alert" className="card" style={{marginBottom:14,color:'var(--red)',padding:14}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={()=>{cacheClear(['getCases']);load();}} style={{marginLeft:10}}>ลองใหม่</button></div>}
+    {loading?<Loading/>:loadError&&!cases.length?null:<>
       {/* Summary Stats */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
         {[['📋 เคสทั้งหมด',allPeriod.length,'var(--blue)'],['🚗 ปล่อยแล้ว',allPeriod.filter(c=>c.status==='ปล่อยแล้ว').length,'var(--green)'],['🔥 Win Rate',allPeriod.length>0?Math.round(allPeriod.filter(c=>c.status==='ปล่อยแล้ว').length/allPeriod.length*100)+'%':'-','var(--yellow)'],['📥 รอมอบหมาย',allPeriod.filter(c=>isUnassignedSales(c.sales)).length,'var(--purple)']].map(([l,v,c])=>
@@ -1918,7 +1928,11 @@ function AdminDashboard({currentUser,users}){
 }
 function AdminBookings({currentUser,users}){
   const [bookings,setBookings]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [showAdd,setShowAdd]=useState(false);
-  const load=useCallback(()=>{setLoading(true);api('getBookings',{}).then(r=>{if(r.success)setBookings(r.data||[]);setLoading(false);});},[]);
+  const [loadError,setLoadError]=useState('');
+  const load=useCallback(()=>{setLoading(true);setLoadError('');api('getBookings',{}).then(r=>{
+    if(r.success)setBookings(safeArray(r.data));
+    else setLoadError(r.error||'โหลดรายการจองไม่สำเร็จ');
+  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อรายการจองไม่สำเร็จ')).finally(()=>setLoading(false));},[]);
   useEffect(()=>{load();},[load]);
   const OD={bg:'linear-gradient(160deg,#020d18 0%,#041e35 50%,#062840 100%)',neon:'#00d4ff',dim:'rgba(0,212,255,.12)',border:'rgba(0,212,255,.2)',text:'#cce8f4',sub:'rgba(0,212,255,.5)'};
   return <div className="page casemyp-v2-bookings" style={{paddingBottom:40}}>
@@ -1935,6 +1949,7 @@ function AdminBookings({currentUser,users}){
         <button onClick={()=>setShowAdd(true)} style={{background:`linear-gradient(135deg,#006699,#00d4ff)`,border:'none',borderRadius:10,color:'#fff',padding:'10px 18px',cursor:'pointer',fontSize:14,fontWeight:700,boxShadow:'0 4px 14px rgba(0,212,255,.3)'}}>+ เพิ่มการจอง</button>
       </div>
     </div>
+    {loadError&&<div className="card" role="alert" style={{margin:'12px 28px',padding:14,color:'var(--red)'}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={load} style={{marginLeft:10}}>ลองใหม่</button></div>}
     {/* TABLE */}
     <div style={{padding:'20px 28px 80px'}}>
       <div style={{background:'rgba(0,212,255,.04)',border:'1px solid rgba(0,212,255,.15)',borderRadius:14,overflow:'hidden'}}>
@@ -1946,7 +1961,7 @@ function AdminBookings({currentUser,users}){
               </tr>
             </thead>
             <tbody>
-              {loading?<SkeletonRows n={5} cols={9}/>:bookings.length===0?
+              {loading?<SkeletonRows n={5} cols={9}/>:loadError&&!bookings.length?<tr><td colSpan={9} style={{padding:32,textAlign:'center',color:'var(--text2)'}}>โหลดรายการจองไม่สำเร็จ กรุณาลองใหม่</td></tr>:bookings.length===0?
                 <tr><td colSpan={9} style={{textAlign:'center',padding:40,color:OD.sub}}>ไม่มีการจอง</td></tr>:
                 bookings.map((b,i)=><tr key={i} style={{borderBottom:'1px solid rgba(0,212,255,.06)',cursor:'pointer',transition:'background .15s'}}
                   onClick={()=>setSel(b)}
@@ -2287,20 +2302,25 @@ function TodayFollowupBanner({currentUser}){
 
 function SalesCurrentCases({currentUser,users}){
   const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
+  const [loadError,setLoadError]=useState('');
   const CLOSED_STATUSES=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'];
-  const load=useCallback(()=>{setLoading(true);api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{if(r.success)setCases(safeArray(r.data));setLoading(false);}).catch(()=>{setCases([]);setLoading(false);});},[currentUser.name]);
+  const load=useCallback(()=>{setLoading(true);setLoadError('');api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{
+    if(r.success)setCases(safeArray(r.data));
+    else setLoadError(r.error||'โหลดเคสไม่สำเร็จ');
+  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อเคสไม่สำเร็จ')).finally(()=>setLoading(false));},[currentUser.name]);
   useEffect(()=>{load();},[load]);
   const filtered=cases.filter(c=>{
     if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){return caseMatchesSearch(c,q);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   return <div className="page">
     <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส{closedCount>0&&<span style={{marginLeft:8,color:'var(--text3)'}}>· ปิดแล้ว {closedCount}</span>}</div></div><button className="btn btn-ghost" onClick={load} style={{padding:'6px 10px'}}>🔄</button></div>
+    {loadError&&<div className="card" role="alert" style={{marginBottom:12,padding:14,color:'var(--red)'}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={load} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <TodayFollowupBanner currentUser={currentUser}/>
     <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:180}}><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)',pointerEvents:'none',fontSize:14}}>🔍</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหาชื่อ เบอร์ รหัสเคส..." style={{paddingLeft:32,fontSize:13}}/></div>{q&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>setQ('')}>✕ ล้าง</button>}</div>
     <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>setShowClosed(v=>!v)}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
     {/* Sort by Score button */}
     {!loading&&!q&&!filterStatus&&<div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}><button className="btn btn-ghost" style={{fontSize:11,padding:'4px 10px',borderRadius:20,border:'1px solid var(--border)'}} onClick={()=>setSortDir(s=>s==='score'?'desc':'score')}>{sortDir==='score'?'🧠 เรียงตามคะแนน ✓':'🧠 เรียงตามคะแนน'}</button></div>}
-    {loading?<SkeletonCards n={4}/>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=>{
+    {loading?<SkeletonCards n={4}/>:loadError&&!cases.length?<div style={{padding:32,textAlign:'center',color:'var(--text2)'}}>โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่</div>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=>{
       const score=calculateCaseScore(c);
       const alert=getCaseAlert(c);
       const suggestion=getCaseSuggestion(c);
