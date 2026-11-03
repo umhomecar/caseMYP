@@ -2621,3 +2621,38 @@ body:not(.light) .casemyp-v2-trash button.cp-tool-button{
     min-width:0!important;width:100%!important;
   }
 }
+
+/* Mobile case form: keep its actions visible above the system navigation.
+   Portaled by Modal(case-form) to escape .page animation stacking contexts. */
+@media(max-width:768px){
+  .cp-case-form-overlay{
+    z-index:10020!important;
+    padding:calc(env(safe-area-inset-top,0px) + 8px) 8px
+            calc(env(safe-area-inset-bottom,0px) + 8px)!important;
+    align-items:stretch!important;
+  }
+  body .cp-case-form-overlay > .casemyp-v2-modal-case-form{
+    display:flex!important;
+    flex-direction:column;
+    width:100%!important;
+    max-width:100%!important;
+    height:100%!important;
+    max-height:100%!important;
+    min-height:0;
+    overflow:hidden;
+  }
+  .cp-case-form-overlay .modal-hd,
+  .cp-case-form-overlay .modal-ft{flex:0 0 auto;}
+  .cp-case-form-overlay .modal-bd{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .cp-case-form-overlay .modal-ft{
+    display:flex!important;
+    padding:12px 14px!important;
+  }
+  /* Validation warnings must remain above the new modal layer. */
+  #toast-container{z-index:10030!important;}
+}
