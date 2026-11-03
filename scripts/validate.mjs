@@ -147,6 +147,8 @@ if(!editModal.includes("api('updateCase'")||!editModal.includes('onUpdated(optim
   fail('Case editor save and state refresh contract changed');
 if(!caseCenter.includes("api('getCases'")||!caseCenter.includes('casemyp-v2-case-filters'))
   fail('Current-case filtering or read path is missing');
+if(!caseCenter.includes('const load=useCallback((background=false)=>{if(!background)setLoading(true)')||!caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
+  fail('Case create/edit must refresh in background without hiding the case list');
 if(!analytics.includes('belongsToPeriod(c,prefixes)')||!analytics.includes('const convPct='))
   fail('Analytics period selection or funnel conversion missing');
 if(!source.includes("if(action==='getCases')return{success:true,data:previewCases()};"))
