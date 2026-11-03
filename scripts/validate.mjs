@@ -182,6 +182,29 @@ for(const [name,body] of [['Current cases',caseCenter],['Private/LINE cases',sta
 }
 if(standalonePage.includes('setRows([])')||caseCenter.includes('setCases([])'))
   fail('Case list load failures must not wipe previously fetched records');
+// Static role-boundary contracts. These are NOT a substitute for live RLS verification.
+const appShell=section('function App(', '\nfunction ');
+const salesShell=section('function SalesApp(', '\nfunction ');
+const loginHandler=section("case 'login':", "case 'getAuthProfile':");
+const rlsCutover=read('supabase/production/20260729_02_auth_rls_after_account_link.sql');
+if(!appShell.includes("if(user.role==='Admin')return")||!appShell.includes('<SalesApp currentUser={user}'))
+  fail('Admin and Sales UI route separation is missing');
+if(!salesCases.includes("api('getCases',{sales:currentUser.name,all:'true'})"))
+  fail('Sales case list lost its assigned-sales scope');
+if(!source.includes("api('searchCases',{q:term,sales:currentUser.name})")||
+   !source.includes("if(sales)query.sales=`eq.${sales}`"))
+  fail('Sales global search must remain scoped at the database query');
+if(!loginHandler.includes("status:'eq.active'"))
+  fail('Login must reject inactive accounts');
+for(const rule of [
+  'sales read assigned cases', 'sales update assigned cases',
+  'sales read own bookings', 'notifications scoped to recipient',
+  'admin manages standalone cases', 'active users without auth_user_id'
+]){
+  if(!rlsCutover.includes(rule))fail('RLS cutover migration missing safeguard: '+rule);
+}
+console.log('Static authorization contracts passed; live database RLS and role matrix remain unverified');
+
 console.log('Phase 4 regression contracts passed: case create/edit, preview isolation, analytics and action colors');
 
 console.log('Validation passed: source, production bundle, public output, accessibility and dead-feature checks');
