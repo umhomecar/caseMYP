@@ -16,6 +16,15 @@ const publicFiles=['index.html','manifest.json','css/styles.css','js/preload.js'
 const runtimeConfigPath=path.join(root,'public/runtime-config.js');
 
 parse(source,{sourceType:'module',plugins:['jsx']});
+// Design preview isolation and single-source React rendering contract.
+const previewHtml=read('design-preview.html');
+if(!previewHtml.includes('./js/app.bundle.js'))fail('Design preview must render the production React bundle');
+if(!source.includes("const DESIGN_PREVIEW=window.location.pathname==='/design-preview.html'"))fail('Design preview path isolation is missing');
+if(!source.includes("if(DESIGN_PREVIEW){\n    if(String(method).toUpperCase()==='GET')return[];"))fail('Design preview direct DB reads are not isolated');
+if(!source.includes("READ_ONLY_PREVIEW"))fail('Design preview does not reject DB mutations');
+if(!source.includes("if(action==='getLineNotificationSetting')return{success:true,enabled:false};"))fail('Design preview LINE status is not isolated');
+
+
 parseCss(css,{positions:true});
 
 if(!fs.existsSync(bundlePath))fail('ไม่พบ public/js/app.bundle.js');
