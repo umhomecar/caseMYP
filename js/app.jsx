@@ -1639,7 +1639,7 @@ function AdminCurrentCases({currentUser,users}){
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [bulkSales,setBulkSales]=useState('');
   const [bulkSaving,setBulkSaving]=useState(false);
-  const load=useCallback(()=>{setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
+  const load=useCallback((background=false)=>{if(!background)setLoading(true);cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
     if(r.success){
       const casesData=safeArray(r.data);
       setCases(casesData);
@@ -1783,7 +1783,7 @@ function AdminCurrentCases({currentUser,users}){
       </div>)}
     </div>
     <div className="card admin-cases-desktop-table casemyp-v2-cases-table" style={{padding:0}}><div className="table-wrap"><table><thead><tr><th style={{width:38}}><input type="checkbox" checked={filtered.length>0&&filtered.every(c=>selectedIds.has(String(c.caseid)))} onChange={e=>setSelectedIds(e.target.checked?new Set(filtered.map(c=>String(c.caseid))):new Set())} aria-label="เลือกทุกเคส"/></th><th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>รหัสเคส {sortDir==='desc'?'↓':'↑'}</th><th>ชื่อลูกค้า</th><th>ติดต่อ</th><th>ข้อมูลคลิปแอด</th><th>สถานะ</th><th>เซลส์</th><th>อัปเดตล่าสุด</th></tr></thead><tbody>{loading?<SkeletonRows n={5} cols={8}/>:filtered.length===0?<tr><td colSpan={8} style={{textAlign:'center',padding:30,color:'var(--text2)'}}>ไม่พบเคส</td></tr>:filtered.map((c,i)=>{const clipAd=getClipAd(c.attachment);return<tr key={i} className="clickable admin-case-row" role="button" tabIndex={0} onClick={()=>setSel(c)} onKeyDown={e=>activateOnKey(e,()=>setSel(c))}><td className="admin-case-col-select" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(String(c.caseid))} onChange={e=>setSelectedIds(prev=>{const next=new Set(prev);e.target.checked?next.add(String(c.caseid)):next.delete(String(c.caseid));return next;})} aria-label={`เลือกเคส ${c.caseid}`}/></td><td className="admin-case-col-id" data-label="รหัสเคส"><span style={{color:'var(--blue)',fontWeight:700}}>{c.caseid}</span></td><td className="admin-case-col-customer" data-label="ชื่อลูกค้า" style={{fontWeight:500}}>{c.customername}</td><td className="admin-case-col-contact" data-label="ติดต่อ" style={{fontSize:13,color:'var(--text2)'}}>{displayContact(c.contact)}</td><td className="admin-case-col-clip" data-label="ข้อมูลคลิปแอด" title={clipAd||''} style={{fontSize:12,color:clipAd?'var(--text2)':'var(--text3)',maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{clipAd||'-'}</td><td className="admin-case-col-status" data-label="สถานะ"><StatusBadge status={c.status}/></td><td className="admin-case-col-sales" data-label="เซลส์"><span style={{color:isUnassignedSales(c.sales)?'var(--yellow)':'var(--purple)'}}>{isUnassignedSales(c.sales)?UNASSIGNED_SALES:c.sales}</span></td><td className="admin-case-col-updated" data-label="อัปเดต" style={{fontSize:12,color:'var(--text3)'}}>{String(c.updatedat||'').split(' ')[0]}</td></tr>;})}</tbody></table></div></div>
-    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
+    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={()=>load(true)}/>}
     {showExport&&<div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setShowExport(false);}}>
       <div className="modal" style={{maxWidth:460,borderRadius:14}}>
         <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}>
@@ -1827,8 +1827,8 @@ function AdminCurrentCases({currentUser,users}){
         </div>
       </div>
     </div>}
-    {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={load}/>}
-    {showBackdate&&<AddCaseModal backdated users={users} currentUser={currentUser} onClose={()=>setShowBackdate(false)} onAdded={load}/>}
+    {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={()=>load(true)}/>}
+    {showBackdate&&<AddCaseModal backdated users={users} currentUser={currentUser} onClose={()=>setShowBackdate(false)} onAdded={()=>load(true)}/>}
     {showAddBook&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAddBook(false)} onAdded={()=>{}}/>}
     {/* FAB มือถือ */}
     <button className="fab" onClick={()=>setShowAdd(true)} title="เพิ่มลูกค้า">＋</button>
