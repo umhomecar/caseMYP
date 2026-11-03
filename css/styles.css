@@ -2538,3 +2538,52 @@ body:not(.light) .casemyp-v2-modal-standalone-form button.cp-action-save:hover:n
  body:not(.light) .casemyp-v2-modal-user-form .modal-ft,
  body:not(.light) .casemyp-v2-modal-standalone-form .modal-ft{padding:12px 14px;gap:8px}
 }
+
+/* CaseMYP 2.0 — unified compact toolbar on case, private-case and LINE OA lists. */
+body:not(.light) .cp-list-tools{
+  display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;
+  gap:8px;min-width:max-content;margin-left:auto;
+}
+body:not(.light) button.btn.cp-tool-button{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  flex:0 0 40px!important;width:40px!important;min-width:40px!important;max-width:40px!important;
+  height:40px!important;min-height:40px!important;max-height:40px!important;
+  padding:0!important;margin:0!important;border-radius:12px!important;
+  font-size:19px!important;line-height:1!important;font-weight:700!important;
+  background:#3c3058!important;color:#f5eaff!important;border:1px solid #70518e!important;
+  transition:background-color .16s ease,border-color .16s ease,transform .16s ease!important;
+}
+body:not(.light) button.btn.cp-tool-button.cp-action-refresh{
+  background:#f58227!important;border:1px solid #ffa764!important;color:#fff!important;
+  box-shadow:0 4px 12px rgba(245,130,39,.19)!important;
+}
+body:not(.light) button.btn.cp-tool-button.cp-action-refresh:hover:not(:disabled){
+  background:#db6e1a!important;
+}
+body:not(.light) button.btn.cp-tool-button.cp-tool-sort:hover:not(:disabled){
+  background:#533e74!important;border-color:#9e79bd!important;
+}
+body:not(.light) button.btn.cp-tool-button:focus-visible{
+  outline:2px solid #d9bfff!important;outline-offset:2px!important;
+}
+body:not(.light) .cp-count-pill{
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 auto;min-height:40px;min-width:64px;
+  padding:0 13px;border-radius:999px;
+  color:#e5e2f4!important;background:rgba(232,226,255,.075);
+  border:1px solid rgba(208,203,246,.23);
+  font-size:12px;font-weight:750;white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+body:not(.light) .casemyp-v2-sent .sent-filter-row,
+body:not(.light) .casemyp-v2-cases .casemyp-v2-case-filters{
+  align-items:center;column-gap:9px;row-gap:10px;
+}
+@media(max-width:760px){
+  body:not(.light) .cp-list-tools{margin-left:0;min-width:0;flex-wrap:nowrap;}
+  body:not(.light) .cp-count-pill{padding:0 10px;min-width:56px;}
+  body:not(.light) .casemyp-v2-sent .sent-filter-row{gap:9px;}
+}
+@media(prefers-reduced-motion:reduce){
+  body:not(.light) button.btn.cp-tool-button{transition:none!important;}
+}
