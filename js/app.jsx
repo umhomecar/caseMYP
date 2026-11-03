@@ -235,7 +235,7 @@ async function getSearchCaseRows({force=false,sales=''}={}){
 const CACHEABLE=['getCases','getUsers','getBookings','getDashboard','getNotifications','getStandaloneCases','getTrashCases'];
 const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard','getHistory'],bulkAssignCases:['getCases','getDashboard','getHistory'],deleteCase:['getCases','getDashboard','getTrashCases','getHistory'],restoreCase:['getCases','getDashboard','getTrashCases','getHistory'],addBooking:['getBookings'],updateBooking:['getBookings'],deleteBooking:['getBookings'],restoreBooking:['getBookings'],addCaseNote:['getCaseNotes','getSalesNotes','getHistory'],deleteCaseNote:['getCaseNotes','getSalesNotes','getHistory'],addCaseFollowup:['getCaseFollowups','getSalesFollowups','getHistory'],updateFollowupStatus:['getCaseFollowups','getSalesFollowups','getHistory'],deleteFollowup:['getCaseFollowups','getSalesFollowups','getHistory'],addStandaloneCase:['getStandaloneCases'],updateStandaloneCase:['getStandaloneCases'],deleteStandaloneCase:['getStandaloneCases'],restoreStandaloneCase:['getStandaloneCases']};
 
-const PREVIEW_SALES=['แฟ้บ','บอลเล็ก','บอลใหญ่','เพ้นท์','พีร์'];
+const PREVIEW_SALES=['แฟ้บ','บอล','พี่บอล','เพ้นท์','พีร์'];
 function previewCases(){
   const d=new Date();const date='02/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()+' 11:00:00';
   const campaigns=['FE','D-max 459','4M','organic','Yaris 359','Jazz 299','City'];
@@ -1020,22 +1020,31 @@ function AdminAnalytics({currentUser}){
   const [range,setRange]=useState('month'); // month|3month|all
   useEffect(()=>{api('getCases',{all:'true'}).then(cr=>{if(cr.success)setCases(cr.data||[]);setLoading(false);});},[]);
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
+  // Real case IDs encode YYMM; only Preview DEMO IDs use their simulated creation dates.
+  const belongsToPeriod=(row,preList)=>{
+    const id=String(row.caseid||'');
+    if(preList.some(p=>id.startsWith(p)))return true;
+    if(!DESIGN_PREVIEW||!/^DEMO\d+$/.test(id))return false;
+    const m=String(row.createdat||'').match(/^\d{2}\/(\d{2})\/(\d{4})/);
+    return !!m&&preList.includes(m[2].slice(-2)+m[1]);
+  };
   function getMonthPre(monthsAgo){const d=new Date();d.setMonth(d.getMonth()-monthsAgo);return String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');}
   const monthCount=range==='month'?1:range==='3month'?3:12;
   const prefixes=Array.from({length:monthCount},(_,i)=>getMonthPre(monthCount-1-i));
   const MONTH_LABELS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   function monthLabel(pre){const y=2000+parseInt(pre.slice(0,2)),m=parseInt(pre.slice(2,4))-1;return MONTH_LABELS[m]+(monthCount>3?' '+String(y+543).slice(-2):'');}
   // รวม stats ต่อเดือน
-  const monthStats=prefixes.map(pre=>{const mc=cases.filter(c=>String(c.caseid||'').startsWith(pre));return{pre,label:monthLabel(pre),total:mc.length,sold:mc.filter(c=>c.status==='ปล่อยแล้ว').length,active:mc.filter(c=>!CLOSED.includes(c.status)).length,wr:mc.length>0?Math.round(mc.filter(c=>c.status==='ปล่อยแล้ว').length/mc.length*100):0};});
+  const monthStats=prefixes.map(pre=>{const mc=cases.filter(c=>belongsToPeriod(c,[pre]));return{pre,label:monthLabel(pre),total:mc.length,sold:mc.filter(c=>c.status==='ปล่อยแล้ว').length,active:mc.filter(c=>!CLOSED.includes(c.status)).length,wr:mc.length>0?Math.round(mc.filter(c=>c.status==='ปล่อยแล้ว').length/mc.length*100):0};});
   // สถิติแต่ละเซลส์
   const salesNames=[...new Set(cases.map(c=>c.sales).filter(Boolean))];
-  const salesStats=salesNames.map(name=>{const mc=cases.filter(c=>c.sales===name&&prefixes.some(p=>String(c.caseid||'').startsWith(p)));const sold=mc.filter(c=>c.status==='ปล่อยแล้ว').length;const score=calculateCaseScore;return{name,total:mc.length,sold,wr:mc.length>0?Math.round(sold/mc.length*100):0};}).sort((a,b)=>b.sold-a.sold);
+  const salesStats=salesNames.map(name=>{const mc=cases.filter(c=>c.sales===name&&belongsToPeriod(c,prefixes));const sold=mc.filter(c=>c.status==='ปล่อยแล้ว').length;const score=calculateCaseScore;return{name,total:mc.length,sold,wr:mc.length>0?Math.round(sold/mc.length*100):0};}).sort((a,b)=>b.sold-a.sold);
   // Funnel
-  const allPeriod=cases.filter(c=>prefixes.some(p=>String(c.caseid||'').startsWith(p)));
+  const allPeriod=cases.filter(c=>belongsToPeriod(c,prefixes));
   const funnel=[['เข้าระบบ',allPeriod.length],['คุยแล้ว',allPeriod.filter(c=>c.report&&c.report.length>5).length],['ไปต่อได้',allPeriod.filter(c=>['ไปต่อได้','เคสวัด 50/50','จอง','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยแล้ว'].includes(c.status)).length],['จอง',allPeriod.filter(c=>['จอง','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยแล้ว'].includes(c.status)).length],['ปล่อยรถ',allPeriod.filter(c=>c.status==='ปล่อยแล้ว').length]];
   const maxF=funnel[0][1]||1;
   return<div className="page casemyp-v2-analytics">
     <div className="page-hd casemyp-v2-report-heading"><div><div className="casemyp-v2-eyebrow">WORKSPACE / REPORTING</div><div className="page-title">📈 Analytics <span className="casemyp-v2-title-accent">· Reports</span></div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์เชิงลึก</div></div><button className="btn cp-tool-button cp-action-refresh" title="รีเฟรชรายงาน" aria-label="รีเฟรชรายงาน" onClick={()=>{cacheClear(['getCases']);location.reload();}}>🔄</button></div>
+    {DESIGN_PREVIEW&&<div className="casemyp-v2-preview-notice">🎨 ข้อมูลรายงานนี้เป็นเคสตัวอย่าง DEMO ไม่ใช่ยอดงานจริง</div>}
     {/* Range Selector */}
     <div style={{display:'flex',gap:6,marginBottom:16}}>
       {[['month','เดือนนี้'],['3month','3 เดือน'],['all','ปีนี้']].map(([k,l])=>
@@ -1067,7 +1076,7 @@ function AdminAnalytics({currentUser}){
       {/* Sales Funnel */}
       <div className="card" style={{marginBottom:14}}>
         <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>🎯 Sales Funnel</div>
-        {funnel.map(([label,val],i)=>{const pct=Math.round(val/maxF*100);const convPct=i>0&&funnel[i-1][1]>0?Math.round(val/funnel[i-1][1]*100):100;return<div key={i} style={{marginBottom:10}}>
+        {funnel.map(([label,val],i)=>{const pct=Math.round(val/maxF*100);const convPct=i>0&&funnel[i-1][1]>0?Math.round(val/funnel[i-1][1]*100):0;return<div key={i} style={{marginBottom:10}}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
             <span style={{fontSize:13,fontWeight:600}}>{['📥','💬','⬆️','📋','🚗'][i]} {label}</span>
             <span style={{fontSize:12,color:'var(--text2)'}}>{val} คน {i>0&&<span style={{color:convPct>=50?'var(--green)':'var(--yellow)'}}>({convPct}%)</span>}</span>
