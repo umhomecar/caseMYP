@@ -2463,3 +2463,48 @@ body:not(.light) .casemyp-v2-bookings select{border-radius:12px}
  body:not(.light) .casemyp-v2-report-heading,
  body:not(.light) .casemyp-v2-booking-heading{padding:19px 15px!important;border-radius:18px}
 }
+
+/* Phase 3 — unified workspace pages: Users, Team, Trash, and sent-case areas. */
+body:not(.light) .casemyp-v2-users,
+body:not(.light) .casemyp-v2-team,
+body:not(.light) .casemyp-v2-trash,
+body:not(.light) .casemyp-v2-sent{
+ padding:24px 26px 44px!important;max-width:1600px;margin:0 auto;
+}
+body:not(.light) .casemyp-v2-secondary-heading{
+ background:radial-gradient(circle at 90% 0%,rgba(255,197,197,.22),transparent 37%),linear-gradient(120deg,#323c69,#4a355e 70%,#3b3057);
+ border:1px solid rgba(209,201,251,.29)!important;border-radius:23px!important;
+ padding:23px 28px!important;margin-bottom:20px!important;
+ box-shadow:0 15px 35px rgba(4,6,26,.26),inset 0 1px rgba(255,255,255,.10);
+}
+body:not(.light) .casemyp-v2-team .page-title,
+body:not(.light) .casemyp-v2-trash .page-title,
+body:not(.light) .casemyp-v2-sent .page-title{font-size:clamp(22px,2.3vw,31px);font-weight:850;color:#f7f3ff;}
+body:not(.light) .casemyp-v2-team .card,
+body:not(.light) .casemyp-v2-trash .card,
+body:not(.light) .casemyp-v2-sent .card{
+ background:linear-gradient(150deg,rgba(48,52,87,.9),rgba(29,32,59,.94));
+ border:1px solid rgba(197,201,255,.22);border-radius:19px;
+ box-shadow:0 14px 33px rgba(4,6,27,.23);
+}
+body:not(.light) .casemyp-v2-sent .sent-filter-row,
+body:not(.light) .casemyp-v2-sent .sent-date-row{
+ background:rgba(37,42,75,.8);border:1px solid rgba(198,202,255,.19);
+ border-radius:16px;padding:11px 13px;margin-bottom:12px;
+}
+body:not(.light) .casemyp-v2-sent .sent-primary{border-radius:999px;}
+body:not(.light) .casemyp-v2-sent .sent-icon-btn{min-width:40px;min-height:40px;}
+body:not(.light) .casemyp-v2-team button:focus-visible,
+body:not(.light) .casemyp-v2-users button:focus-visible,
+body:not(.light) .casemyp-v2-trash button:focus-visible{
+ outline:2px solid #bba7ff;outline-offset:3px;
+}
+body:not(.light) .casemyp-v2-trash .card button.btn-primary{background:#168fd1!important;border-color:#52b7ec!important;color:white!important;}
+@media(max-width:768px){
+ body:not(.light) .casemyp-v2-users,
+ body:not(.light) .casemyp-v2-team,
+ body:not(.light) .casemyp-v2-trash,
+ body:not(.light) .casemyp-v2-sent{padding:12px!important;}
+ body:not(.light) .casemyp-v2-secondary-heading{padding:17px 15px!important;border-radius:17px!important;}
+ body:not(.light) .casemyp-v2-sent .sent-filter-row{flex-wrap:wrap;}
+}
