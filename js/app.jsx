@@ -1035,7 +1035,7 @@ function AdminAnalytics({currentUser}){
   const funnel=[['เข้าระบบ',allPeriod.length],['คุยแล้ว',allPeriod.filter(c=>c.report&&c.report.length>5).length],['ไปต่อได้',allPeriod.filter(c=>['ไปต่อได้','เคสวัด 50/50','จอง','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยแล้ว'].includes(c.status)).length],['จอง',allPeriod.filter(c=>['จอง','รอเซ็นต์','รอผล','อนุมัติ','ปล่อยแล้ว'].includes(c.status)).length],['ปล่อยรถ',allPeriod.filter(c=>c.status==='ปล่อยแล้ว').length]];
   const maxF=funnel[0][1]||1;
   return<div className="page casemyp-v2-analytics">
-    <div className="page-hd casemyp-v2-report-heading"><div><div className="casemyp-v2-eyebrow">WORKSPACE / REPORTING</div><div className="page-title">📈 Analytics <span className="casemyp-v2-title-accent">· Reports</span></div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์เชิงลึก</div></div><button className="btn btn-ghost cp-action-refresh" style={{fontSize:13}} onClick={()=>{cacheClear(['getCases']);location.reload();}}>🔄</button></div>
+    <div className="page-hd casemyp-v2-report-heading"><div><div className="casemyp-v2-eyebrow">WORKSPACE / REPORTING</div><div className="page-title">📈 Analytics <span className="casemyp-v2-title-accent">· Reports</span></div><div style={{fontSize:12,color:'var(--text2)'}}>วิเคราะห์เชิงลึก</div></div><button className="btn cp-tool-button cp-action-refresh" title="รีเฟรชรายงาน" aria-label="รีเฟรชรายงาน" onClick={()=>{cacheClear(['getCases']);location.reload();}}>🔄</button></div>
     {/* Range Selector */}
     <div style={{display:'flex',gap:6,marginBottom:16}}>
       {[['month','เดือนนี้'],['3month','3 เดือน'],['all','ปีนี้']].map(([k,l])=>
@@ -1559,9 +1559,11 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
       <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
         <option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
       </select>
-      <button className="btn btn-ghost sent-icon-btn" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงตามวันที่สร้าง">{sortDir==='desc'?'↓':'↑'}</button>
-      <button className="btn btn-ghost sent-icon-btn cp-action-refresh" onClick={load} title="โหลดข้อมูลใหม่">🔄</button>
-      <span className="sent-result-count">{filtered.length} เคส</span>
+      <div className="cp-list-tools" role="group" aria-label="เครื่องมือจัดการรายการ">
+        <button type="button" className="btn btn-ghost cp-tool-button cp-tool-sort" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงตามวันที่สร้าง" aria-label="เรียงตามวันที่สร้าง">{sortDir==='desc'?'↓':'↑'}</button>
+        <button type="button" className="btn cp-tool-button cp-action-refresh" onClick={load} title="รีเฟรชรายการ" aria-label="รีเฟรชรายการ">↻</button>
+        <span className="cp-count-pill" aria-live="polite">{filtered.length} เคส</span>
+      </div>
     </div>
 
     <div className="sent-date-row">
@@ -1742,10 +1744,12 @@ function AdminCurrentCases({currentUser,users}){
       <select value={filter.status} onChange={e=>setFilter(f=>({...f,status:e.target.value}))} style={{fontSize:13,height:34,padding:'0 8px',borderRadius:8,flex:'0 0 auto',maxWidth:120}}>
         <option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
       </select>
-      <button className="btn btn-ghost" style={{height:34,padding:'0 10px',fontSize:13}} onClick={search}><Ico.search/></button>
-      <button className="btn btn-ghost" style={{height:34,padding:'0 10px',fontSize:13}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงลำดับ">{sortDir==='desc'?'↓':'↑'}</button>
-      <button className="btn btn-ghost" style={{height:34,padding:'0 10px',fontSize:13}} onClick={()=>{cacheClear(['getCases','getDashboard']);load();}} title="ล้าง Cache แล้วโหลดใหม่">🔄</button>
-      <span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>{filtered.length} เคส</span>
+      <div className="cp-list-tools" role="group" aria-label="เครื่องมือจัดการรายการ">
+        <button type="button" className="btn btn-ghost cp-tool-button cp-tool-sort" onClick={search} title="ค้นหา" aria-label="ค้นหา"><Ico.search/></button>
+        <button type="button" className="btn btn-ghost cp-tool-button cp-tool-sort" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงลำดับ" aria-label="เรียงลำดับ">{sortDir==='desc'?'↓':'↑'}</button>
+        <button type="button" className="btn cp-tool-button cp-action-refresh" onClick={()=>{cacheClear(['getCases','getDashboard']);load();}} title="รีเฟรชรายการ" aria-label="รีเฟรชรายการ">↻</button>
+        <span className="cp-count-pill" aria-live="polite">{filtered.length} เคส</span>
+      </div>
     </div>
     {/* Date range filter row */}
     <div className="admin-current-cases-desktop-date" style={{display:'flex',gap:6,marginBottom:10,alignItems:'center',flexWrap:'wrap'}}>
@@ -2662,7 +2666,7 @@ function AdminTrash({currentUser}){
   ];
   const total=groups.reduce((sum,g)=>sum+g.rows.length,0);
   return <div className="page casemyp-v2-trash">
-    <div className="page-hd casemyp-v2-secondary-heading"><div><div className="page-title">🗑️ ถังขยะ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>กู้คืนได้ภายใน 30 วัน และแยกประเภทข้อมูลเหมือนเดิม</div></div><button className="btn btn-ghost cp-action-refresh" onClick={load}>🔄</button></div>
+    <div className="page-hd casemyp-v2-secondary-heading"><div><div className="page-title">🗑️ ถังขยะ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>กู้คืนได้ภายใน 30 วัน และแยกประเภทข้อมูลเหมือนเดิม</div></div><button className="btn cp-tool-button cp-action-refresh" title="รีเฟรชถังขยะ" aria-label="รีเฟรชถังขยะ" onClick={load}>↻</button></div>
     {loading?<Loading/>:total===0?<div className="card" style={{textAlign:'center',padding:50,color:'var(--text2)'}}>ถังขยะว่าง</div>:groups.map(g=>g.rows.length?<div className="card" key={g.key} style={{marginBottom:14}}>
       <div style={{fontWeight:800,marginBottom:10}}>{g.title} <span style={{color:'var(--text3)',fontSize:12}}>({g.rows.length})</span></div>
       {g.rows.map(row=>{const key=g.key+':'+(row.caseid||row.id);return <div key={key} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderTop:'1px solid var(--border)'}}>
