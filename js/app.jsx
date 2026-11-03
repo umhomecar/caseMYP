@@ -1536,8 +1536,8 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   });
   function openAdd(){setModalItem(null);setShowModal(true);}
   function openEdit(r){setModalItem(r);setShowModal(true);}
-  return <div className={`page admin-sent-page admin-sent-${caseType}`} style={{'--sent-accent':theme.accent,'--sent-accent-rgb':theme.rgb}}>
-    <div className="page-hd">
+  return <div className={`page admin-sent-page admin-sent-${caseType} casemyp-v2-sent`} style={{'--sent-accent':theme.accent,'--sent-accent-rgb':theme.rgb}}>
+    <div className="page-hd casemyp-v2-secondary-heading">
       <div>
         <div className="page-title sent-page-title" style={{display:'flex',alignItems:'center',gap:10}}><span>{icon}</span>{title}</div>
         <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · ข้อมูลแยกจากเคสปัจจุบันและไม่มีรหัสเคส</div>
@@ -1559,7 +1559,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
         <option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
       </select>
       <button className="btn btn-ghost sent-icon-btn" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงตามวันที่สร้าง">{sortDir==='desc'?'↓':'↑'}</button>
-      <button className="btn btn-ghost sent-icon-btn" onClick={load} title="โหลดข้อมูลใหม่">🔄</button>
+      <button className="btn btn-ghost sent-icon-btn cp-action-refresh" onClick={load} title="โหลดข้อมูลใหม่">🔄</button>
       <span className="sent-result-count">{filtered.length} เคส</span>
     </div>
 
@@ -2002,9 +2002,9 @@ function AdminUsers({currentUser}){
     if(r.success)load();else showToast('เปลี่ยนสถานะผู้ใช้ไม่สำเร็จ: '+(r.error||''),'err');
   }
   const AU={bg:'linear-gradient(160deg,#080818 0%,#100828 50%,#0d1830 100%)',p:'#a78bfa',b:'#60a5fa',g:'#34d399',dim:'rgba(139,92,246,.1)',border:'rgba(139,92,246,.2)',text:'#e2e8f0',sub:'#6b7280'};
-  return <div className="page" style={{paddingBottom:40}}>
+  return <div className="page casemyp-v2-users" style={{paddingBottom:40}}>
     {/* AURORA HEADER */}
-    <div style={{padding:'24px 28px 20px',position:'relative',overflow:'hidden'}}>
+    <div className="casemyp-v2-secondary-heading" style={{padding:'24px 28px 20px',position:'relative',overflow:'hidden'}}>
       <div style={{position:'absolute',top:0,left:0,right:0,height:1,background:'linear-gradient(90deg,transparent,#8b5cf6,#3b82f6,#10b981,transparent)'}}/>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <div>
@@ -2625,8 +2625,8 @@ function AdminTeam({users,currentUser}){
     {k:'broadcast',label:'📢 Broadcast',neon:'#a855f7'},
   ];
   const cur=TABS.find(t=>t.k===tab)||TABS[0];
-  return <div className="page">
-    <div className="page-hd"><div><div className="page-title">🎯 TEAM HQ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Followup · Target · Broadcast</div></div></div>
+  return <div className="page casemyp-v2-team">
+    <div className="page-hd casemyp-v2-secondary-heading"><div><div className="page-title">🎯 TEAM HQ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Followup · Target · Broadcast</div></div></div>
     <div style={{display:'flex',gap:4,marginBottom:18,borderBottom:'1px solid var(--border)',paddingBottom:10}}>
       {TABS.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'7px 16px',borderRadius:20,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,background:tab===t.k?t.neon:'var(--bg3)',color:tab===t.k?'#000':'var(--text2)',transition:'all .2s'}}>{t.label}</button>)}
     </div>
@@ -2660,8 +2660,8 @@ function AdminTrash({currentUser}){
     {key:'standalone',title:'🔒 เคสส่วนตัว / 💬 Line OA',rows:safeArray(items.standalone),name:r=>`${r.case_type==='line_oa'?'Line OA':'เคสส่วนตัว'} — ${r.name||'-'}`}
   ];
   const total=groups.reduce((sum,g)=>sum+g.rows.length,0);
-  return <div className="page">
-    <div className="page-hd"><div><div className="page-title">🗑️ ถังขยะ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>กู้คืนได้ภายใน 30 วัน และแยกประเภทข้อมูลเหมือนเดิม</div></div><button className="btn btn-ghost" onClick={load}>🔄</button></div>
+  return <div className="page casemyp-v2-trash">
+    <div className="page-hd casemyp-v2-secondary-heading"><div><div className="page-title">🗑️ ถังขยะ</div><div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>กู้คืนได้ภายใน 30 วัน และแยกประเภทข้อมูลเหมือนเดิม</div></div><button className="btn btn-ghost cp-action-refresh" onClick={load}>🔄</button></div>
     {loading?<Loading/>:total===0?<div className="card" style={{textAlign:'center',padding:50,color:'var(--text2)'}}>ถังขยะว่าง</div>:groups.map(g=>g.rows.length?<div className="card" key={g.key} style={{marginBottom:14}}>
       <div style={{fontWeight:800,marginBottom:10}}>{g.title} <span style={{color:'var(--text3)',fontSize:12}}>({g.rows.length})</span></div>
       {g.rows.map(row=>{const key=g.key+':'+(row.caseid||row.id);return <div key={key} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderTop:'1px solid var(--border)'}}>
