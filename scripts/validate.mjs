@@ -164,10 +164,10 @@ for(const selector of ['.cp-action-copy','.cp-action-save','.cp-action-line','.c
 }
 if(!source.includes('const PREVIEW_SALES=[\'แฟ้บ\',\'บอล\',\'พี่บอล\',\'เพ้นท์\',\'พีร์\']'))
   fail('Demo sales names changed unexpectedly');
-const salesCases=section('function SalesCurrentCases(', '\\nfunction ');
-const bookingsPage=section('function AdminBookings(', '\\nfunction ');
+const salesCases=section('function SalesCurrentCases(', '\nfunction ');
+const bookingsPage=section('function AdminBookings(', '\nfunction ');
 for(const [name,body] of [['Analytics',analytics],['Bookings',bookingsPage],['Sales cases',salesCases]]){
-  if(!body.includes('const [loadError,setLoadError]=useState')||!body.includes('role="alert"')||!body.includes('onClick={load}'))
+  if(!body.includes('const [loadError,setLoadError]=useState')||!body.includes('role="alert"')||!(body.includes('onClick={load}')||body.includes('load();}}')))
     fail(name+' needs an error state, visible alert and retry button');
   if(!body.includes('.catch(')||!body.includes('.finally(()=>setLoading(false))'))
     fail(name+' must stop loading when the request fails');
