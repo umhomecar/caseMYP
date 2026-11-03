@@ -2508,3 +2508,33 @@ body:not(.light) .casemyp-v2-trash .card button.btn-primary{background:#168fd1!i
  body:not(.light) .casemyp-v2-secondary-heading{padding:17px 15px!important;border-radius:17px!important;}
  body:not(.light) .casemyp-v2-sent .sent-filter-row{flex-wrap:wrap;}
 }
+
+/* Phase 3 semantic action parity — Users / Private Cases / LINE OA forms */
+body:not(.light) .casemyp-v2-modal-user-form,
+body:not(.light) .casemyp-v2-modal-standalone-form{
+ background:#252729;border:1px solid rgba(196,201,232,.32)!important;
+ border-radius:19px!important;overflow:hidden;
+}
+body:not(.light) .casemyp-v2-modal-user-form .modal-ft,
+body:not(.light) .casemyp-v2-modal-standalone-form .modal-ft{
+ display:flex;justify-content:flex-end;gap:9px;
+}
+body:not(.light) .casemyp-v2-modal-user-form button.cp-action-danger,
+body:not(.light) .casemyp-v2-modal-standalone-form button.cp-action-danger{
+ background:#bf344a!important;border:1px solid #e3697b!important;color:#fff!important;
+}
+body:not(.light) .casemyp-v2-modal-user-form button.cp-action-save,
+body:not(.light) .casemyp-v2-modal-standalone-form button.cp-action-save{
+ background:#168fd1!important;border:1px solid #52b7ec!important;color:#fff!important;
+ box-shadow:0 5px 15px rgba(22,143,209,.19)!important;
+}
+body:not(.light) .casemyp-v2-modal-user-form button.cp-action-save:disabled,
+body:not(.light) .casemyp-v2-modal-standalone-form button.cp-action-save:disabled{
+ opacity:.68!important;cursor:not-allowed;box-shadow:none!important;
+}
+body:not(.light) .casemyp-v2-modal-user-form button.cp-action-save:hover:not(:disabled),
+body:not(.light) .casemyp-v2-modal-standalone-form button.cp-action-save:hover:not(:disabled){background:#117ab5!important;}
+@media(max-width:620px){
+ body:not(.light) .casemyp-v2-modal-user-form .modal-ft,
+ body:not(.light) .casemyp-v2-modal-standalone-form .modal-ft{padding:12px 14px;gap:8px}
+}
