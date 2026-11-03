@@ -1472,10 +1472,10 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
     if(r.success){showToast('ย้ายข้อมูลไปถังขยะแล้ว','ok');onSaved();onClose();}
     else showToast(r.error||'ลบไม่สำเร็จ','err',5000);
   }
-  return <><Modal title={(isEdit?'✏️ แก้ไข ':'➕ เพิ่ม ')+title} onClose={onClose} footer={<>
+  return <><Modal variant="standalone-form" title={(isEdit?'✏️ แก้ไข ':'➕ เพิ่ม ')+title} onClose={onClose} footer={<>
     {isEdit&&<button className="btn btn-danger" onClick={()=>setConfirmDelete(true)} disabled={loading} style={{marginRight:'auto'}}>ลบ</button>}
-    <button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button>
-    <button className="btn btn-primary" onClick={submit} disabled={loading}>{loading?'กำลังบันทึก...':'บันทึก'}</button>
+    <button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button>
+    <button className="btn btn-primary cp-action-save" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{loading?'กำลังบันทึก...':'บันทึก'}</button>
   </>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อ *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อลูกค้า / ชื่อบัญชี / ชื่อเคส"/></div>
@@ -2051,7 +2051,7 @@ function AdminUsers({currentUser}){
     </div>
 
     {/* Add User Modal */}
-    {showAdd&&<Modal title="➕ เพิ่มผู้ใช้ใหม่" onClose={()=>setShowAdd(false)} footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={addUser}>บันทึก</button></>}>
+    {showAdd&&<Modal variant="user-form" title="➕ เพิ่มผู้ใช้ใหม่" onClose={()=>setShowAdd(false)} footer={<><button className="btn btn-ghost cp-action-danger" onClick={()=>setShowAdd(false)}>ยกเลิก</button><button className="btn btn-primary cp-action-save" onClick={addUser} disabled={DESIGN_PREVIEW}>บันทึก</button></>}>
       <div style={{display:'grid',gap:12}}>
         <div className="form-group"><label>Username</label><input value={form.username} onChange={e=>set('username',e.target.value)} placeholder="ตัวอักษรภาษาอังกฤษ"/></div>
         <div className="form-group"><label>รหัสผ่าน</label><input value={form.password} onChange={e=>set('password',e.target.value)}/></div>
@@ -2061,7 +2061,7 @@ function AdminUsers({currentUser}){
     </Modal>}
 
     {/* Edit User Modal */}
-    {editUser&&<Modal title={`✏️ แก้ไข — ${editUser.username}`} onClose={()=>setEditUser(null)} footer={<><button className="btn btn-ghost" onClick={()=>setEditUser(null)}>ยกเลิก</button><button className="btn btn-primary" onClick={saveEdit} disabled={saving}>{saving?'กำลังบันทึก...':'💾 บันทึก'}</button></>}>
+    {editUser&&<Modal variant="user-form" title={`✏️ แก้ไข — ${editUser.username}`} onClose={()=>setEditUser(null)} footer={<><button className="btn btn-ghost cp-action-danger" onClick={()=>setEditUser(null)}>ยกเลิก</button><button className="btn btn-primary cp-action-save" onClick={saveEdit} disabled={saving||DESIGN_PREVIEW}>{saving?'กำลังบันทึก...':'💾 บันทึก'}</button></>}>
       <div style={{display:'grid',gap:12}}>
         <div style={{display:'flex',alignItems:'center',gap:16,background:'var(--bg3)',borderRadius:10,padding:'12px 14px'}}>
           <div style={{width:64,height:64,borderRadius:'50%',background:'var(--bg2)',border:'2px solid var(--border)',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>
