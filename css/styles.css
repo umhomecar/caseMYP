@@ -2622,6 +2622,15 @@ body:not(.light) .casemyp-v2-trash button.cp-tool-button{
   }
 }
 
+/* Booking detail — full edit mode and multiline notes */
+.casemyp-booking-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.casemyp-booking-label{font-size:11px;color:var(--text2);margin-bottom:4px}
+.casemyp-booking-value{font-weight:600;overflow-wrap:anywhere;white-space:pre-wrap}
+.casemyp-booking-note-full{padding:14px 15px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;min-height:120px;max-height:none}
+.casemyp-booking-note-editor{display:block;width:100%;min-height:220px;box-sizing:border-box;resize:vertical;white-space:pre-wrap;line-height:1.7}
+.casemyp-booking-created{font-size:11px;color:var(--text3);margin-top:10px}
+@media(max-width:620px){.casemyp-booking-detail-grid{grid-template-columns:1fr}.casemyp-v2-modal-booking-edit .modal-ft{display:flex;flex-wrap:wrap;gap:8px}.casemyp-v2-modal-booking-edit .modal-ft button{flex:1 1 auto}}
+
 /* Mobile case form: keep its actions visible above the system navigation.
    Portaled by Modal(case-form) to escape .page animation stacking contexts. */
 @media(max-width:768px){
