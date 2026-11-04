@@ -681,15 +681,17 @@ async function sbApi(action,data){
       const current=safeArray(currentRows)[0];
       if(!current)return{success:false,error:'ไม่พบรายการจอง หรือรายการอยู่ในถังขยะ'};
       if(data.expectedVersion!==undefined&&Number(current.version||1)!==Number(data.expectedVersion))return{success:false,conflict:true,error:'การจองถูกแก้จากอุปกรณ์อื่น กรุณารีเฟรช'};
-      const upd={version:(Number(current.version)||1)+1};if(data.status!==undefined)upd.status=data.status;if(data.note!==undefined)upd.note=data.note;
-      const q=data.bookingId?{id:`eq.${data.bookingId}`}:{caseid:`eq.${data.caseId}`};
-      if(!data.bookingId&&data.createdat)q.createdat=`eq.${data.createdat}`;
-      q.deleted_at='is.null';q.version=`eq.${Number(current.version)||1}`;
-      const updated=await sbQ('PATCH','bookings',q,upd);
+      if(!data.bookingId)return{success:false,error:'ต้องระบุ bookingId เพื่อแก้ไขรายการจอง'};
+      const fields={caseId:'caseid',sales:'sales',customer:'customer',facebook:'facebook',ads:'ads',brand:'brand',model:'model',plate:'plate',status:'status',note:'note'};
+      const upd={version:(Number(current.version)||1)+1};
+      for(const [input,column] of Object.entries(fields))if(data[input]!==undefined)upd[column]=input==='note'?String(data[input]??''):String(data[input]??'').trim();
+      if(!String(upd.caseid??current.caseid).trim()||!String(upd.customer??current.customer).trim()||!String(upd.sales??current.sales).trim())return{success:false,error:'กรุณากรอกรหัสเคส ชื่อลูกค้า และเลือกเซลส์'};
+      const updated=await sbQ('PATCH','bookings',{id:`eq.${data.bookingId}`,deleted_at:'is.null',version:`eq.${Number(current.version)||1}`},upd);
       if(isSbError(updated))return{success:false,error:formatSbError(updated)};
-      if(!safeArray(updated).length)return{success:false,error:'ไม่พบรายการจอง หรือรายการถูกเปลี่ยนจากอุปกรณ์อื่น'};
-      const hist=await sbQ('POST','history',{},{caseid:data.caseId,sales:data.updatedBy||'ระบบ',action:'แก้ไขการจอง',detail:'เปลี่ยนสถานะการจองเป็น '+(data.status||'-'),createdat:nowTH()});
-      return{success:true,historySaved:!isSbError(hist)};
+      if(!safeArray(updated).length)return{success:false,conflict:true,error:'รายการจองถูกเปลี่ยนจากอุปกรณ์อื่น กรุณารีเฟรช'};
+      const changed=Object.entries(fields).filter(([input,column])=>data[input]!==undefined&&String(upd[column])!==String(current[column]??'')).map(([input])=>input);
+      const hist=await sbQ('POST','history',{},{caseid:current.caseid,sales:data.updatedBy||'ระบบ',action:'แก้ไขการจอง',detail:'แก้ไขรายการจอง #'+String(data.bookingId)+' ('+(changed.join(', ')||'บันทึก')+')',createdat:nowTH()});
+      return{success:true,data:mapBooking(safeArray(updated)[0]),historySaved:!isSbError(hist)};
     }
     case 'deleteBooking':{
       const q=data.bookingId?{id:`eq.${data.bookingId}`,deleted_at:'is.null'}:{caseid:`eq.${data.caseId}`,deleted_at:'is.null'};
@@ -1988,27 +1990,55 @@ function AdminBookings({currentUser,users}){
         </div>
       </div>
     </div>
-    {sel&&<BookingDetailModal booking={sel} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
+    {sel&&<BookingDetailModal booking={sel} currentUser={currentUser} users={users} onClose={()=>setSel(null)} onUpdated={load}/>}
     {showAdd&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAdd(false)} onAdded={load}/>}
   </div>;
 }
 
-function BookingDetailModal({booking,currentUser,onClose,onUpdated}){
-  const [status,setStatus]=useState(booking['สถานะ']||'จองแล้ว');const [note,setNote]=useState(booking['หมายเหตุ']||'');const [loading,setLoading]=useState(false);const [deleting,setDeleting]=useState(false);const [confirmDelete,setConfirmDelete]=useState(false);
-  async function save(){setLoading(true);const r=await api('updateBooking',{bookingId:booking.bookingId,caseId:booking.CaseID,createdat:booking['วันที่'],status,note,expectedVersion:booking.version,updatedBy:currentUser?.name||'ระบบ'});setLoading(false);if(r.success){showToast('บันทึกการจองแล้ว','ok');onUpdated();onClose();}else showToast('บันทึกไม่สำเร็จ: '+(r.error||''),'err');}
+function BookingDetailModal({booking,currentUser,users=[],onClose,onUpdated}){
+  const initial={caseId:booking.CaseID||'',sales:booking['เซลส์']||'',customer:booking['ลูกค้า']||'',facebook:booking.Facebook||'',ads:booking.Ads||'',brand:booking['รถ']||'',model:booking['รุ่น']||'',plate:booking['ทะเบียน']||'',status:booking['สถานะ']||'จองแล้ว',note:booking['หมายเหตุ']||''};
+  const [form,setForm]=useState(initial),[editing,setEditing]=useState(false),[loading,setLoading]=useState(false),[deleting,setDeleting]=useState(false),[confirmDelete,setConfirmDelete]=useState(false);
+  const set=(key,value)=>setForm(old=>({...old,[key]:value}));
+  const models=form.brand?CAR_MODELS[form.brand]||[]:[];
+  async function save(){
+    if(!editing||DESIGN_PREVIEW)return;
+    if(!form.caseId.trim()||!form.customer.trim()||!form.sales.trim())return showToast('กรุณากรอกรหัสเคส ชื่อลูกค้า และเลือกเซลส์','warn');
+    setLoading(true);
+    const r=await api('updateBooking',{bookingId:booking.bookingId,expectedVersion:booking.version,updatedBy:currentUser?.name||'ระบบ',...form});
+    setLoading(false);
+    if(r.success){showToast('บันทึกการจองแล้ว','ok');onUpdated();onClose();}
+    else showToast('บันทึกไม่สำเร็จ: '+(r.error||''),'err');
+  }
   async function deleteBooking(){
     setDeleting(true);
     const r=await api('deleteBooking',{bookingId:booking.bookingId,caseId:booking.CaseID,createdat:booking['วันที่'],customer:booking['ลูกค้า'],deletedBy:currentUser?.name||'ระบบ'});
     setDeleting(false);
     if(r.success){showToast('ลบการจองแล้ว','ok');onUpdated();onClose();}else showToast(r.error||'ลบไม่สำเร็จ','err');
   }
+  const displayFields=[['รหัสเคส',form.caseId],['ลูกค้า',form.customer],['เซลส์',form.sales],['Facebook',form.facebook],['Ads ไหน',form.ads],['ยี่ห้อ',form.brand],['รุ่น',form.model],['ทะเบียน',form.plate]];
   return <>
-  <Modal title={`จอง — ${booking.CaseID}`} onClose={onClose} footer={<><button className="btn btn-danger" style={{marginRight:'auto'}} onClick={()=>setConfirmDelete(true)} disabled={deleting||loading}>{deleting?'กำลังลบ...':'🗑️ ลบเคสจอง'}</button><button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={save} disabled={loading||deleting}>{loading?'บันทึก...':'💾 บันทึก'}</button></>}>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>{[['ลูกค้า',booking['ลูกค้า']],['เซลส์',booking['เซลส์']],['ยี่ห้อ',booking['รถ']],['รุ่น',booking['รุ่น']],['ทะเบียน',booking['ทะเบียน']],['Facebook',booking.Facebook]].map(([l,v])=>v?<div key={l}><div style={{fontSize:11,color:'var(--text2)',marginBottom:3}}>{l}</div><div style={{fontWeight:500}}>{v}</div></div>:null)}</div>
-    <div className="form-group"><label>สถานะ</label><select value={status} onChange={e=>setStatus(e.target.value)}>{BOOK_STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-    <div className="form-group"><label>หมายเหตุ</label><textarea rows={2} value={note} onChange={e=>setNote(e.target.value)}/></div>
-  </Modal>
-  {confirmDelete&&<Confirm msg={`ย้ายการจองของ “${String(booking['ลูกค้า']||booking.CaseID).slice(0,80)}” ไปถังขยะ 30 วันหรือไม่? เคสหลักจะไม่ถูกลบ`} onOk={()=>{setConfirmDelete(false);deleteBooking();}} onCancel={()=>setConfirmDelete(false)}/>}
+    <Modal variant="booking-edit" title={`จอง — ${booking.CaseID}`} onClose={onClose} footer={<>
+      <button className="btn btn-danger cp-action-danger" style={{marginRight:'auto'}} onClick={()=>setConfirmDelete(true)} disabled={deleting||loading||DESIGN_PREVIEW}>🗑️ ลบเคสจอง</button>
+      {!editing?<button className="btn cp-action-edit" onClick={()=>setEditing(true)} disabled={loading||deleting}>✏️ แก้ไขทั้งหมด</button>:<button className="btn btn-ghost cp-action-danger" onClick={()=>{setForm(initial);setEditing(false);}} disabled={loading}>ยกเลิกแก้ไข</button>}
+      <button className="btn btn-primary cp-action-save" onClick={save} disabled={!editing||loading||deleting||DESIGN_PREVIEW}>{loading?'บันทึก...':'💾 บันทึก'}</button>
+    </>}>
+      <div className="casemyp-booking-detail-grid">
+        {!editing?displayFields.map(([label,value])=><div key={label}><div className="casemyp-booking-label">{label}</div><div className="casemyp-booking-value">{value||'-'}</div></div>):<>
+          <div className="form-group"><label>รหัสเคส *</label><input value={form.caseId} onChange={e=>set('caseId',e.target.value)}/></div>
+          <div className="form-group"><label>ชื่อลูกค้า *</label><input value={form.customer} onChange={e=>set('customer',e.target.value)}/></div>
+          <div className="form-group"><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value={form.sales}>{form.sales||'-- เลือก --'}</option>{users.filter(u=>u.role==='Sales'&&u.name!==form.sales).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
+          <div className="form-group"><label>Facebook</label><input value={form.facebook} onChange={e=>set('facebook',e.target.value)}/></div>
+          <div className="form-group"><label>Ads ไหน</label><input value={form.ads} onChange={e=>set('ads',e.target.value)}/></div>
+          <div className="form-group"><label>ยี่ห้อ</label><select value={form.brand} onChange={e=>setForm(old=>({...old,brand:e.target.value,model:''}))}><option value="">-- เลือก --</option>{form.brand&&!CAR_MODELS[form.brand]&&<option value={form.brand}>{form.brand}</option>}{Object.keys(CAR_MODELS).map(b=><option key={b} value={b}>{b}</option>)}</select></div>
+          <div className="form-group"><label>รุ่น</label><select value={form.model} onChange={e=>set('model',e.target.value)}><option value="">-- เลือก --</option>{form.model&&!models.includes(form.model)&&<option value={form.model}>{form.model}</option>}{models.map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+          <div className="form-group"><label>ทะเบียน</label><input value={form.plate} onChange={e=>set('plate',e.target.value)}/></div>
+        </>}
+      </div>
+      <div className="form-group"><label>สถานะ</label>{editing?<select value={form.status} onChange={e=>set('status',e.target.value)}>{BOOK_STATUSES.map(s=><option key={s}>{s}</option>)}</select>:<div className="casemyp-booking-value">{form.status||'-'}</div>}</div>
+      <div className="form-group"><label>หมายเหตุ (แสดงทั้งหมด)</label>{editing?<textarea className="casemyp-booking-note-editor" rows={10} value={form.note} onChange={e=>set('note',e.target.value)}/>:<div className="casemyp-booking-note-full">{form.note||'ไม่มีหมายเหตุ'}</div>}</div>
+      <div className="casemyp-booking-created">วันที่บันทึก: {booking['วันที่']||'-'}</div>
+    </Modal>
+    {confirmDelete&&<Confirm msg={`ย้ายการจองของ “${String(booking['ลูกค้า']||booking.CaseID).slice(0,80)}” ไปถังขยะ 30 วันหรือไม่? เคสหลักจะไม่ถูกลบ`} onOk={()=>{setConfirmDelete(false);deleteBooking();}} onCancel={()=>setConfirmDelete(false)}/>}
   </>;
 }
 
