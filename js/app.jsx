@@ -3,6 +3,7 @@
 // ============================================================
 
 import React, {useState,useEffect,useCallback,useRef} from 'react';
+import {createPortal} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 import {createClient} from '@supabase/supabase-js';
 
@@ -892,13 +893,14 @@ function Modal({title,onClose,children,footer,variant=''}){
     document.addEventListener('keydown',onKeyDown);
     return()=>document.removeEventListener('keydown',onKeyDown);
   },[onClose]);
-  return <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+  const modal=<div className={`overlay${variant==='case-form'?' cp-case-form-overlay':''}`} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div className={`modal ${variant?`casemyp-v2-modal casemyp-v2-modal-${variant}`:""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="modal-hd"><span id={titleId} style={{fontWeight:700,fontSize:16}}>{title}</span><button type="button" className="btn btn-ghost cp-action-danger" style={{padding:'6px 10px',borderRadius:8,display:'flex',alignItems:'center',gap:4,fontSize:13}} onClick={onClose} aria-label="ปิดหน้าต่าง"><Ico.x/><span style={{fontSize:12}}>ปิด</span></button></div>
       <div className="modal-bd">{children}</div>
       {footer&&<div className="modal-ft">{footer}</div>}
     </div>
   </div>;
+  return variant==='case-form'?createPortal(modal,document.body):modal;
 }
 
 function Loading(){return <div className="loading"><span className="spin"/><span>กำลังโหลด...</span></div>;}
