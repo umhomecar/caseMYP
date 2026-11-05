@@ -1478,10 +1478,36 @@ function NotifPanel({user,onClose,onCountChange}){
 
 
 
+const LINE_OA_FAVORITE_CARS = {
+  BMW: ['430i'],
+  Ford: ['Everest', 'Ranger'],
+  Honda: ['Accord', 'City', 'Civic', 'CR-V', 'HR-V', 'Jazz'],
+  Isuzu: ['D-Max', 'MU-X'],
+  Mazda: ['Mazda 2', 'Mazda 3', 'CX-3', 'CX-30', 'CX-5', 'CX-8'],
+  'Mercedes-Benz': ['GLA'],
+  Mitsubishi: ['Attrage', 'Mirage', 'Triton', 'Xpander'],
+  Nissan: ['Almera', 'Juke', 'March', 'Navara', 'Navara King'],
+  Suzuki: ['Swift'],
+  Toyota: ['C-HR', 'Camry', 'Corolla', 'Fortuner', 'Hilux', 'Revo', 'Vios', 'Yaris', 'Yaris Ativ'],
+};
+
+function parseLineOAFavoriteCar(value) {
+  const text = String(value || '').trim();
+  for (const [brand, models] of Object.entries(LINE_OA_FAVORITE_CARS)) {
+    for (const model of models) {
+      if (text === brand + ' ' + model) return {brand, model};
+    }
+  }
+  return {brand:'', model:''};
+}
+
 function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSaved}){
   const isEdit=!!item;
   const [form,setForm]=useState({name:item?.name||'',sales:item?.sales||'',status:item?.status||'รอข้อมูล',report:item?.report||''});
   const isLineOA=caseType==='line_oa';
+  const initialCar=parseLineOAFavoriteCar(item?.report);
+  const [favoriteBrand,setFavoriteBrand]=useState(initialCar.brand);
+  const [favoriteModel,setFavoriteModel]=useState(initialCar.model);
   const [loading,setLoading]=useState(false);
   const [confirmDelete,setConfirmDelete]=useState(false);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
@@ -1511,7 +1537,25 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อ *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อลูกค้า / ชื่อบัญชี / ชื่อเคส"/></div>
       <div className="form-group"><label>เซลส์ดูแล</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-      <div className="form-group" style={{gridColumn:'1/-1'}}><label>{isLineOA?'รถที่ชอบ':'รีพอร์ต'}</label><textarea rows={5} value={form.report} onChange={e=>set('report',e.target.value)} placeholder={isLineOA?'ยี่ห้อ / รุ่น / ปี / งบประมาณ':'รายละเอียด / ความคืบหน้า / หมายเหตุ'}/></div>
+      {isLineOA?<>
+        <div className="form-group"><label>ยี่ห้อรถที่ชอบ</label>
+          <select value={favoriteBrand} onChange={e=>{setFavoriteBrand(e.target.value);setFavoriteModel('');set('report','');}}>
+            <option value="">-- เลือกยี่ห้อ --</option>
+            {Object.keys(LINE_OA_FAVORITE_CARS).map(brand=><option key={brand} value={brand}>{brand}</option>)}
+          </select>
+        </div>
+        <div className="form-group"><label>รุ่นรถที่ชอบ</label>
+          <select value={favoriteModel} disabled={!favoriteBrand} onChange={e=>{const model=e.target.value;setFavoriteModel(model);set('report',model?favoriteBrand+' '+model:'');}}>
+            <option value="">-- เลือกรุ่น --</option>
+            {(LINE_OA_FAVORITE_CARS[favoriteBrand]||[]).map(model=><option key={model} value={model}>{model}</option>)}
+          </select>
+        </div>
+        {!favoriteBrand&&!!form.report.trim()&&<div className="form-group" style={{gridColumn:'1/-1'}}>
+          <label>ข้อมูลรถที่ชอบเดิม (แก้ไขได้)</label>
+          <textarea rows={3} value={form.report} onChange={e=>set('report',e.target.value)}/>
+          <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>ข้อมูลเดิมจะยังอยู่จนกว่าจะเลือกยี่ห้อและรุ่นใหม่</div>
+        </div>}
+      </>:<div className="form-group" style={{gridColumn:'1/-1'}}><label>รีพอร์ต</label><textarea rows={5} value={form.report} onChange={e=>set('report',e.target.value)} placeholder="รายละเอียด / ความคืบหน้า / หมายเหตุ"/></div>}
       {isEdit&&<div style={{gridColumn:'1/-1',fontSize:12,color:'var(--text3)',lineHeight:1.7,background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px'}}>
         {isLineOA&&<div>รหัสเคส: <strong>{item.case_code||'ยังไม่มีรหัส'}</strong></div>}
         <div>สร้างเมื่อ: {formatTextDateToTHBE(item.created_at)}</div>
