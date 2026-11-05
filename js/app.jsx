@@ -236,7 +236,15 @@ async function getSearchCaseRows({force=false,sales=''}={}){
 const CACHEABLE=['getCases','getUsers','getBookings','getDashboard','getNotifications','getStandaloneCases','getTrashCases'];
 const INVALIDATE_MAP={addCase:['getCases','getDashboard'],updateCase:['getCases','getDashboard','getHistory'],bulkAssignCases:['getCases','getDashboard','getHistory'],deleteCase:['getCases','getDashboard','getTrashCases','getHistory'],restoreCase:['getCases','getDashboard','getTrashCases','getHistory'],addBooking:['getBookings'],updateBooking:['getBookings'],deleteBooking:['getBookings'],restoreBooking:['getBookings'],addCaseNote:['getCaseNotes','getSalesNotes','getHistory'],deleteCaseNote:['getCaseNotes','getSalesNotes','getHistory'],addCaseFollowup:['getCaseFollowups','getSalesFollowups','getHistory'],updateFollowupStatus:['getCaseFollowups','getSalesFollowups','getHistory'],deleteFollowup:['getCaseFollowups','getSalesFollowups','getHistory'],addStandaloneCase:['getStandaloneCases'],updateStandaloneCase:['getStandaloneCases'],deleteStandaloneCase:['getStandaloneCases'],restoreStandaloneCase:['getStandaloneCases']};
 
-const PREVIEW_SALES=['แฟ้บ','บอล','พี่บอล','เพ้นท์','พีร์'];
+// Limit new salesperson choices without deleting users or changing historical records.
+const ACTIVE_SALES_NAMES=['แฟ้บ','เพ้นท์','พีร์','บอลเล็ก','บอลใหญ่'];
+const ACTIVE_SALES_SET=new Set(ACTIVE_SALES_NAMES);
+function selectableSales(users){
+  const available=new Map(safeArray(users).filter(u=>u.role==='Sales'&&u.status!=='inactive'&&ACTIVE_SALES_SET.has(u.name)).map(u=>[u.name,u]));
+  return ACTIVE_SALES_NAMES.map(name=>available.get(name)).filter(Boolean);
+}
+function selectableSalesValue(name){return ACTIVE_SALES_SET.has(String(name||''))?name:'';}
+const PREVIEW_SALES=ACTIVE_SALES_NAMES;
 function previewCases(){
   const d=new Date();const date='02/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()+' 11:00:00';
   const campaigns=['FE','D-max 459','4M','organic','Yaris 359','Jazz 299','City'];
@@ -845,9 +853,9 @@ async function sbApi(action,data){
       if(data.sales==='all'){
         const rows=await sbQ('GET','users',{role:'eq.Sales',status:'eq.active',select:'name'});
         if(isSbError(rows))throw new Error(formatSbError(rows));
-        targets=safeArray(rows).map(u=>u.name);
+        targets=safeArray(rows).map(u=>u.name).filter(name=>ACTIVE_SALES_SET.has(name));
       }
-      targets=[...new Set(targets.map(s=>String(s||'').trim()).filter(Boolean))];
+      targets=[...new Set(targets.map(s=>String(s||'').trim()).filter(name=>ACTIVE_SALES_SET.has(name)))];
       if(!targets.length)return{success:false,error:'ไม่พบผู้รับประกาศ'};
       const createdat=nowTH();
       await sbMutate('POST','notifications',{},targets.map(s=>({sales:s,caseid:'',message:'📢 '+data.message,createdat,status:'unread'})));
@@ -1263,8 +1271,8 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
             {isAdmin&&<div style={{fontSize:14,display:'flex',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)',paddingTop:editAll?9:0}}>ข้อมูลคลิปแอด: </span>{editAll?<input value={clipAd} onChange={e=>setClipAd(e.target.value)} placeholder="ชื่อแอด / แคมเปญ / คลิป URL..." style={{flex:1,minWidth:180}}/>:<span style={{fontWeight:600,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{clipAd||'-'}</span>}</div>}
           </div>
           <div className="form-group"><label>สถานะ:</label><select value={status} onChange={e=>setStatus(e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-          <div className="form-group"><label>เซลส์:</label>{isAdmin?<select value={newSales} onChange={e=>setNewSales(e.target.value)}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>:<div style={{display:'flex',gap:8,alignItems:'center'}}><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:14,flex:1}}>{caseData.sales||currentUser.name}</div>{currentUser.role==='Sales'&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px',whiteSpace:'nowrap',color:'var(--orange)'}} onClick={()=>setShowTransfer(v=>!v)}>↔ โอนเคส</button>}</div>}</div>
-          {showTransfer&&!isAdmin&&<div style={{background:'rgba(255,166,87,.08)',border:'1px solid rgba(255,166,87,.3)',borderRadius:8,padding:'12px',marginTop:-8,marginBottom:8}}><div style={{fontWeight:600,fontSize:13,marginBottom:8,color:'var(--orange)'}}>↔ โอนเคสให้เพื่อน</div><div style={{display:'flex',gap:8}}><select value={transferTo} onChange={e=>setTransferTo(e.target.value)} style={{flex:1,fontSize:13}}><option value="">-- เลือกเซลส์ --</option>{(users||[]).filter(u=>u.role==='Sales'&&u.name!==currentUser.name).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" style={{fontSize:12,padding:'0 12px',whiteSpace:'nowrap',background:'var(--orange)'}} disabled={!transferTo||transferring} onClick={doTransfer}>{transferring?'กำลังโอน...':'โอนเลย'}</button></div></div>}
+          <div className="form-group"><label>เซลส์:</label>{isAdmin?<select value={newSales} onChange={e=>setNewSales(e.target.value)}><option value="">-- เลือกเซลส์ --</option>{selectableSales(users).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select>:<div style={{display:'flex',gap:8,alignItems:'center'}}><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:14,flex:1}}>{caseData.sales||currentUser.name}</div>{currentUser.role==='Sales'&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px',whiteSpace:'nowrap',color:'var(--orange)'}} onClick={()=>setShowTransfer(v=>!v)}>↔ โอนเคส</button>}</div>}</div>
+          {showTransfer&&!isAdmin&&<div style={{background:'rgba(255,166,87,.08)',border:'1px solid rgba(255,166,87,.3)',borderRadius:8,padding:'12px',marginTop:-8,marginBottom:8}}><div style={{fontWeight:600,fontSize:13,marginBottom:8,color:'var(--orange)'}}>↔ โอนเคสให้เพื่อน</div><div style={{display:'flex',gap:8}}><select value={transferTo} onChange={e=>setTransferTo(e.target.value)} style={{flex:1,fontSize:13}}><option value="">-- เลือกเซลส์ --</option>{selectableSales(users).filter(u=>u.name!==currentUser.name).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" style={{fontSize:12,padding:'0 12px',whiteSpace:'nowrap',background:'var(--orange)'}} disabled={!transferTo||transferring} onClick={doTransfer}>{transferring?'กำลังโอน...':'โอนเลย'}</button></div></div>}
           {/* Case Intelligence */}
           {<div style={{background:'rgba(88,166,255,.07)',border:'1px solid rgba(88,166,255,.2)',borderRadius:8,padding:'10px 12px',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
@@ -1428,7 +1436,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       <div className="form-group"><label>ข้อมูลติดต่อ</label>{form.contact_by==='QR Code'?<QrUploader value={form.contact} onChange={v=>set('contact',v)}/>:<div><input value={form.contact} onChange={e=>set('contact',e.target.value)} placeholder="เบอร์ / ไลน์ / ID"/>{form.contact_by==='เบอร์'&&form.contact&&!/^0\d{8,9}$/.test(form.contact.replace(/\D/g,''))&&<div style={{fontSize:11,color:'var(--yellow)',marginTop:3}}>⚠️ เบอร์ไม่ครบ 10 หลัก</div>}</div>}</div>
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
       {currentUser.role==='Admin'&&!backdated&&!forcedSent&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>รูปแบบการส่งเพจ</label><select value={form.sent} onChange={e=>set('sent',e.target.value)}><option value="คิวเพจ">✅ ส่งตามคิวเพจอัตโนมัติ (10:00–17:00 น.)</option><option value="ปกติ">มอบหมายเอง / รอมอบหมาย</option></select><div style={{fontSize:11,color:'var(--text3)',marginTop:5}}>คิววนต่อเนื่องข้ามวัน · นอกเวลาระบบบันทึกเป็นรอมอบหมาย · เคสย้อนหลังไม่กินคิว</div></div>}
-      {currentUser.role==='Admin'&&(backdated||form.sent!=='คิวเพจ')&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>เซลส์ผู้รับผิดชอบ</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">รอมอบหมายภายหลัง</option>{users.filter(u=>u.role==='Sales'&&u.status!=='inactive').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>}
+      {currentUser.role==='Admin'&&(backdated||form.sent!=='คิวเพจ')&&<div className="form-group" style={{gridColumn:'1/-1'}}><label>เซลส์ผู้รับผิดชอบ</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">รอมอบหมายภายหลัง</option>{selectableSales(users).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>}
       {currentUser.role==='Admin'&&!backdated&&form.sent==='คิวเพจ'&&<div style={{gridColumn:'1/-1',fontSize:12,color:'var(--green)',padding:'8px 10px',background:'rgba(16,185,129,.08)',borderRadius:8}}>🔄 ระบบกำหนดเซลส์จากคิวกลางเมื่อบันทึกสำเร็จ ไม่จำเป็นต้องเลือกชื่อเอง</div>}
       {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1',background:'rgba(210,153,34,.06)',border:'1px solid rgba(210,153,34,.25)',borderRadius:8,padding:'10px 12px'}}>
         <label style={{display:'flex',alignItems:'center',gap:6,color:'var(--yellow)',marginBottom:6}}>🎬 ข้อมูลคลิปแอด <span style={{fontSize:11,fontWeight:400,color:'var(--text3)'}}>เห็นเฉพาะ Admin</span></label>
@@ -1451,7 +1459,7 @@ function AddBookingModal({currentUser,users,onClose,onAdded}){
   return <Modal variant="case-form" title="📋 เพิ่มการจอง" onClose={onClose} footer={<><button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary cp-action-save" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'บันทึก...':'บันทึก'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group"><label>รหัสเคส *</label><input value={form.caseId} onChange={e=>set('caseId',e.target.value)} placeholder="เช่น 2603001"/></div>
-      {currentUser.role==='Admin'?<div className="form-group"><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือก --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>:<div className="form-group"><label>เซลส์ *</label><input value={form.sales} readOnly/></div>}
+      {currentUser.role==='Admin'?<div className="form-group"><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือก --</option>{selectableSales(users).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>:<div className="form-group"><label>เซลส์ *</label><input value={form.sales} readOnly/></div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อลูกค้า *</label><input value={form.customer} onChange={e=>set('customer',e.target.value)}/></div>
       <div className="form-group"><label>Facebook</label><input value={form.facebook} onChange={e=>set('facebook',e.target.value)}/></div>
       <div className="form-group"><label>Ads ไหน</label><input value={form.ads} onChange={e=>set('ads',e.target.value)}/></div>
@@ -1558,7 +1566,7 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
         {!isEdit&&<div style={{fontSize:11,color:'var(--text3)',marginTop:5}}>รหัสที่แสดงเป็นตัวอย่างล่วงหน้า ระบบจะยืนยันรหัสจริงเมื่อบันทึกสำเร็จ เพื่อป้องกันรหัสซ้ำ</div>}
       </div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อ *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อลูกค้า / ชื่อบัญชี / ชื่อเคส"/></div>
-      <div className="form-group"><label>เซลส์ดูแล</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
+      <div className="form-group"><label>เซลส์ดูแล</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{selectableSales(users).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
       {isLineOA?<>
         <div className="form-group"><label>ยี่ห้อรถที่ชอบ</label>
@@ -1656,7 +1664,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder={isLineOA?'รหัสเคส ชื่อ รถที่ชอบ สถานะ หรือเซลส์':'ชื่อ เซลส์ สถานะ หรือรีพอร์ต'}/>
       </div>
       <select value={salesFilter} onChange={e=>setSalesFilter(e.target.value)}>
-        <option value="all">ทุกเซลส์</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
+        <option value="all">ทุกเซลส์</option>{selectableSales(users).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
       </select>
       <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
         <option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
@@ -1765,7 +1773,7 @@ function AdminCurrentCases({currentUser,users}){
     if(filter.dateTo){const d=parseD2(c.createdat);const to=new Date(filter.dateTo+'T00:00:00');to.setHours(23,59,59,999);if(!d||d>to)return false;}
     return true;
   }).sort((a,b)=>{const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
-  const salesList=users.filter(u=>u.role==='Sales');
+  const salesList=selectableSales(users);
   const unassignedCount=filtered.filter(c=>isUnassignedSales(c.sales)).length;
   async function assignSelected(){
     if(!selectedIds.size||!bulkSales)return showToast('กรุณาเลือกเคสและเซลส์','warn');
@@ -2098,7 +2106,7 @@ function BookingDetailModal({booking,currentUser,users=[],onClose,onUpdated}){
         {!editing?displayFields.map(([label,value])=><div key={label}><div className="casemyp-booking-label">{label}</div><div className="casemyp-booking-value">{value||'-'}</div></div>):<>
           <div className="form-group"><label>รหัสเคส *</label><input value={form.caseId} onChange={e=>set('caseId',e.target.value)}/></div>
           <div className="form-group"><label>ชื่อลูกค้า *</label><input value={form.customer} onChange={e=>set('customer',e.target.value)}/></div>
-          <div className="form-group"><label>เซลส์ *</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value={form.sales}>{form.sales||'-- เลือก --'}</option>{users.filter(u=>u.role==='Sales'&&u.name!==form.sales).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
+          <div className="form-group"><label>เซลส์ *</label><select value={selectableSalesValue(form.sales)} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{selectableSales(users).map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
           <div className="form-group"><label>Facebook</label><input value={form.facebook} onChange={e=>set('facebook',e.target.value)}/></div>
           <div className="form-group"><label>Ads ไหน</label><input value={form.ads} onChange={e=>set('ads',e.target.value)}/></div>
           <div className="form-group"><label>ยี่ห้อ</label><select value={form.brand} onChange={e=>setForm(old=>({...old,brand:e.target.value,model:''}))}><option value="">-- เลือก --</option>{form.brand&&!CAR_MODELS[form.brand]&&<option value={form.brand}>{form.brand}</option>}{Object.keys(CAR_MODELS).map(b=><option key={b} value={b}>{b}</option>)}</select></div>
@@ -2586,7 +2594,7 @@ function AdminFollowupsContent({users,neon='#00f5ff'}){
   const [loading,setLoading]=useState(true);
   const [filterSales,setFilterSales]=useState('all');
   const [filterType,setFilterType]=useState('all');
-  const salesList=(users||[]).filter(u=>u.role==='Sales');
+  const salesList=selectableSales(users);
 
   const load=useCallback(()=>{
     setLoading(true);
@@ -2680,7 +2688,7 @@ function AdminTargetContent({users,neon='#ff2d78'}){
   const d=new Date();const monthKey=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
   const MONTH_NAMES=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const monthLabel=MONTH_NAMES[d.getMonth()]+' 25'+String(d.getFullYear()).slice(-2);
-  const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
+  const salesList=selectableSales(users);
   useEffect(()=>{
     Promise.all([
       api('getCases',{}),
@@ -2744,7 +2752,7 @@ function AdminTargetContent({users,neon='#ff2d78'}){
 
 function AdminBroadcastContent({users,neon='#a855f7'}){
   const [target,setTarget]=useState('all');const [msg,setMsg]=useState('');const [sending,setSending]=useState(false);const [done,setDone]=useState('');
-  const salesList=(users||[]).filter(u=>u.role==='Sales'&&u.status==='active');
+  const salesList=selectableSales(users);
   async function send(){if(!msg.trim())return showToast('กรุณาพิมพ์ข้อความก่อนส่ง','warn');setSending(true);setDone('');const r=await api('broadcast',{sales:target,message:msg});setSending(false);if(r.success){setDone('✅ ส่งถึง '+r.sent+' คน');setMsg('');}else setDone('❌ '+(r.error||'เกิดข้อผิดพลาด'));}
   return <div>
     <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:16,marginBottom:14}}>
