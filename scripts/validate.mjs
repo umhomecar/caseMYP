@@ -162,8 +162,22 @@ if(!source.includes("if(DESIGN_PREVIEW){\n    if(String(method).toUpperCase()===
 for(const selector of ['.cp-action-copy','.cp-action-save','.cp-action-line','.cp-action-danger','.cp-action-edit','.cp-action-refresh']){
   if(!css.includes(selector))fail('Missing semantic action style: '+selector);
 }
-if(!source.includes('const PREVIEW_SALES=[\'แฟ้บ\',\'บอล\',\'พี่บอล\',\'เพ้นท์\',\'พีร์\']'))
-  fail('Demo sales names changed unexpectedly');
+if(!source.includes("const ACTIVE_SALES_NAMES=['แฟ้บ','เพ้นท์','พีร์','บอลเล็ก','บอลใหญ่']")||
+   !source.includes('const PREVIEW_SALES=ACTIVE_SALES_NAMES;'))
+  fail('Active and demo sales roster must list exactly the five current staff');
+if(!source.includes('function selectableSales(users)')||
+   !source.includes("u.role==='Sales'&&u.status!=='inactive'&&ACTIVE_SALES_SET.has(u.name)"))
+  fail('Sales options must exclude departed or inactive staff');
+for(const fragment of [
+  "users.filter(u=>u.role==='Sales').map(u=><option",
+  "(users||[]).filter(u=>u.role==='Sales').map(u=><option",
+  "users.filter(u=>u.role==='Sales'&&u.status!=='inactive').map(u=><option"
+])if(source.includes(fragment))fail('An unfiltered salesperson dropdown remains: '+fragment);
+if(!source.includes("selectableSalesValue(form.sales)")||
+   !source.includes("const salesList=selectableSales(users);"))
+  fail('Booking edit and bulk assignment must limit new salesperson choices');
+if(!source.includes("targets=safeArray(rows).map(u=>u.name).filter(name=>ACTIVE_SALES_SET.has(name));"))
+  fail('All-staff broadcasts must not reach departed sales users');
 const salesCases=section('function SalesCurrentCases(', '\nfunction ');
 const bookingsPage=section('function AdminBookings(', '\nfunction ');
 for(const [name,body] of [['Analytics',analytics],['Bookings',bookingsPage],['Sales cases',salesCases]]){
