@@ -1501,7 +1501,23 @@ function parseLineOAFavoriteCar(value) {
   return {brand:'', model:''};
 }
 
-function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSaved}){
+// A preview only: the database trigger assigns the definitive code on INSERT.
+function previewNextLineOACaseCode(rows) {
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',year:'2-digit',month:'2-digit'}).formatToParts(new Date());
+  const year=parts.find(p=>p.type==='year')?.value||String(new Date().getFullYear()).slice(-2);
+  const month=parts.find(p=>p.type==='month')?.value||String(new Date().getMonth()+1).padStart(2,'0');
+  const prefix='L'+year+month;
+  const max=safeArray(rows).reduce((highest,row)=>{
+    const code=String(row.case_code||'');
+    if(!code.startsWith(prefix))return highest;
+    const suffix=code.slice(prefix.length);
+    if(!/^\\d{3,}$/.test(suffix))return highest;
+    return Math.max(highest,Number(suffix));
+  },0);
+  return prefix+String(max+1).padStart(3,'0');
+}
+
+function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSaved,previewCaseCode}){
   const isEdit=!!item;
   const [form,setForm]=useState({name:item?.name||'',sales:item?.sales||'',status:item?.status||'รอข้อมูล',report:item?.report||''});
   const isLineOA=caseType==='line_oa';
@@ -1534,6 +1550,13 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
     <button className="btn btn-primary cp-action-save" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{loading?'กำลังบันทึก...':'บันทึก'}</button>
   </>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+      {isLineOA&&<div className="form-group" style={{gridColumn:'1/-1'}}>
+        <label htmlFor="line-oa-auto-case-code">รหัสเคส (สร้างอัตโนมัติ)</label>
+        <input id="line-oa-auto-case-code" readOnly aria-readonly="true"
+          value={isEdit?(item?.case_code||'ยังไม่มีรหัส'):(previewCaseCode||'กำลังตรวจสอบรหัส')}
+          style={{background:'rgba(99,102,241,.20)',borderColor:'rgba(129,140,248,.42)',color:'#c4b5fd',fontWeight:800,letterSpacing:'.4px',cursor:'default'}}/>
+        {!isEdit&&<div style={{fontSize:11,color:'var(--text3)',marginTop:5}}>รหัสที่แสดงเป็นตัวอย่างล่วงหน้า ระบบจะยืนยันรหัสจริงเมื่อบันทึกสำเร็จ เพื่อป้องกันรหัสซ้ำ</div>}
+      </div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อ *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อลูกค้า / ชื่อบัญชี / ชื่อเคส"/></div>
       <div className="form-group"><label>เซลส์ดูแล</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
@@ -1682,7 +1705,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
       </div>
     </div>
 
-    {showModal&&<StandaloneCaseModal item={modalItem} users={users} currentUser={currentUser} caseType={caseType} title={title} onClose={()=>setShowModal(false)} onSaved={load}/>}    
+    {showModal&&<StandaloneCaseModal item={modalItem} users={users} currentUser={currentUser} caseType={caseType} title={title} previewCaseCode={isLineOA&&!loading&&!loadError?previewNextLineOACaseCode(rows):''} onClose={()=>setShowModal(false)} onSaved={load}/>}    
     <button className="fab sent-fab" onClick={openAdd} title={`เพิ่ม${title}`}>＋</button>
   </div>;
 }
