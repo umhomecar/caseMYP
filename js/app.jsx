@@ -1481,6 +1481,7 @@ function NotifPanel({user,onClose,onCountChange}){
 function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSaved}){
   const isEdit=!!item;
   const [form,setForm]=useState({name:item?.name||'',sales:item?.sales||'',status:item?.status||'รอข้อมูล',report:item?.report||''});
+  const isLineOA=caseType==='line_oa';
   const [loading,setLoading]=useState(false);
   const [confirmDelete,setConfirmDelete]=useState(false);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
@@ -1510,8 +1511,9 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>ชื่อ *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อลูกค้า / ชื่อบัญชี / ชื่อเคส"/></div>
       <div className="form-group"><label>เซลส์ดูแล</label><select value={form.sales} onChange={e=>set('sales',e.target.value)}><option value="">-- เลือกเซลส์ --</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select></div>
       <div className="form-group"><label>สถานะ</label><select value={form.status} onChange={e=>set('status',e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-      <div className="form-group" style={{gridColumn:'1/-1'}}><label>รีพอร์ต</label><textarea rows={5} value={form.report} onChange={e=>set('report',e.target.value)} placeholder="รายละเอียด / ความคืบหน้า / หมายเหตุ"/></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label>{isLineOA?'รถที่ชอบ':'รีพอร์ต'}</label><textarea rows={5} value={form.report} onChange={e=>set('report',e.target.value)} placeholder={isLineOA?'ยี่ห้อ / รุ่น / ปี / งบประมาณ':'รายละเอียด / ความคืบหน้า / หมายเหตุ'}/></div>
       {isEdit&&<div style={{gridColumn:'1/-1',fontSize:12,color:'var(--text3)',lineHeight:1.7,background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px'}}>
+        {isLineOA&&<div>รหัสเคส: <strong>{item.case_code||'ยังไม่มีรหัส'}</strong></div>}
         <div>สร้างเมื่อ: {formatTextDateToTHBE(item.created_at)}</div>
         <div>อัปเดตล่าสุด: {formatTextDateToTHBE(item.updated_at)}</div>
       </div>}
@@ -1533,6 +1535,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const [sortDir,setSortDir]=useState('desc');
   const [modalItem,setModalItem]=useState(null);
   const [showModal,setShowModal]=useState(false);
+  const isLineOA=caseType==='line_oa';
   const theme=caseType==='private'
     ?{accent:'#ec4899',rgb:'236,72,153'}
     :{accent:'#22c55e',rgb:'34,197,94'};
@@ -1549,7 +1552,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   function matchRow(r){
     if(!q.trim())return true;
     const term=normalizeSearchText(q), loose=normalizeLoose(q);
-    const values=[r.name,r.sales,r.status,r.report,formatTextDateToTHBE(r.created_at),formatTextDateToTHBE(r.updated_at)];
+    const values=[r.case_code,r.name,r.sales,r.status,r.report,formatTextDateToTHBE(r.created_at),formatTextDateToTHBE(r.updated_at)];
     return values.some(v=>normalizeSearchText(v).includes(term)||normalizeLoose(v).includes(loose));
   }
   const filtered=safeArray(rows).filter(r=>{
@@ -1572,7 +1575,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
     <div className="page-hd casemyp-v2-secondary-heading">
       <div>
         <div className="page-title sent-page-title" style={{display:'flex',alignItems:'center',gap:10}}><span>{icon}</span>{title}</div>
-        <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · ข้อมูลแยกจากเคสปัจจุบันและไม่มีรหัสเคส</div>
+        <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · {isLineOA?'รหัสเคสรันอัตโนมัติแยกตามเดือน':'ข้อมูลแยกจากเคสปัจจุบันและไม่มีรหัสเคส'}</div>
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
         <button className="btn btn-primary sent-primary" onClick={openAdd}><Ico.plus/> เพิ่ม{title}</button>
@@ -1583,7 +1586,7 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
     <div className="sent-filter-row">
       <div className="sent-search-wrap">
         <span>🔍</span>
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ชื่อ เซลส์ สถานะ หรือรีพอร์ต"/>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder={isLineOA?'รหัสเคส ชื่อ รถที่ชอบ สถานะ หรือเซลส์':'ชื่อ เซลส์ สถานะ หรือรีพอร์ต'}/>
       </div>
       <select value={salesFilter} onChange={e=>setSalesFilter(e.target.value)}>
         <option value="all">ทุกเซลส์</option>{users.filter(u=>u.role==='Sales').map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
@@ -1610,9 +1613,9 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
       <div className="table-wrap">
         <table>
           <thead><tr>
-            <th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>สร้างเมื่อ {sortDir==='desc'?'↓':'↑'}</th>
+            {isLineOA?<th>รหัสเคส</th>:<th onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>สร้างเมื่อ {sortDir==='desc'?'↓':'↑'}</th>}
             <th>ชื่อ</th>
-            <th>รีพอร์ต</th>
+            <th>{isLineOA?'รถที่ชอบ':'รีพอร์ต'}</th>
             <th>สถานะ</th>
             <th>เซลส์</th>
             <th>อัปเดตล่าสุด</th>
@@ -1622,9 +1625,9 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
             {loading?<SkeletonRows n={6} cols={7}/>:filtered.length===0?
               <tr><td colSpan={7} className="sent-empty"><span>{icon}</span>ไม่พบข้อมูลใน {title}</td></tr>:
               filtered.map(r=><tr key={r.id} className="clickable" role="button" tabIndex={0} onClick={()=>openEdit(r)} onKeyDown={e=>activateOnKey(e,()=>openEdit(r))}>
-                <td data-label="สร้างเมื่อ" className="sent-created">{formatTextDateToTHBE(r.created_at)}</td>
+                {isLineOA?<td data-label="รหัสเคส" className="sent-created">{r.case_code||'—'}</td>:<td data-label="สร้างเมื่อ" className="sent-created">{formatTextDateToTHBE(r.created_at)}</td>}
                 <td data-label="ชื่อ" className="sent-name">{r.name||'-'}</td>
-                <td data-label="รีพอร์ต" className="sent-report-cell"><div className="sent-report-preview">{r.report||'ยังไม่มีรีพอร์ต'}</div></td>
+                <td data-label={isLineOA?'รถที่ชอบ':'รีพอร์ต'} className="sent-report-cell"><div className="sent-report-preview">{r.report||(isLineOA?'ยังไม่ระบุรถที่ชอบ':'ยังไม่มีรีพอร์ต')}</div></td>
                 <td data-label="สถานะ"><StatusBadge status={r.status}/></td>
                 <td data-label="เซลส์"><span className="sent-sales">{r.sales||'-'}</span></td>
                 <td data-label="อัปเดตล่าสุด" className="sent-updated">{formatTextDateToTHBE(r.updated_at)}</td>
