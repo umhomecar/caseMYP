@@ -151,8 +151,15 @@ if(!getCasesHandler.includes("if(isSbError(rows))return{success:false,error:form
   fail('getCases must distinguish an empty dataset from a failed Supabase request');
 if(!caseCenter.includes("api('getCases'")||!caseCenter.includes('casemyp-v2-case-filters'))
   fail('Current-case filtering or read path is missing');
-if(!caseCenter.includes('const load=useCallback((background=false)=>{if(!background)setLoading(true)')||!caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
+if(!caseCenter.includes("const load=useCallback((background=false)=>{if(!background&&!cacheGetStale('getCases',{all:'true'})?.success)setLoading(true)")||
+   !caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
   fail('Case create/edit must refresh in background without hiding the case list');
+if(!source.includes('const concurrency=2;')||!source.includes('const batch=await Promise.all(offsets.map(')||
+   !source.includes('if(isSbError(pageData))return pageData;'))
+  fail('Paginated cases must load bounded parallel pages and reject partial errors');
+if(!standalonePage.includes("useState(()=>safeArray(cacheGetStale('getStandaloneCases',{caseType})?.data))")||
+   !standalonePage.includes("if(force)cacheClear(['getStandaloneCases'])"))
+  fail('Line OA must reuse cached rows on navigation and force refresh on demand');
 if(!analytics.includes('belongsToPeriod(c,prefixes)')||!analytics.includes('const convPct='))
   fail('Analytics period selection or funnel conversion missing');
 if(!source.includes("if(action==='getCases')return{success:true,data:previewCases()};"))
