@@ -157,8 +157,9 @@ if(!caseCenter.includes("const load=useCallback((background=false)=>{if(!backgro
 if(!source.includes('const concurrency=2;')||!source.includes('const batch=await Promise.all(offsets.map(')||
    !source.includes('if(isSbError(pageData))return pageData;'))
   fail('Paginated cases must load bounded parallel pages and reject partial errors');
-if(!standalonePage.includes("useState(()=>safeArray(cacheGetStale('getStandaloneCases',{caseType})?.data))")||
-   !standalonePage.includes("if(force)cacheClear(['getStandaloneCases'])"))
+const fastStandalonePage=section('function AdminSentCasesPage(', '\nfunction ');
+if(!fastStandalonePage.includes("useState(()=>safeArray(cacheGetStale('getStandaloneCases',{caseType})?.data))")||
+   !fastStandalonePage.includes("if(force)cacheClear(['getStandaloneCases'])"))
   fail('Line OA must reuse cached rows on navigation and force refresh on demand');
 if(!analytics.includes('belongsToPeriod(c,prefixes)')||!analytics.includes('const convPct='))
   fail('Analytics period selection or funnel conversion missing');
