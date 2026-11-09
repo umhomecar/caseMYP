@@ -385,19 +385,25 @@ async function sbQ(method,table,q={},body=null){
   }
   
   if (needsPagination) {
-    // ดึงข้อมูลทีละ 1000 rows
-    const allData = [];
-    let offset = 0;
-    const pageSize = 1000;
-    
-    while (offset < limit) {
-      const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+bearer,'Content-Type':'application/json','Range':`${offset}-${offset+pageSize-1}`};
-      const pageData=await sbFetch(finalUrl,{method:'GET',headers:h});
-      if(isSbError(pageData))return pageData;
-      if(!Array.isArray(pageData)||pageData.length===0)break;
-      allData.push(...pageData);
-      if(pageData.length<pageSize)break; // ไม่มีข้อมูลเพิ่มแล้ว
-      offset+=pageSize;
+    // Load two consecutive pages in parallel to avoid serial round trips on 1000+ cases.
+    // Preserve server ordering and stop after the first short page.
+    const allData=[];
+    const pageSize=1000;
+    const concurrency=2;
+    for(let offset=0;offset<limit;offset+=pageSize*concurrency){
+      const offsets=Array.from({length:Math.min(concurrency,Math.ceil((limit-offset)/pageSize))},(_,i)=>offset+i*pageSize);
+      const batch=await Promise.all(offsets.map(start=>{
+        const end=Math.min(start+pageSize,limit)-1;
+        const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+bearer,'Content-Type':'application/json','Range':`${start}-${end}`};
+        return sbFetch(finalUrl,{method:'GET',headers});
+      }));
+      for(let i=0;i<batch.length;i++){
+        const pageData=batch[i];
+        if(isSbError(pageData))return pageData; // Do not silently show incomplete data.
+        if(!Array.isArray(pageData))return{error:'รูปแบบข้อมูลไม่ถูกต้อง',message:'รูปแบบข้อมูลไม่ถูกต้อง'};
+        allData.push(...pageData);
+        if(pageData.length<Math.min(pageSize,limit-offsets[i]))return allData;
+      }
     }
     return allData;
   }
@@ -540,7 +546,21 @@ async function sbApi(action,data){
       if(isSbError(res))return{success:false,error:formatSbError(res)};
       return{success:true};
     }
-    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const dashboardMonth=String(data.dashboardMonth||'');if(dashboardMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(dashboardMonth))return{success:false,error:'เดือนไม่ถูกต้อง'};const q={deleted_at:'is.null',order:'caseid.desc',limit:dashboardMonth?'5000':'50000'};if(dashboardMonth)q.caseid=`like.${dashboardMonth.slice(2,4)+dashboardMonth.slice(5,7)}*`;else if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows)};}
+    case 'getCases':{
+      const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
+      const dashboardMonth=String(data.dashboardMonth||'');
+      if(dashboardMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(dashboardMonth))return{success:false,error:'เดือนไม่ถูกต้อง'};
+      const q={deleted_at:'is.null',order:'caseid.desc',limit:dashboardMonth?'5000':'50000'};
+      if(dashboardMonth)q.caseid=`like.${dashboardMonth.slice(2,4)+dashboardMonth.slice(5,7)}*`;
+      else if(data.scope==='current_and_pending')q.or=`(caseid.like.${pre}*,status.not.in.(${CLOSED_STATUSES.join(',')}),status.is.null)`;
+      else if(!data.all)q.caseid=`like.${pre}*`;
+      if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;
+      if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;
+      if(data.status)q.status=`eq.${data.status}`;
+      const rows=await sbQ('GET','cases',q);
+      if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};
+      return{success:true,data:safeArray(rows)};
+    }
     case 'getCaseIdPreview':{const prefix=String(data.prefix||'');if(!/^\d{4}$/.test(prefix))return{success:false,error:'รูปแบบเดือนสำหรับรหัสเคสไม่ถูกต้อง'};const rows=await sbQ('GET','cases',{select:'caseid',caseid:`like.${prefix}*`,deleted_at:'is.null',order:'caseid.desc',limit:'1'});if(isSbError(rows))return{success:false,error:formatSbError(rows)};const max=Number(String(safeArray(rows)[0]?.caseid||'').slice(4))||0;return{success:true,data:prefix+String(max+1).padStart(3,'0')};}
     case 'checkCaseDuplicates':{
       const rows=await sbQ('GET','cases',{select:'caseid,customername,contact',deleted_at:'is.null',order:'updatedat.desc',limit:'10000'});
@@ -1600,8 +1620,8 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
 }
 
 function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
-  const [rows,setRows]=useState([]);
-  const [loading,setLoading]=useState(true);
+  const [rows,setRows]=useState(()=>safeArray(cacheGetStale('getStandaloneCases',{caseType})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getStandaloneCases',{caseType})?.success);
   const [loadError,setLoadError]=useState('');
   const [q,setQ]=useState('');
   const [salesFilter,setSalesFilter]=useState('all');
@@ -1615,11 +1635,17 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const theme=caseType==='private'
     ?{accent:'#ec4899',rgb:'236,72,153'}
     :{accent:'#22c55e',rgb:'34,197,94'};
-  const load=useCallback(()=>{setLoading(true);setLoadError('');cacheClear(['getStandaloneCases']);api('getStandaloneCases',{caseType}).then(r=>{
-    if(r.success)setRows(safeArray(r.data));
-    else setLoadError(r.error||'โหลดข้อมูล '+title+' ไม่สำเร็จ');
-  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูล '+title+' ไม่สำเร็จ'))
-    .finally(()=>setLoading(false));},[caseType,title]);
+  const load=useCallback((force=false)=>{
+    const hasSnapshot=!!cacheGetStale('getStandaloneCases',{caseType})?.success;
+    if(!hasSnapshot)setLoading(true);
+    setLoadError('');
+    if(force)cacheClear(['getStandaloneCases']);
+    return api('getStandaloneCases',{caseType}).then(r=>{
+      if(r.success)setRows(safeArray(r.data));
+      else setLoadError(r.error||'โหลดข้อมูล '+title+' ไม่สำเร็จ');
+    }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูล '+title+' ไม่สำเร็จ'))
+      .finally(()=>setLoading(false));
+  },[caseType,title]);
   useEffect(()=>{load();},[load]);
   function rowDate(v){
     const d=new Date(v||'');
@@ -1714,16 +1740,17 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
       </div>
     </div>
 
-    {showModal&&<StandaloneCaseModal item={modalItem} users={users} currentUser={currentUser} caseType={caseType} title={title} previewCaseCode={isLineOA&&!loading&&!loadError?previewNextLineOACaseCode(rows):''} onClose={()=>setShowModal(false)} onSaved={load}/>}    
+    {showModal&&<StandaloneCaseModal item={modalItem} users={users} currentUser={currentUser} caseType={caseType} title={title} previewCaseCode={isLineOA&&!loading&&!loadError?previewNextLineOACaseCode(rows):''} onClose={()=>setShowModal(false)} onSaved={()=>load(true)}/>}    
     <button className="fab sent-fab" onClick={openAdd} title={`เพิ่ม${title}`}>＋</button>
   </div>;
 }
 
 function AdminCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState([]);
-  const [loading,setLoading]=useState(true);
+  const [scope,setScope]=useState('current_and_pending');
+  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_and_pending'})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_and_pending'})?.success);
   const [loadError,setLoadError]=useState('');
-  const currentMonthFilters=()=>{const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0');return{sales:'all',status:'',q:'',dateFrom:`${y}-${m}-01`,dateTo:`${y}-${m}-${String(new Date(y,d.getMonth()+1,0).getDate()).padStart(2,'0')}`};};
+  const currentMonthFilters=()=>({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
   const [filter,setFilter]=useState(currentMonthFilters);
   const [sortDir,setSortDir]=useState('desc');
   const [sel,setSel]=useState(null);
@@ -1736,19 +1763,33 @@ function AdminCurrentCases({currentUser,users}){
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [bulkSales,setBulkSales]=useState('');
   const [bulkSaving,setBulkSaving]=useState(false);
-  const load=useCallback((background=false)=>{if(!background)setLoading(true);setLoadError('');cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
-    if(r.success){
-      const casesData=safeArray(r.data);
-      setCases(casesData);
-      if(r.stale)showToast('กำลังแสดงข้อมูลสำรองล่าสุด','warn',3500);
-    }else{
-      setLoadError(r.error||'โหลดเคสล่าสุดไม่สำเร็จ');
-    }
-    setLoading(false);
-  }).catch(e=>{setLoading(false);setLoadError(e?.message||'เชื่อมต่อข้อมูลเคสไม่สำเร็จ');});},[]);
+  const load=useCallback((background=false,force=false)=>{
+    const params=scope==='all'?{all:'true'}:{scope:'current_and_pending'};
+    const cached=cacheGetStale('getCases',params);
+    if(cached?.success)setCases(safeArray(cached.data));
+    if(!background&&!cached?.success)setLoading(true);
+    setLoadError('');
+    if(force)cacheClear(['getCases']);
+    api('getCases',params).then(r=>{
+      if(r.success){setCases(safeArray(r.data));if(r.stale)showToast('กำลังแสดงข้อมูลสำรองล่าสุด','warn',3500);}
+      else setLoadError(r.error||'โหลดเคสล่าสุดไม่สำเร็จ');
+    }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูลเคสไม่สำเร็จ'))
+      .finally(()=>setLoading(false));
+  },[scope]);
   useEffect(()=>{load();},[load]);
-  // Keep the complete loaded dataset: searching must not overwrite the list.
-  function search(){/* Search is applied immediately by the shared local filter. */}
+  const [archiveMatches,setArchiveMatches]=useState([]);
+  const [archiveSearching,setArchiveSearching]=useState(false);
+  const [archiveQuery,setArchiveQuery]=useState('');
+  async function search(){
+    const term=String(filter.q||'').trim();
+    if(!term){setArchiveMatches([]);setArchiveQuery('');return;}
+    setArchiveSearching(true);
+    const r=await api('searchCases',{q:term});
+    setArchiveSearching(false);
+    if(!r.success)return showToast(r.error||'ค้นหาข้อมูลย้อนหลังไม่สำเร็จ','err');
+    setArchiveMatches(safeArray(r.data));
+    setArchiveQuery(term);
+  }
   function parseD2(value){
     const raw=String(value||'').trim();
     const th=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -1761,7 +1802,10 @@ function AdminCurrentCases({currentUser,users}){
     if(iso){const d=new Date(Number(iso[1]),Number(iso[2])-1,Number(iso[3]));return isNaN(d.getTime())?null:d;}
     return null;
   }
-  const filtered=safeArray(cases).filter(c=>{
+  const combinedCases=archiveQuery&&archiveQuery===String(filter.q||'').trim()
+    ?[...new Map([...cases,...archiveMatches].map(c=>[String(c.caseid),c])).values()]
+    :cases;
+  const filtered=safeArray(combinedCases).filter(c=>{
     const q=String(filter.q||'').trim().toLowerCase();
     if(q){
       const hay=[c.caseid,c.customername,c.contact,getClipAd(c.attachment),c.sales,c.status].map(v=>String(v||'').toLowerCase()).join(' ');
@@ -1849,8 +1893,9 @@ function AdminCurrentCases({currentUser,users}){
     <div className="admin-current-cases-desktop-filters casemyp-v2-case-filters" style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
-        <input value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ชื่อ เบอร์ รหัสเคส" style={{paddingLeft:28,fontSize:13,height:34}}/>
+        <input value={filter.q} onChange={e=>{setArchiveQuery('');setFilter(f=>({...f,q:e.target.value}));}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ชื่อ เบอร์ รหัสเคส" style={{paddingLeft:28,fontSize:13,height:34}}/>
       </div>
+      <button type="button" className="btn btn-ghost" disabled={!String(filter.q||'').trim()||archiveSearching} onClick={search} style={{fontSize:12,whiteSpace:'nowrap'}}>{archiveSearching?'กำลังค้นหา...':'🔎 ค้นหาทุกเดือน'}</button>
       <select value={filter.sales} onChange={e=>setFilter(f=>({...f,sales:e.target.value}))} style={{fontSize:13,height:34,padding:'0 8px',borderRadius:8,flex:'0 0 auto',maxWidth:110}}>
         <option value="all">ทุกเซลส์</option><option value={UNASSIGNED_SALES}>รอมอบหมาย</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
       </select>
@@ -1870,7 +1915,11 @@ function AdminCurrentCases({currentUser,users}){
       <input type="date" value={filter.dateFrom||''} onChange={e=>setFilter(f=>({...f,dateFrom:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
       <span style={{fontSize:12,color:'var(--text3)'}}>—</span>
       <input type="date" value={filter.dateTo||''} onChange={e=>setFilter(f=>({...f,dateTo:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
-      <button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>{setFilter(currentMonthFilters());setSelectedIds(new Set());}}>↺ ล้างตัวกรอง (เดือนปัจจุบัน)</button>
+      <select value={scope} onChange={e=>{setScope(e.target.value);setSelectedIds(new Set());setArchiveMatches([]);setArchiveQuery('');}} style={{fontSize:12,height:30}}>
+        <option value="current_and_pending">เดือนนี้ + เคสเก่าที่ยังค้าง</option>
+        <option value="all">ทุกเดือน (รวมเคสปิด)</option>
+      </select>
+      <button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>{setFilter(currentMonthFilters());setArchiveMatches([]);setArchiveQuery('');setSelectedIds(new Set());setScope('current_and_pending');}}>↺ ล้างตัวกรอง</button>
     </div>
     {selectedIds.size>0&&<div className="card" style={{padding:'10px 12px',marginBottom:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',borderColor:'rgba(88,166,255,.4)'}}><strong style={{fontSize:13}}>เลือกแล้ว {selectedIds.size} เคส</strong><select value={bulkSales} onChange={e=>setBulkSales(e.target.value)} style={{maxWidth:240}}><option value="">-- เลือกเซลส์ผู้รับผิดชอบ --</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" onClick={assignSelected} disabled={!bulkSales||bulkSaving}>{bulkSaving?'กำลังมอบหมาย...':'มอบหมายพร้อมกัน'}</button><button className="btn btn-ghost" onClick={()=>setSelectedIds(new Set())}>ยกเลิกการเลือก</button></div>}
     <div className="admin-cases-mobile-list">
@@ -1947,7 +1996,7 @@ function AdminDashboard({currentUser,users}){
   const [chosen,setChosen]=useState('all');
   const [drilldown,setDrilldown]=useState(null);
   const [editingCase,setEditingCase]=useState(null);
-  const load=useCallback((showSpinner=false)=>{if(showSpinner)setLoading(true);cacheClear(['getCases']);return api('getCases',{dashboardMonth:month}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>{showToast('โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);});},[month]);
+  const load=useCallback((showSpinner=false)=>{if(showSpinner&&!cacheGetStale('getCases',{dashboardMonth:month})?.success)setLoading(true);return api('getCases',{dashboardMonth:month}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>{showToast('โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);});},[month]);
   useEffect(()=>{load(true);},[load]);
   const monthCases=cases.filter(c=>{const t=String(c.createdat||'');const m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m){let y=Number(m[3]);if(y>2400)y-=543;return y+'-'+String(Number(m[2])).padStart(2,'0')===month;}return t.startsWith(month+'-');});
   const adMap={};
@@ -2417,23 +2466,49 @@ function TodayFollowupBanner({currentUser}){
 }
 
 function SalesCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
+  const [scope,setScope]=useState('current_and_pending');
+  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_and_pending',sales:currentUser.name})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_and_pending',sales:currentUser.name})?.success);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
   const [loadError,setLoadError]=useState('');
   const CLOSED_STATUSES=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'];
-  const load=useCallback(()=>{setLoading(true);setLoadError('');api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{
-    if(r.success)setCases(safeArray(r.data));
-    else setLoadError(r.error||'โหลดเคสไม่สำเร็จ');
-  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อเคสไม่สำเร็จ')).finally(()=>setLoading(false));},[currentUser.name]);
+  const load=useCallback((force=false)=>{
+    const params=scope==='all'?{all:'true',sales:currentUser.name}:{scope:'current_and_pending',sales:currentUser.name};
+    const cached=cacheGetStale('getCases',params);
+    if(cached?.success)setCases(safeArray(cached.data));
+    if(!cached?.success)setLoading(true);
+    setLoadError('');
+    if(force)cacheClear(['getCases']);
+    api('getCases',params).then(r=>{
+      if(r.success)setCases(safeArray(r.data));
+      else setLoadError(r.error||'โหลดเคสไม่สำเร็จ');
+    }).catch(e=>setLoadError(e?.message||'เชื่อมต่อเคสไม่สำเร็จ')).finally(()=>setLoading(false));
+  },[currentUser.name,scope]);
   useEffect(()=>{load();},[load]);
-  const filtered=cases.filter(c=>{
-    if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){return caseMatchesSearch(c,q);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
+  const [archiveMatches,setArchiveMatches]=useState([]);
+  const [archiveQuery,setArchiveQuery]=useState('');
+  const [archiveSearching,setArchiveSearching]=useState(false);
+  async function searchArchive(){
+    const term=q.trim();
+    if(!term){setArchiveMatches([]);setArchiveQuery('');return;}
+    setArchiveSearching(true);
+    const r=await api('searchCases',{q:term,sales:currentUser.name});
+    setArchiveSearching(false);
+    if(!r.success)return showToast(r.error||'ค้นหาย้อนหลังไม่สำเร็จ','err');
+    setArchiveMatches(safeArray(r.data));
+    setArchiveQuery(term);
+  }
+  const combinedCases=archiveQuery&&archiveQuery===q.trim()
+    ?[...new Map([...cases,...archiveMatches].map(c=>[String(c.caseid),c])).values()]
+    :cases;
+  const filtered=combinedCases.filter(c=>{
+    if(!showClosed&&!archiveQuery&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){return caseMatchesSearch(c,q);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   return <div className="page">
-    <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส{closedCount>0&&<span style={{marginLeft:8,color:'var(--text3)'}}>· ปิดแล้ว {closedCount}</span>}</div></div><button className="btn btn-ghost" onClick={load} style={{padding:'6px 10px'}}>🔄</button></div>
-    {loadError&&<div className="card" role="alert" style={{marginBottom:12,padding:14,color:'var(--red)'}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={load} style={{marginLeft:10}}>ลองใหม่</button></div>}
+    <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส{closedCount>0&&<span style={{marginLeft:8,color:'var(--text3)'}}>· ปิดแล้ว {closedCount}</span>}</div></div><button className="btn btn-ghost" onClick={()=>load(true)} style={{padding:'6px 10px'}}>🔄</button></div>
+    {loadError&&<div className="card" role="alert" style={{marginBottom:12,padding:14,color:'var(--red)'}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={()=>load(true)} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <TodayFollowupBanner currentUser={currentUser}/>
-    <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:180}}><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)',pointerEvents:'none',fontSize:14}}>🔍</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหาชื่อ เบอร์ รหัสเคส..." style={{paddingLeft:32,fontSize:13}}/></div>{q&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>setQ('')}>✕ ล้าง</button>}</div>
-    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>setShowClosed(v=>!v)}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
+    <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:180}}><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)',pointerEvents:'none',fontSize:14}}>🔍</span><input value={q} onChange={e=>{setArchiveQuery('');setQ(e.target.value);}} onKeyDown={e=>e.key==='Enter'&&searchArchive()} placeholder="ค้นหาชื่อ เบอร์ รหัสเคส..." style={{paddingLeft:32,fontSize:13}}/></div>{q&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>{setQ('');setArchiveQuery('');setArchiveMatches([]);}}>✕ ล้าง</button>}<button className="btn btn-ghost" disabled={!q.trim()||archiveSearching} onClick={searchArchive} style={{fontSize:12}}>{archiveSearching?'กำลังค้นหา...':'ค้นหาทุกเดือน'}</button></div>
+    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>{setShowClosed(v=>!v);setScope(v=>v==='all'?'current_and_pending':'all');}}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
     {/* Sort by Score button */}
     {!loading&&!q&&!filterStatus&&<div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}><button className="btn btn-ghost" style={{fontSize:11,padding:'4px 10px',borderRadius:20,border:'1px solid var(--border)'}} onClick={()=>setSortDir(s=>s==='score'?'desc':'score')}>{sortDir==='score'?'🧠 เรียงตามคะแนน ✓':'🧠 เรียงตามคะแนน'}</button></div>}
     {loading?<SkeletonCards n={4}/>:loadError&&!cases.length?<div style={{padding:32,textAlign:'center',color:'var(--text2)'}}>โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่</div>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=>{
@@ -2457,7 +2532,7 @@ function SalesCurrentCases({currentUser,users}){
         {!isClosed&&alert&&<div style={{fontSize:11,fontWeight:700,color:alert.color,marginBottom:4}}>{alert.msg}</div>}
         {!isClosed&&<div style={{fontSize:11,color:'var(--blue)',opacity:.85}}>💡 {suggestion}</div>}
       </div>;})}
-    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
+    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={()=>load(true)}/>}
   </div>;
 }
 

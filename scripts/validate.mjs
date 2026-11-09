@@ -151,8 +151,21 @@ if(!getCasesHandler.includes("if(isSbError(rows))return{success:false,error:form
   fail('getCases must distinguish an empty dataset from a failed Supabase request');
 if(!caseCenter.includes("api('getCases'")||!caseCenter.includes('casemyp-v2-case-filters'))
   fail('Current-case filtering or read path is missing');
-if(!caseCenter.includes('const load=useCallback((background=false)=>{if(!background)setLoading(true)')||!caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
+if(!caseCenter.includes("const params=scope==='all'?{all:'true'}:{scope:'current_and_pending'}")||
+   !caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
   fail('Case create/edit must refresh in background without hiding the case list');
+if(!getCasesHandler.includes("data.scope==='current_and_pending'")||
+   !getCasesHandler.includes("status.not.in.(")||
+   !caseCenter.includes("ค้นหาทุกเดือน")||
+   !caseCenter.includes('ทุกเดือน (รวมเคสปิด)'))
+  fail('Hybrid list must include unresolved historic cases and offer on-demand archive');
+if(!source.includes('const concurrency=2;')||!source.includes('const batch=await Promise.all(offsets.map(')||
+   !source.includes('if(isSbError(pageData))return pageData;'))
+  fail('Paginated cases must load bounded parallel pages and reject partial errors');
+const fastStandalonePage=section('function AdminSentCasesPage(', '\nfunction ');
+if(!fastStandalonePage.includes("useState(()=>safeArray(cacheGetStale('getStandaloneCases',{caseType})?.data))")||
+   !fastStandalonePage.includes("if(force)cacheClear(['getStandaloneCases'])"))
+  fail('Line OA must reuse cached rows on navigation and force refresh on demand');
 if(!analytics.includes('belongsToPeriod(c,prefixes)')||!analytics.includes('const convPct='))
   fail('Analytics period selection or funnel conversion missing');
 if(!source.includes("if(action==='getCases')return{success:true,data:previewCases()};"))
@@ -181,7 +194,7 @@ if(!source.includes("targets=safeArray(rows).map(u=>u.name).filter(name=>ACTIVE_
 const salesCases=section('function SalesCurrentCases(', '\nfunction ');
 const bookingsPage=section('function AdminBookings(', '\nfunction ');
 for(const [name,body] of [['Analytics',analytics],['Bookings',bookingsPage],['Sales cases',salesCases]]){
-  if(!body.includes('const [loadError,setLoadError]=useState')||!body.includes('role="alert"')||!(body.includes('onClick={load}')||body.includes('load();}}')))
+  if(!body.includes('const [loadError,setLoadError]=useState')||!body.includes('role="alert"')||!(body.includes('onClick={load}')||body.includes('onClick={()=>load(true)}')||body.includes('load();}}')))
     fail(name+' needs an error state, visible alert and retry button');
   if(!body.includes('.catch(')||!body.includes('.finally(()=>setLoading(false))'))
     fail(name+' must stop loading when the request fails');
@@ -203,7 +216,7 @@ const loginHandler=section("case 'login':", "case 'getAuthProfile':");
 const rlsCutover=read('supabase/production/20260729_02_auth_rls_after_account_link.sql');
 if(!appShell.includes("if(user.role==='Admin')return")||!appShell.includes('<SalesApp currentUser={user}'))
   fail('Admin and Sales UI route separation is missing');
-if(!salesCases.includes("api('getCases',{sales:currentUser.name,all:'true'})"))
+if(!salesCases.includes("scope:'current_and_pending',sales:currentUser.name")||!salesCases.includes("api('getCases',params)"))
   fail('Sales case list lost its assigned-sales scope');
 if(!source.includes("api('searchCases',{q:term,sales:currentUser.name})")||
    !source.includes("if(sales)query.sales=`eq.${sales}`"))
