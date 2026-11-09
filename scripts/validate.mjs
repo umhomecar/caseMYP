@@ -151,9 +151,14 @@ if(!getCasesHandler.includes("if(isSbError(rows))return{success:false,error:form
   fail('getCases must distinguish an empty dataset from a failed Supabase request');
 if(!caseCenter.includes("api('getCases'")||!caseCenter.includes('casemyp-v2-case-filters'))
   fail('Current-case filtering or read path is missing');
-if(!caseCenter.includes("const load=useCallback((background=false)=>{if(!background&&!cacheGetStale('getCases',{all:'true'})?.success)setLoading(true)")||
+if(!caseCenter.includes("const params=scope==='all'?{all:'true'}:{scope:'current_and_pending'}")||
    !caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
   fail('Case create/edit must refresh in background without hiding the case list');
+if(!getCasesHandler.includes("data.scope==='current_and_pending'")||
+   !getCasesHandler.includes("status.not.in.(")||
+   !caseCenter.includes("ค้นหาทุกเดือน")||
+   !caseCenter.includes('ทุกเดือน (รวมเคสปิด)'))
+  fail('Hybrid list must include unresolved historic cases and offer on-demand archive');
 if(!source.includes('const concurrency=2;')||!source.includes('const batch=await Promise.all(offsets.map(')||
    !source.includes('if(isSbError(pageData))return pageData;'))
   fail('Paginated cases must load bounded parallel pages and reject partial errors');
@@ -211,7 +216,7 @@ const loginHandler=section("case 'login':", "case 'getAuthProfile':");
 const rlsCutover=read('supabase/production/20260729_02_auth_rls_after_account_link.sql');
 if(!appShell.includes("if(user.role==='Admin')return")||!appShell.includes('<SalesApp currentUser={user}'))
   fail('Admin and Sales UI route separation is missing');
-if(!salesCases.includes("api('getCases',{sales:currentUser.name,all:'true'})"))
+if(!salesCases.includes("scope:'current_and_pending',sales:currentUser.name")||!salesCases.includes("api('getCases',params)"))
   fail('Sales case list lost its assigned-sales scope');
 if(!source.includes("api('searchCases',{q:term,sales:currentUser.name})")||
    !source.includes("if(sales)query.sales=`eq.${sales}`"))
