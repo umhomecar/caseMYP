@@ -2466,23 +2466,49 @@ function TodayFollowupBanner({currentUser}){
 }
 
 function SalesCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState([]);const [loading,setLoading]=useState(true);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
+  const [scope,setScope]=useState('current_and_pending');
+  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_and_pending',sales:currentUser.name})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_and_pending',sales:currentUser.name})?.success);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
   const [loadError,setLoadError]=useState('');
   const CLOSED_STATUSES=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'];
-  const load=useCallback(()=>{setLoading(true);setLoadError('');api('getCases',{sales:currentUser.name,all:'true'}).then(r=>{
-    if(r.success)setCases(safeArray(r.data));
-    else setLoadError(r.error||'โหลดเคสไม่สำเร็จ');
-  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อเคสไม่สำเร็จ')).finally(()=>setLoading(false));},[currentUser.name]);
+  const load=useCallback((force=false)=>{
+    const params=scope==='all'?{all:'true',sales:currentUser.name}:{scope:'current_and_pending',sales:currentUser.name};
+    const cached=cacheGetStale('getCases',params);
+    if(cached?.success)setCases(safeArray(cached.data));
+    if(!cached?.success)setLoading(true);
+    setLoadError('');
+    if(force)cacheClear(['getCases']);
+    api('getCases',params).then(r=>{
+      if(r.success)setCases(safeArray(r.data));
+      else setLoadError(r.error||'โหลดเคสไม่สำเร็จ');
+    }).catch(e=>setLoadError(e?.message||'เชื่อมต่อเคสไม่สำเร็จ')).finally(()=>setLoading(false));
+  },[currentUser.name,scope]);
   useEffect(()=>{load();},[load]);
-  const filtered=cases.filter(c=>{
+  const [archiveMatches,setArchiveMatches]=useState([]);
+  const [archiveQuery,setArchiveQuery]=useState('');
+  const [archiveSearching,setArchiveSearching]=useState(false);
+  async function searchArchive(){
+    const term=q.trim();
+    if(!term){setArchiveMatches([]);setArchiveQuery('');return;}
+    setArchiveSearching(true);
+    const r=await api('searchCases',{q:term,sales:currentUser.name});
+    setArchiveSearching(false);
+    if(!r.success)return showToast(r.error||'ค้นหาย้อนหลังไม่สำเร็จ','err');
+    setArchiveMatches(safeArray(r.data));
+    setArchiveQuery(term);
+  }
+  const combinedCases=archiveQuery&&archiveQuery===q.trim()
+    ?[...new Map([...cases,...archiveMatches].map(c=>[String(c.caseid),c])).values()]
+    :cases;
+  const filtered=combinedCases.filter(c=>{
     if(!showClosed&&CLOSED_STATUSES.includes(c.status))return false;if(filterStatus&&c.status!==filterStatus)return false;if(q){return caseMatchesSearch(c,q);}return true;}).sort((a,b)=>{if(sortDir==='score')return calculateCaseScore(b)-calculateCaseScore(a);const av=String(a.caseid||''),bv=String(b.caseid||'');return sortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);});
   const activeCount=cases.filter(c=>!CLOSED_STATUSES.includes(c.status)).length;const closedCount=cases.filter(c=>CLOSED_STATUSES.includes(c.status)).length;
   return <div className="page">
     <div className="page-hd" style={{marginBottom:12}}><div><div className="page-title">📋 เคสของฉัน</div><div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>กำลังดูแล <span style={{color:'var(--blue)',fontWeight:700}}>{activeCount}</span> เคส{closedCount>0&&<span style={{marginLeft:8,color:'var(--text3)'}}>· ปิดแล้ว {closedCount}</span>}</div></div><button className="btn btn-ghost" onClick={load} style={{padding:'6px 10px'}}>🔄</button></div>
     {loadError&&<div className="card" role="alert" style={{marginBottom:12,padding:14,color:'var(--red)'}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={load} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <TodayFollowupBanner currentUser={currentUser}/>
-    <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:180}}><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)',pointerEvents:'none',fontSize:14}}>🔍</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหาชื่อ เบอร์ รหัสเคส..." style={{paddingLeft:32,fontSize:13}}/></div>{q&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>setQ('')}>✕ ล้าง</button>}</div>
-    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>setShowClosed(v=>!v)}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
+    <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:180}}><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)',pointerEvents:'none',fontSize:14}}>🔍</span><input value={q} onChange={e=>{setArchiveQuery('');setQ(e.target.value);}} onKeyDown={e=>e.key==='Enter'&&searchArchive()} placeholder="ค้นหาชื่อ เบอร์ รหัสเคส..." style={{paddingLeft:32,fontSize:13}}/></div>{q&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>{setQ('');setArchiveQuery('');setArchiveMatches([]);}}>✕ ล้าง</button>}<button className="btn btn-ghost" disabled={!q.trim()||archiveSearching} onClick={searchArchive} style={{fontSize:12}}>{archiveSearching?'กำลังค้นหา...':'ค้นหาทุกเดือน'}</button></div>
+    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>{setShowClosed(v=>!v);setScope(v=>v==='all'?'current_and_pending':'all');}}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
     {/* Sort by Score button */}
     {!loading&&!q&&!filterStatus&&<div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}><button className="btn btn-ghost" style={{fontSize:11,padding:'4px 10px',borderRadius:20,border:'1px solid var(--border)'}} onClick={()=>setSortDir(s=>s==='score'?'desc':'score')}>{sortDir==='score'?'🧠 เรียงตามคะแนน ✓':'🧠 เรียงตามคะแนน'}</button></div>}
     {loading?<SkeletonCards n={4}/>:loadError&&!cases.length?<div style={{padding:32,textAlign:'center',color:'var(--text2)'}}>โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่</div>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=>{
@@ -2506,7 +2532,7 @@ function SalesCurrentCases({currentUser,users}){
         {!isClosed&&alert&&<div style={{fontSize:11,fontWeight:700,color:alert.color,marginBottom:4}}>{alert.msg}</div>}
         {!isClosed&&<div style={{fontSize:11,color:'var(--blue)',opacity:.85}}>💡 {suggestion}</div>}
       </div>;})}
-    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={load}/>}
+    {sel&&<CaseModal caseData={sel} users={users} currentUser={currentUser} onClose={()=>setSel(null)} onUpdated={()=>load(true)}/>}
   </div>;
 }
 
