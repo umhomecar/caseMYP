@@ -546,7 +546,21 @@ async function sbApi(action,data){
       if(isSbError(res))return{success:false,error:formatSbError(res)};
       return{success:true};
     }
-    case 'getCases':{const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');const dashboardMonth=String(data.dashboardMonth||'');if(dashboardMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(dashboardMonth))return{success:false,error:'เดือนไม่ถูกต้อง'};const q={deleted_at:'is.null',order:'caseid.desc',limit:dashboardMonth?'5000':'50000'};if(dashboardMonth)q.caseid=`like.${dashboardMonth.slice(2,4)+dashboardMonth.slice(5,7)}*`;else if(!data.all)q.caseid=`like.${pre}*`;if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;if(data.status)q.status=`eq.${data.status}`;const rows=await sbQ('GET','cases',q);if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};return{success:true,data:safeArray(rows)};}
+    case 'getCases':{
+      const d=new Date(),pre=String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
+      const dashboardMonth=String(data.dashboardMonth||'');
+      if(dashboardMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(dashboardMonth))return{success:false,error:'เดือนไม่ถูกต้อง'};
+      const q={deleted_at:'is.null',order:'caseid.desc',limit:dashboardMonth?'5000':'50000'};
+      if(dashboardMonth)q.caseid=`like.${dashboardMonth.slice(2,4)+dashboardMonth.slice(5,7)}*`;
+      else if(data.scope==='current_and_pending')q.or=`(caseid.like.${pre}*,status.not.in.(${CLOSED_STATUSES.join(',')}),status.is.null)`;
+      else if(!data.all)q.caseid=`like.${pre}*`;
+      if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;
+      if(data.unassigned)q.sales=`eq.${UNASSIGNED_SALES}`;
+      if(data.status)q.status=`eq.${data.status}`;
+      const rows=await sbQ('GET','cases',q);
+      if(isSbError(rows))return{success:false,error:formatSbError(rows),data:[]};
+      return{success:true,data:safeArray(rows)};
+    }
     case 'getCaseIdPreview':{const prefix=String(data.prefix||'');if(!/^\d{4}$/.test(prefix))return{success:false,error:'รูปแบบเดือนสำหรับรหัสเคสไม่ถูกต้อง'};const rows=await sbQ('GET','cases',{select:'caseid',caseid:`like.${prefix}*`,deleted_at:'is.null',order:'caseid.desc',limit:'1'});if(isSbError(rows))return{success:false,error:formatSbError(rows)};const max=Number(String(safeArray(rows)[0]?.caseid||'').slice(4))||0;return{success:true,data:prefix+String(max+1).padStart(3,'0')};}
     case 'checkCaseDuplicates':{
       const rows=await sbQ('GET','cases',{select:'caseid,customername,contact',deleted_at:'is.null',order:'updatedat.desc',limit:'10000'});
@@ -1732,10 +1746,11 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
 }
 
 function AdminCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{all:'true'})?.data));
-  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{all:'true'})?.success);
+  const [scope,setScope]=useState('current_and_pending');
+  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_and_pending'})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_and_pending'})?.success);
   const [loadError,setLoadError]=useState('');
-  const currentMonthFilters=()=>{const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0');return{sales:'all',status:'',q:'',dateFrom:`${y}-${m}-01`,dateTo:`${y}-${m}-${String(new Date(y,d.getMonth()+1,0).getDate()).padStart(2,'0')}`};};
+  const currentMonthFilters=()=>({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
   const [filter,setFilter]=useState(currentMonthFilters);
   const [sortDir,setSortDir]=useState('desc');
   const [sel,setSel]=useState(null);
@@ -1748,19 +1763,33 @@ function AdminCurrentCases({currentUser,users}){
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [bulkSales,setBulkSales]=useState('');
   const [bulkSaving,setBulkSaving]=useState(false);
-  const load=useCallback((background=false)=>{if(!background&&!cacheGetStale('getCases',{all:'true'})?.success)setLoading(true);setLoadError('');api('getCases',{all:'true'}).then(r=>{
-    if(r.success){
-      const casesData=safeArray(r.data);
-      setCases(casesData);
-      if(r.stale)showToast('กำลังแสดงข้อมูลสำรองล่าสุด','warn',3500);
-    }else{
-      setLoadError(r.error||'โหลดเคสล่าสุดไม่สำเร็จ');
-    }
-    setLoading(false);
-  }).catch(e=>{setLoading(false);setLoadError(e?.message||'เชื่อมต่อข้อมูลเคสไม่สำเร็จ');});},[]);
+  const load=useCallback((background=false,force=false)=>{
+    const params=scope==='all'?{all:'true'}:{scope:'current_and_pending'};
+    const cached=cacheGetStale('getCases',params);
+    if(cached?.success)setCases(safeArray(cached.data));
+    if(!background&&!cached?.success)setLoading(true);
+    setLoadError('');
+    if(force)cacheClear(['getCases']);
+    api('getCases',params).then(r=>{
+      if(r.success){setCases(safeArray(r.data));if(r.stale)showToast('กำลังแสดงข้อมูลสำรองล่าสุด','warn',3500);}
+      else setLoadError(r.error||'โหลดเคสล่าสุดไม่สำเร็จ');
+    }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูลเคสไม่สำเร็จ'))
+      .finally(()=>setLoading(false));
+  },[scope]);
   useEffect(()=>{load();},[load]);
-  // Keep the complete loaded dataset: searching must not overwrite the list.
-  function search(){/* Search is applied immediately by the shared local filter. */}
+  const [archiveMatches,setArchiveMatches]=useState([]);
+  const [archiveSearching,setArchiveSearching]=useState(false);
+  const [archiveQuery,setArchiveQuery]=useState('');
+  async function search(){
+    const term=String(filter.q||'').trim();
+    if(!term){setArchiveMatches([]);setArchiveQuery('');return;}
+    setArchiveSearching(true);
+    const r=await api('searchCases',{q:term});
+    setArchiveSearching(false);
+    if(!r.success)return showToast(r.error||'ค้นหาข้อมูลย้อนหลังไม่สำเร็จ','err');
+    setArchiveMatches(safeArray(r.data));
+    setArchiveQuery(term);
+  }
   function parseD2(value){
     const raw=String(value||'').trim();
     const th=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -1773,7 +1802,10 @@ function AdminCurrentCases({currentUser,users}){
     if(iso){const d=new Date(Number(iso[1]),Number(iso[2])-1,Number(iso[3]));return isNaN(d.getTime())?null:d;}
     return null;
   }
-  const filtered=safeArray(cases).filter(c=>{
+  const combinedCases=archiveQuery&&archiveQuery===String(filter.q||'').trim()
+    ?[...new Map([...cases,...archiveMatches].map(c=>[String(c.caseid),c])).values()]
+    :cases;
+  const filtered=safeArray(combinedCases).filter(c=>{
     const q=String(filter.q||'').trim().toLowerCase();
     if(q){
       const hay=[c.caseid,c.customername,c.contact,getClipAd(c.attachment),c.sales,c.status].map(v=>String(v||'').toLowerCase()).join(' ');
@@ -1861,8 +1893,9 @@ function AdminCurrentCases({currentUser,users}){
     <div className="admin-current-cases-desktop-filters casemyp-v2-case-filters" style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
       <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
-        <input value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ชื่อ เบอร์ รหัสเคส" style={{paddingLeft:28,fontSize:13,height:34}}/>
+        <input value={filter.q} onChange={e=>{setArchiveQuery('');setFilter(f=>({...f,q:e.target.value}));}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ชื่อ เบอร์ รหัสเคส" style={{paddingLeft:28,fontSize:13,height:34}}/>
       </div>
+      <button type="button" className="btn btn-ghost" disabled={!String(filter.q||'').trim()||archiveSearching} onClick={search} style={{fontSize:12,whiteSpace:'nowrap'}}>{archiveSearching?'กำลังค้นหา...':'🔎 ค้นหาทุกเดือน'}</button>
       <select value={filter.sales} onChange={e=>setFilter(f=>({...f,sales:e.target.value}))} style={{fontSize:13,height:34,padding:'0 8px',borderRadius:8,flex:'0 0 auto',maxWidth:110}}>
         <option value="all">ทุกเซลส์</option><option value={UNASSIGNED_SALES}>รอมอบหมาย</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}
       </select>
@@ -1882,7 +1915,11 @@ function AdminCurrentCases({currentUser,users}){
       <input type="date" value={filter.dateFrom||''} onChange={e=>setFilter(f=>({...f,dateFrom:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
       <span style={{fontSize:12,color:'var(--text3)'}}>—</span>
       <input type="date" value={filter.dateTo||''} onChange={e=>setFilter(f=>({...f,dateTo:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
-      <button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>{setFilter(currentMonthFilters());setSelectedIds(new Set());}}>↺ ล้างตัวกรอง (เดือนปัจจุบัน)</button>
+      <select value={scope} onChange={e=>{setScope(e.target.value);setSelectedIds(new Set());setArchiveMatches([]);setArchiveQuery('');}} style={{fontSize:12,height:30}}>
+        <option value="current_and_pending">เดือนนี้ + เคสเก่าที่ยังค้าง</option>
+        <option value="all">ทุกเดือน (รวมเคสปิด)</option>
+      </select>
+      <button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>{setFilter(currentMonthFilters());setArchiveMatches([]);setArchiveQuery('');setSelectedIds(new Set());setScope('current_and_pending');}}>↺ ล้างตัวกรอง</button>
     </div>
     {selectedIds.size>0&&<div className="card" style={{padding:'10px 12px',marginBottom:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',borderColor:'rgba(88,166,255,.4)'}}><strong style={{fontSize:13}}>เลือกแล้ว {selectedIds.size} เคส</strong><select value={bulkSales} onChange={e=>setBulkSales(e.target.value)} style={{maxWidth:240}}><option value="">-- เลือกเซลส์ผู้รับผิดชอบ --</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" onClick={assignSelected} disabled={!bulkSales||bulkSaving}>{bulkSaving?'กำลังมอบหมาย...':'มอบหมายพร้อมกัน'}</button><button className="btn btn-ghost" onClick={()=>setSelectedIds(new Set())}>ยกเลิกการเลือก</button></div>}
     <div className="admin-cases-mobile-list">
