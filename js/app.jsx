@@ -385,19 +385,25 @@ async function sbQ(method,table,q={},body=null){
   }
   
   if (needsPagination) {
-    // ดึงข้อมูลทีละ 1000 rows
-    const allData = [];
-    let offset = 0;
-    const pageSize = 1000;
-    
-    while (offset < limit) {
-      const h={'apikey':SUPA_KEY,'Authorization':'Bearer '+bearer,'Content-Type':'application/json','Range':`${offset}-${offset+pageSize-1}`};
-      const pageData=await sbFetch(finalUrl,{method:'GET',headers:h});
-      if(isSbError(pageData))return pageData;
-      if(!Array.isArray(pageData)||pageData.length===0)break;
-      allData.push(...pageData);
-      if(pageData.length<pageSize)break; // ไม่มีข้อมูลเพิ่มแล้ว
-      offset+=pageSize;
+    // Load two consecutive pages in parallel to avoid serial round trips on 1000+ cases.
+    // Preserve server ordering and stop after the first short page.
+    const allData=[];
+    const pageSize=1000;
+    const concurrency=2;
+    for(let offset=0;offset<limit;offset+=pageSize*concurrency){
+      const offsets=Array.from({length:Math.min(concurrency,Math.ceil((limit-offset)/pageSize))},(_,i)=>offset+i*pageSize);
+      const batch=await Promise.all(offsets.map(start=>{
+        const end=Math.min(start+pageSize,limit)-1;
+        const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+bearer,'Content-Type':'application/json','Range':`${start}-${end}`};
+        return sbFetch(finalUrl,{method:'GET',headers});
+      }));
+      for(let i=0;i<batch.length;i++){
+        const pageData=batch[i];
+        if(isSbError(pageData))return pageData; // Do not silently show incomplete data.
+        if(!Array.isArray(pageData))return{error:'รูปแบบข้อมูลไม่ถูกต้อง',message:'รูปแบบข้อมูลไม่ถูกต้อง'};
+        allData.push(...pageData);
+        if(pageData.length<Math.min(pageSize,limit-offsets[i]))return allData;
+      }
     }
     return allData;
   }
@@ -1600,8 +1606,8 @@ function StandaloneCaseModal({item,users,currentUser,caseType,title,onClose,onSa
 }
 
 function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
-  const [rows,setRows]=useState([]);
-  const [loading,setLoading]=useState(true);
+  const [rows,setRows]=useState(()=>safeArray(cacheGetStale('getStandaloneCases',{caseType})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getStandaloneCases',{caseType})?.success);
   const [loadError,setLoadError]=useState('');
   const [q,setQ]=useState('');
   const [salesFilter,setSalesFilter]=useState('all');
@@ -1615,11 +1621,17 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
   const theme=caseType==='private'
     ?{accent:'#ec4899',rgb:'236,72,153'}
     :{accent:'#22c55e',rgb:'34,197,94'};
-  const load=useCallback(()=>{setLoading(true);setLoadError('');cacheClear(['getStandaloneCases']);api('getStandaloneCases',{caseType}).then(r=>{
-    if(r.success)setRows(safeArray(r.data));
-    else setLoadError(r.error||'โหลดข้อมูล '+title+' ไม่สำเร็จ');
-  }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูล '+title+' ไม่สำเร็จ'))
-    .finally(()=>setLoading(false));},[caseType,title]);
+  const load=useCallback((force=false)=>{
+    const hasSnapshot=!!cacheGetStale('getStandaloneCases',{caseType})?.success;
+    if(!hasSnapshot)setLoading(true);
+    setLoadError('');
+    if(force)cacheClear(['getStandaloneCases']);
+    return api('getStandaloneCases',{caseType}).then(r=>{
+      if(r.success)setRows(safeArray(r.data));
+      else setLoadError(r.error||'โหลดข้อมูล '+title+' ไม่สำเร็จ');
+    }).catch(e=>setLoadError(e?.message||'เชื่อมต่อข้อมูล '+title+' ไม่สำเร็จ'))
+      .finally(()=>setLoading(false));
+  },[caseType,title]);
   useEffect(()=>{load();},[load]);
   function rowDate(v){
     const d=new Date(v||'');
@@ -1714,14 +1726,14 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
       </div>
     </div>
 
-    {showModal&&<StandaloneCaseModal item={modalItem} users={users} currentUser={currentUser} caseType={caseType} title={title} previewCaseCode={isLineOA&&!loading&&!loadError?previewNextLineOACaseCode(rows):''} onClose={()=>setShowModal(false)} onSaved={load}/>}    
+    {showModal&&<StandaloneCaseModal item={modalItem} users={users} currentUser={currentUser} caseType={caseType} title={title} previewCaseCode={isLineOA&&!loading&&!loadError?previewNextLineOACaseCode(rows):''} onClose={()=>setShowModal(false)} onSaved={()=>load(true)}/>}    
     <button className="fab sent-fab" onClick={openAdd} title={`เพิ่ม${title}`}>＋</button>
   </div>;
 }
 
 function AdminCurrentCases({currentUser,users}){
-  const [cases,setCases]=useState([]);
-  const [loading,setLoading]=useState(true);
+  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{all:'true'})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{all:'true'})?.success);
   const [loadError,setLoadError]=useState('');
   const currentMonthFilters=()=>{const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0');return{sales:'all',status:'',q:'',dateFrom:`${y}-${m}-01`,dateTo:`${y}-${m}-${String(new Date(y,d.getMonth()+1,0).getDate()).padStart(2,'0')}`};};
   const [filter,setFilter]=useState(currentMonthFilters);
@@ -1736,7 +1748,7 @@ function AdminCurrentCases({currentUser,users}){
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [bulkSales,setBulkSales]=useState('');
   const [bulkSaving,setBulkSaving]=useState(false);
-  const load=useCallback((background=false)=>{if(!background)setLoading(true);setLoadError('');cacheClear(['getCases']);api('getCases',{all:'true'}).then(r=>{
+  const load=useCallback((background=false)=>{if(!background&&!cacheGetStale('getCases',{all:'true'})?.success)setLoading(true);setLoadError('');api('getCases',{all:'true'}).then(r=>{
     if(r.success){
       const casesData=safeArray(r.data);
       setCases(casesData);
@@ -1947,7 +1959,7 @@ function AdminDashboard({currentUser,users}){
   const [chosen,setChosen]=useState('all');
   const [drilldown,setDrilldown]=useState(null);
   const [editingCase,setEditingCase]=useState(null);
-  const load=useCallback((showSpinner=false)=>{if(showSpinner)setLoading(true);cacheClear(['getCases']);return api('getCases',{dashboardMonth:month}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>{showToast('โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);});},[month]);
+  const load=useCallback((showSpinner=false)=>{if(showSpinner&&!cacheGetStale('getCases',{dashboardMonth:month})?.success)setLoading(true);return api('getCases',{dashboardMonth:month}).then(r=>{if(r.success)setCases(safeArray(r.data));else showToast(r.error||'โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);}).catch(()=>{showToast('โหลดข้อมูลไม่สำเร็จ','err');setLoading(false);});},[month]);
   useEffect(()=>{load(true);},[load]);
   const monthCases=cases.filter(c=>{const t=String(c.createdat||'');const m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m){let y=Number(m[3]);if(y>2400)y-=543;return y+'-'+String(Number(m[2])).padStart(2,'0')===month;}return t.startsWith(month+'-');});
   const adMap={};
