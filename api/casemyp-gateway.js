@@ -120,6 +120,90 @@ async function loginAllowed(config,req,username){
   }
   return true;
 }
+
+// Confirm ownership using the server credential, never a caller-supplied identity.
+async function caseOwned(config,caseid,sales){
+  if(!caseid||typeof caseid!=='string')return false;
+  const r=await db(config,'cases',{select:'caseid',caseid:'eq.'+caseid,sales:'eq.'+sales,deleted_at:'is.null',limit:1});
+  return r.status===200&&Array.isArray(r.data)&&r.data.length===1;
+}
+async function relatedCaseOwned(config,table,id,sales){
+  if(!id||!['bookings','case_notes','case_followups','notifications','standalone_cases'].includes(table))return false;
+  const column=table==='standalone_cases'?'id':'id';
+  const r=await db(config,table,{select:table==='standalone_cases'?'id,sales':'id,caseid,sales',[column]:'eq.'+String(id),limit:1});
+  if(r.status!==200||!Array.isArray(r.data)||r.data.length!==1)return false;
+  const row=r.data[0];
+  if(table==='notifications')return row.sales===sales;
+  if(table==='standalone_cases')return row.sales===sales;
+  return row.sales===sales||(typeof row.caseid==='string'&&await caseOwned(config,row.caseid,sales));
+}
+async function salesCaseIds(config,sales){
+  const r=await db(config,'cases',{select:'caseid',sales:'eq.'+sales,deleted_at:'is.null',limit:1000});
+  if(r.status!==200||!Array.isArray(r.data))return null;
+  return r.data.map(row=>row.caseid).filter(x=>typeof x==='string'&&/^[0-9a-zA-Z-]+$/.test(x));
+}
+async function salesScope(config,user,table,method,query,body){
+  const sales=String(user.name||'');
+  if(!sales||sales.length>100)return {allow:false};
+  if(method==='GET'){
+    if(table==='users'||table==='bank_logos')return {allow:true,query};
+    if(table==='cases'&&query.select==='caseid'){
+      // Case ID generation must see the global maximum to prevent duplicates.
+      return {allow:true,query:{...query,select:'caseid'}};
+    }
+    if(['cases','bookings','standalone_cases','notifications','targets'].includes(table)){
+      query[table==='targets'?'sales_name':'sales']='eq.'+sales;
+      query.select='*';return {allow:true,query};
+    }
+    if(['history','case_notes','case_followups'].includes(table)){
+      const ids=await salesCaseIds(config,sales);
+      if(!ids)return {allow:false};
+      if(!ids.length)return {allow:true,empty:true};
+      if(query.caseid?.startsWith('eq.')&&!ids.includes(query.caseid.slice(3)))return {allow:true,empty:true};
+      if(!query.caseid||!query.caseid.startsWith('eq.'))query.caseid='in.('+ids.join(',')+')';
+      query.select='*';return {allow:true,query};
+    }
+    return {allow:false};
+  }
+  if(method==='DELETE'||!SALES_WRITE.has(table)||!body||Array.isArray(body)||typeof body!=='object')return {allow:false};
+  if(method==='POST'){
+    if(table==='cases'){
+      if(!['',sales,'รอมอบหมาย'].includes(String(body.sales||'')))return {allow:false};
+      if(!/^[0-9]{7}$/.test(String(body.caseid||'')))return {allow:false};
+      return {allow:true,query,body:{...body,sales:String(body.sales||sales)}};
+    }
+    if(table==='standalone_cases'){
+      if(String(body.sales||'')!==sales)return {allow:false};
+      return {allow:true,query,body:{...body,created_by:sales}};
+    }
+    if(table==='notifications')return {allow:String(body.sales||'')===sales,query,body};
+    if(!['history','case_notes','case_followups','bookings'].includes(table))return {allow:false};
+    if(!await caseOwned(config,String(body.caseid||''),sales))return {allow:false};
+    if(table==='bookings'&&body.sales!==sales)return {allow:false};
+    if(['case_notes','case_followups'].includes(table)&&body.sales!==sales)return {allow:false};
+    return {allow:true,query,body};
+  }
+  if(method==='PATCH'){
+    const rowId=String(query.id||'').startsWith('eq.')?String(query.id).slice(3):'';
+    const caseid=String(query.caseid||'').startsWith('eq.')?String(query.caseid).slice(3):'';
+    if(table==='cases'){
+      if(!caseid||!await caseOwned(config,caseid,sales))return {allow:false};
+      if('sales' in body&&body.sales!==sales)return {allow:false};
+      query.sales='eq.'+sales;return {allow:true,query,body};
+    }
+    if(table==='standalone_cases'){
+      if(!rowId||!await relatedCaseOwned(config,table,rowId,sales)||('sales' in body&&body.sales!==sales))return {allow:false};
+      query.sales='eq.'+sales;return {allow:true,query,body};
+    }
+    if(table==='bookings'||table==='case_notes'||table==='case_followups'||table==='notifications'){
+      if(!rowId||!await relatedCaseOwned(config,table,rowId,sales))return {allow:false};
+      if('sales' in body&&body.sales!==sales)return {allow:false};
+      return {allow:true,query,body};
+    }
+    return {allow:false};
+  }
+  return {allow:false};
+}
 async function handler(req,res){
   if(req.method!=='POST')return json(res,405,{message:'Method not allowed'});
   if(!sameOrigin(req))return json(res,403,{message:'Origin mismatch'});
@@ -147,9 +231,9 @@ async function handler(req,res){
     if(!TABLES.has(table)||!['GET','POST','PATCH','DELETE'].includes(method))return json(res,403,{message:'Operation not allowed'});
     const admin=user.role==='Admin',sales=user.role==='Sales';
     if(!admin&&!sales)return json(res,403,{message:'Role not allowed'});
-    // Until audited row/role policies are available, fail closed for all Sales gateway data requests.
-    // This also blocks a direct GET ?select=* from bypassing UI-side Sales filters.
-    if(!admin)return json(res,403,{message:'การเข้าถึงข้อมูลของเซลส์ยังรอการตรวจสิทธิ์ในเว็บทดสอบ'});
+    // Sales requests are constrained to the authenticated user's scope server-side.
+    // Admin functionality stays unchanged for the isolated preview.
+    if(!admin&&(!sales||!String(user.name||'')))return json(res,403,{message:'Permission denied'});
     let query=validParams(data.query||'');
     if(table==='users'){
       // Allow only the existing user-list search and sorting. Never permit password filters.
@@ -161,14 +245,13 @@ async function handler(req,res){
     const range=String(data.range||'');
     if(range&&!/^\d{1,6}-\d{1,6}$/.test(range))return json(res,400,{message:'Invalid range'});
     if(range){const [start,end]=range.split('-').map(Number);if(end<start||end-start>4999)return json(res,400,{message:'Range too large'});}
-    const body=data.body??null;
+    let body=data.body??null;
     if(method!=='GET'&&body===null)return json(res,400,{message:'Missing body'});
-    if(method!=='GET'&&!admin){
-      // Require record-scoped mutations; avoid allowing a sales session to update whole tables.
-      if((method==='PATCH'||method==='DELETE')&&!('caseid' in query)&&!('id' in query)&&!('case_code' in query))
-        return json(res,403,{message:'Record filter required'});
-      // Stronger ownership validation is required before enabling sales write access.
-      return json(res,403,{message:'การแก้ไขข้อมูลของเซลส์ยังรอการตรวจสิทธิ์ในเว็บทดสอบ'});
+    if(!admin){
+      const scope=await salesScope(config,user,table,method,query,body);
+      if(!scope.allow)return json(res,403,{message:'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้'});
+      if(scope.empty)return json(res,200,[]);
+      query=scope.query;body=scope.body??body;
     }
     const result=await db(config,table,query,{method,write:method!=='GET',body,range});
     if(table==='users'&&Array.isArray(result.data)){
