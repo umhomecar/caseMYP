@@ -3275,7 +3275,13 @@ function App(){
     // ปิด realtime channels ทั้งหมดก่อน logout
     try{if(supabase)supabase.removeAllChannels();}catch(e){}
     if(AUTH_MODE==='supabase'&&supabase){try{await supabase.auth.signOut();}catch(e){}}
-    if(SECURE_GATEWAY){try{await fetch('/api/casemyp-gateway',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});}catch(e){}}
+    if(SECURE_GATEWAY){
+      try{
+        const response=await fetch('/api/casemyp-gateway',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok||result.success!==true){showToast('ออกจากระบบไม่สำเร็จ กรุณาลองอีกครั้ง','err');return;}
+      }catch(e){showToast('ไม่สามารถออกจากระบบได้ กรุณาลองอีกครั้ง','err');return;}
+    }
     clearPersistedSession();
     Object.keys(_cache).forEach(k=>delete _cache[k]);
     setUser(null);
