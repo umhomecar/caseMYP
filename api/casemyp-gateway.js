@@ -94,6 +94,26 @@ function validParams(raw){
   const result={};for(const [k,v] of p.entries())result[k]=v;
   return result;
 }
+async function loginAllowed(config,req,username){
+  // Persistent Postgres counter shared by all Vercel serverless instances.
+  // Hash identifier before storage; the database never receives raw IP/username.
+  const remote=String(req.headers['x-real-ip']||req.headers['x-forwarded-for']||'unknown').split(',')[0].trim().slice(0,120);
+  const normalizedUser=String(username).toLowerCase();
+  const keys=[
+    {v:'account:'+normalizedUser,max:8,window:900},
+    {v:'ip:'+remote,max:40,window:900}
+  ];
+  for(const item of keys){
+    const bucket=crypto.createHmac('sha256',config.signing).update(item.v).digest('hex');
+    const response=await fetch(config.url+'/rest/v1/rpc/casemyp_check_login_limit',{
+      method:'POST',
+      headers:{apikey:config.secret,Authorization:'Bearer '+config.secret,'Content-Type':'application/json'},
+      body:JSON.stringify({p_bucket:bucket,p_max_attempts:item.max,p_window_seconds:item.window})
+    });
+    if(!response.ok||await response.json()!==true)return false;
+  }
+  return true;
+}
 async function handler(req,res){
   if(req.method!=='POST')return json(res,405,{message:'Method not allowed'});
   if(!sameOrigin(req))return json(res,403,{message:'Origin mismatch'});
@@ -104,6 +124,7 @@ async function handler(req,res){
     if(data.action==='login'){
       const username=String(data.username||'').trim(),password=String(data.password||'');
       if(!username||username.length>80||!password||password.length>256)return json(res,401,{message:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'});
+      if(!await loginAllowed(config,req,username))return json(res,429,{message:'ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณาลองใหม่ภายหลัง'});
       const r=await db(config,'users',{select:'userid,username,password,name,role,status,avatar,startdate',username:'eq.'+username,status:'eq.active',limit:2});
       if(r.status!==200)return json(res,502,{message:'ไม่สามารถตรวจสอบบัญชีได้'});
       const user=Array.isArray(r.data)&&r.data.length===1?r.data[0]:null;
