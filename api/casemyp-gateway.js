@@ -14,7 +14,7 @@ function settings(){
   const url=String(process.env.CASEMYP_SUPABASE_URL||'').replace(/\/+$/,'');
   const secret=String(process.env.CASEMYP_SUPABASE_SECRET_KEY||process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||'');
   const signing=String(process.env.CASEMYP_SESSION_SECRET||'');
-  if(process.env.CASEMYP_SECURE_GATEWAY!=='true'||url!==`https://${PROJECT}.supabase.co`||secret.length<24||signing.length<32)
+  if(process.env.CASEMYP_SECURE_GATEWAY!=='true'||url!==`https://${PROJECT}.supabase.co`||secret.length<24||signing.length<32||signing==='replace-with-a-random-strong-session-secret-at-least-32-characters')
     throw new Error('CaseMYP-New gateway not configured');
   return {url,secret,signing};
 }
@@ -120,12 +120,16 @@ async function handler(req,res){
     if(!TABLES.has(table)||!['GET','POST','PATCH','DELETE'].includes(method))return json(res,403,{message:'Operation not allowed'});
     const admin=user.role==='Admin',sales=user.role==='Sales';
     if(!admin&&!sales)return json(res,403,{message:'Role not allowed'});
-    if(!admin&&method!=='GET'&&(!SALES_WRITE.has(table)||ADMIN_ONLY.has(table)))return json(res,403,{message:'Permission denied'});
+    // Until audited row/role policies are available, fail closed for all Sales gateway data requests.
+    // This also blocks a direct GET ?select=* from bypassing UI-side Sales filters.
+    if(!admin)return json(res,403,{message:'การเข้าถึงข้อมูลของเซลส์ยังรอการตรวจสิทธิ์ในเว็บทดสอบ'});
     let query=validParams(data.query||'');
     if(table==='users'){
-      // Never return plaintext passwords or password hashes to a browser.
-      if(method==='GET')query.select=PUBLIC_USER_FIELDS;
-      if(!admin&&method!=='GET')return json(res,403,{message:'Permission denied'});
+      // Allow only the existing user-list search and sorting. Never permit password filters.
+      const allowed=new Set(['select','order','limit','offset','userid','username','name','role','status','auth_user_id']);
+      if(Object.keys(query).some(k=>!allowed.has(k)))return json(res,403,{message:'User filter not allowed'});
+      // Prevent credential exposure even for returning POST/PATCH representations.
+      query.select=PUBLIC_USER_FIELDS;
     }
     const range=String(data.range||'');
     if(range&&!/^\d{1,6}-\d{1,6}$/.test(range))return json(res,400,{message:'Invalid range'});
@@ -140,6 +144,9 @@ async function handler(req,res){
       return json(res,403,{message:'การแก้ไขข้อมูลของเซลส์ยังรอการตรวจสิทธิ์ในเว็บทดสอบ'});
     }
     const result=await db(config,table,query,{method,write:method!=='GET',body,range});
+    if(table==='users'&&Array.isArray(result.data)){
+      result.data=result.data.map(({password,...safe})=>safe);
+    }
     return json(res,result.status,result.data);
   }catch(error){
     console.error('CaseMYP-New gateway:',error?.message||error);
