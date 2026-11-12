@@ -34,7 +34,7 @@ const runtimeConfig={
   supabaseAnonKey,
   deployEnvironment,
   authMode,
-  secureGateway:process.env.CASEMYP_SECURE_GATEWAY==='true'&&deployEnvironment!=='production',
+  secureGateway:process.env.CASEMYP_SECURE_GATEWAY==='true'&&supabaseUrl==='https://vujcmmnnakqqjiejavfs.supabase.co',
 };
 fs.writeFileSync(
   runtimeConfigPath,
