@@ -99,17 +99,47 @@ test('rejects password-based filters against the users endpoint',async()=>{
   const result=res();await handler(req({action:'data',table:'users',method:'GET',query:'?password=eq.example&select=*'},cookie),result);
   assert.equal(result.statusCode,403);
 });
-test('blocks all Sales data reads while row-level authorization is incomplete',async()=>{
-  setup();global.fetch=async(url)=>{
-    const parsed=new URL(url);
+test('Sales GET is scoped on the server to the logged-in employee',async()=>{
+  setup();const seen=[];
+  global.fetch=async(url)=>{
+    const parsed=new URL(url);seen.push(parsed);
     if(parsed.pathname.endsWith('/casemyp_check_login_limit'))return new Response('true',{status:200});
     if(parsed.pathname.endsWith('/users'))return new Response(JSON.stringify([{...exampleUser,role:'Sales'}]),{status:200});
-    return new Response(JSON.stringify([{caseid:'private-other-sales-case'}]),{status:200});
+    return new Response(JSON.stringify([{caseid:'2601001',sales:'Administrator'}]),{status:200});
   };
   const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
   const cookie=login.headers['Set-Cookie'].split(';')[0];
-  const result=res();await handler(req({action:'data',table:'cases',method:'GET',query:'?select=*'},cookie),result);
+  const result=res();await handler(req({action:'data',table:'cases',method:'GET',query:'?select=*&sales=eq.other'},cookie),result);
+  assert.equal(result.statusCode,200);
+  assert.equal(seen.at(-1).searchParams.get('sales'),'eq.Administrator');
+});
+test('Sales cannot update a different employee case',async()=>{
+  setup();const seen=[];
+  global.fetch=async(url)=>{
+    const parsed=new URL(url);seen.push(parsed);
+    if(parsed.pathname.endsWith('/casemyp_check_login_limit'))return new Response('true',{status:200});
+    if(parsed.pathname.endsWith('/users'))return new Response(JSON.stringify([{...exampleUser,role:'Sales'}]),{status:200});
+    if(parsed.pathname.endsWith('/cases'))return new Response('[]',{status:200});
+    return new Response('[]',{status:200});
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const result=res();await handler(req({action:'data',table:'cases',method:'PATCH',query:'caseid=eq.2601002',body:{status:'จอง'}},cookie),result);
   assert.equal(result.statusCode,403);
+  assert.equal(seen.filter(u=>u.pathname.endsWith('/cases')).length,1);
+});
+test('new Supabase opaque secret key is never passed as a bearer JWT',async()=>{
+  setup();process.env.CASEMYP_SUPABASE_SECRET_KEY='sb_secret_test-only-opaque-secret-for-tests';
+  const headers=[];
+  global.fetch=async(url,opts)=>{
+    headers.push(opts.headers);
+    const parsed=new URL(url);
+    if(parsed.pathname.endsWith('/casemyp_check_login_limit'))return new Response('true',{status:200});
+    return new Response(JSON.stringify([exampleUser]),{status:200});
+  };
+  const result=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),result);
+  assert.equal(result.statusCode,200);
+  assert.equal(headers.every(h=>!('Authorization' in h)),true);
 });
 
 test('fails closed on an unavailable persistent throttle',async()=>{
