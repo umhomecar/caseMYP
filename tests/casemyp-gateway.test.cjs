@@ -21,6 +21,7 @@ function fakeDb(){
   global.fetch=async(url,opts)=>{
     const parsed=new URL(url);seen.push(parsed);
     const table=parsed.pathname.split('/').pop();
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
     if(table==='users'){
       const query=parsed.searchParams;
       if(query.get('username')==='eq.wrong')return new Response('[]',{status:200});
@@ -69,6 +70,7 @@ test('rejects a Sales write while ownership authorization is unfinished',async()
   setup();
   global.fetch=async(url)=>{
     const parsed=new URL(url);
+    if(parsed.pathname.endsWith('/casemyp_check_login_limit'))return new Response('true',{status:200});
     if(parsed.pathname.endsWith('/users')){
       return new Response(JSON.stringify([{...exampleUser,role:'Sales'}]),{status:200});
     }
@@ -100,6 +102,7 @@ test('rejects password-based filters against the users endpoint',async()=>{
 test('blocks all Sales data reads while row-level authorization is incomplete',async()=>{
   setup();global.fetch=async(url)=>{
     const parsed=new URL(url);
+    if(parsed.pathname.endsWith('/casemyp_check_login_limit'))return new Response('true',{status:200});
     if(parsed.pathname.endsWith('/users'))return new Response(JSON.stringify([{...exampleUser,role:'Sales'}]),{status:200});
     return new Response(JSON.stringify([{caseid:'private-other-sales-case'}]),{status:200});
   };
@@ -107,4 +110,11 @@ test('blocks all Sales data reads while row-level authorization is incomplete',a
   const cookie=login.headers['Set-Cookie'].split(';')[0];
   const result=res();await handler(req({action:'data',table:'cases',method:'GET',query:'?select=*'},cookie),result);
   assert.equal(result.statusCode,403);
+});
+
+test('fails closed on an unavailable persistent throttle',async()=>{
+ setup();
+ global.fetch=async()=>new Response('false',{status:200});
+ const result=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),result);
+ assert.equal(result.statusCode,429);
 });
