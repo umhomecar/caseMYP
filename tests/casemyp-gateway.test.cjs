@@ -84,3 +84,27 @@ test('refuses using the gateway against the original database',async()=>{
   const result=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),result);
   assert.equal(result.statusCode,503);
 });
+
+test('rejects the publicly documented session secret example',async()=>{
+  setup();process.env.CASEMYP_SESSION_SECRET='replace-with-a-random-strong-session-secret-at-least-32-characters';
+  const result=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),result);
+  assert.equal(result.statusCode,503);
+});
+test('rejects password-based filters against the users endpoint',async()=>{
+  setup();fakeDb();
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const result=res();await handler(req({action:'data',table:'users',method:'GET',query:'?password=eq.example&select=*'},cookie),result);
+  assert.equal(result.statusCode,403);
+});
+test('blocks all Sales data reads while row-level authorization is incomplete',async()=>{
+  setup();global.fetch=async(url)=>{
+    const parsed=new URL(url);
+    if(parsed.pathname.endsWith('/users'))return new Response(JSON.stringify([{...exampleUser,role:'Sales'}]),{status:200});
+    return new Response(JSON.stringify([{caseid:'private-other-sales-case'}]),{status:200});
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const result=res();await handler(req({action:'data',table:'cases',method:'GET',query:'?select=*'},cookie),result);
+  assert.equal(result.statusCode,403);
+});
