@@ -8,7 +8,7 @@ const TTL_MS=8*60*60*1000;
 const TABLES=new Set(['users','cases','standalone_cases','case_notes','case_followups','history','notifications','bookings','page_queue_state','targets','bank_logos','line_recipients','profile_images','fcm_tokens','audit_log']);
 const ADMIN_ONLY=new Set(['users','page_queue_state','targets','bank_logos','line_recipients','profile_images','fcm_tokens','audit_log']);
 const SALES_WRITE=new Set(['cases','standalone_cases','case_notes','case_followups','history','notifications','bookings']);
-const PUBLIC_USER_FIELDS='userid,username,name,role,status,avatar,startdate,auth_user_id,email';
+const PUBLIC_USER_FIELDS='userid,username,name,role,status,avatar,startdate';
 
 function settings(){
   const url=String(process.env.CASEMYP_SUPABASE_URL||'').replace(/\/+$/,'');
@@ -17,6 +17,12 @@ function settings(){
   if(process.env.CASEMYP_SECURE_GATEWAY!=='true'||url!==`https://${PROJECT}.supabase.co`||secret.length<24||signing.length<32||signing==='replace-with-a-random-strong-session-secret-at-least-32-characters')
     throw new Error('CaseMYP-New gateway not configured');
   return {url,secret,signing};
+}
+function serverHeaders(secret){
+  // sb_secret_* is an opaque API key, not a JWT. Never send it as Bearer.
+  const headers={apikey:secret,Accept:'application/json'};
+  if(!secret.startsWith('sb_secret_'))headers.Authorization='Bearer '+secret;
+  return headers;
 }
 function json(res,status,body){
   res.setHeader('Content-Type','application/json; charset=utf-8');
@@ -70,7 +76,7 @@ async function db(settings,table,params={},options={}){
   if(!TABLES.has(table))throw new Error('Table not permitted');
   const url=new URL(settings.url+'/rest/v1/'+table);
   Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
-  const headers={'apikey':settings.secret,'Authorization':'Bearer '+settings.secret,'Accept':'application/json'};
+  const headers=serverHeaders(settings.secret);
   if(options.write){headers['Content-Type']='application/json';headers['Prefer']='return=representation';}
   if(options.range)headers['Range']=options.range;
   const response=await fetch(url,{method:options.method||'GET',headers,body:options.write?JSON.stringify(options.body):undefined});
@@ -107,7 +113,7 @@ async function loginAllowed(config,req,username){
     const bucket=crypto.createHmac('sha256',config.signing).update(item.v).digest('hex');
     const response=await fetch(config.url+'/rest/v1/rpc/casemyp_check_login_limit',{
       method:'POST',
-      headers:{apikey:config.secret,Authorization:'Bearer '+config.secret,'Content-Type':'application/json'},
+      headers:{...serverHeaders(config.secret),'Content-Type':'application/json'},
       body:JSON.stringify({p_bucket:bucket,p_max_attempts:item.max,p_window_seconds:item.window})
     });
     if(!response.ok||await response.json()!==true)return false;
