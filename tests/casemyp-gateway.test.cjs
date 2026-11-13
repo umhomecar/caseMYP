@@ -218,6 +218,7 @@ test('fast case creation keeps queue-assigned salesperson, history, and notifica
   assert.equal(result.body.noteSaved,true);
   assert.ok(requests.some(x=>x.table==='history'&&x.method==='POST'));
   assert.ok(requests.some(x=>x.table==='case_notes'&&x.method==='POST'));
+  assert.equal(requests.find(x=>x.table==='case_notes'&&x.method==='POST').body.deletedat,null);
   assert.ok(requests.some(x=>x.table==='notifications'&&x.method==='POST'));
   assert.equal(requests.filter(x=>x.table==='cases'&&x.method==='POST').length,1);
 });
