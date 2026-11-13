@@ -472,16 +472,13 @@ async function sbNotif(sales,caseid,message){
 
 async function genCaseId(attempt=0,customPrefix=''){
   const d=new Date(),pre=customPrefix||String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0');
+  // The cases.caseid primary key rejects collisions atomically on INSERT.
+  // A separate existence request adds latency and cannot prevent a race.
   const rows=await sbQ('GET','cases',{select:'caseid',caseid:`like.${pre}*`,order:'caseid.desc',limit:'1'});
-  let max=0;if(rows?.length){const id=String(rows[0].caseid||'');if(id.startsWith(pre))max=parseInt(id.slice(4))||0;}
-  // กัน race condition — เพิ่มค่าตาม attempt ถ้าเจอชน
-  const candidate=pre+String(max+1+attempt).padStart(3,'0');
-  // ตรวจซ้ำ — ถ้ามีอยู่แล้ว ลอง attempt ถัดไป (สูงสุด 5 รอบ)
-  if(attempt<5){
-    const check=await sbQ('GET','cases',{select:'caseid',caseid:`eq.${candidate}`,limit:'1'});
-    if(check?.length)return genCaseId(attempt+1,pre);
-  }
-  return candidate;
+  if(isSbError(rows))throw new Error(formatSbError(rows));
+  let max=0;
+  if(rows?.length){const id=String(rows[0].caseid||'');if(id.startsWith(pre))max=parseInt(id.slice(4))||0;}
+  return pre+String(max+1+attempt).padStart(3,'0');
 }
 
 async function sbApi(action,data){
@@ -603,18 +600,25 @@ async function sbApi(action,data){
           assignedSales=String(safeArray(inserted)[0]?.sales||assignedSales);
           const lineSender=LINE_SENDERS.includes(String(data.lineSender||'').trim())?String(data.lineSender).trim():'';
           const lineSenderDetail=lineSender?' | ผู้ส่ง LINE: '+lineSender:'';
-          let historySaved=await sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales)+lineSenderDetail);
-          let noteSaved=true;
+          // History, initial note, and assignment notification are independent.
+          // Run these requests concurrently instead of serial round trips.
           const initialNote=String(data.note||'').trim();
-          if(initialNote){
-            const noteRow={caseid:id,sales:data.createdBy||assignedSales||'ระบบ',note:initialNote,createdat:ts,deletedat:null};
-            const noteInserted=await sbQ('POST','case_notes',{},noteRow);
-            noteSaved=!isSbError(noteInserted)&&safeArray(noteInserted).length>0;
-            if(noteSaved){
-              historySaved=(await sbHist(id,data.createdBy||assignedSales||'ระบบ','📝 Note','📝 Note: '+initialNote))&&historySaved;
-            }
-          }
-          const notificationSaved=isUnassignedSales(assignedSales)?true:await sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+')');
+          const [firstHistorySaved,noteOutcome,notificationSaved]=await Promise.all([
+            sbHist(id,data.createdBy||'แอดมิน','เพิ่มเคส','เพิ่มเคสใหม่: '+data.customername+(isUnassignedSales(assignedSales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+assignedSales)+lineSenderDetail),
+            (async()=>{
+              if(!initialNote)return {noteSaved:true,noteHistorySaved:true};
+              const noteRow={caseid:id,sales:data.createdBy||assignedSales||'ระบบ',note:initialNote,createdat:ts,deletedat:null};
+              const noteInserted=await sbQ('POST','case_notes',{},noteRow);
+              const noteSaved=!isSbError(noteInserted)&&safeArray(noteInserted).length>0;
+              const noteHistorySaved=noteSaved
+                ?await sbHist(id,data.createdBy||assignedSales||'ระบบ','📝 Note','📝 Note: '+initialNote)
+                :true;
+              return {noteSaved,noteHistorySaved};
+            })(),
+            isUnassignedSales(assignedSales)?Promise.resolve(true):sbNotif(assignedSales,id,'📋 ได้รับมอบหมายเคสใหม่ '+id+' ('+data.customername+')')
+          ]);
+          const historySaved=firstHistorySaved&&noteOutcome.noteHistorySaved;
+          const noteSaved=noteOutcome.noteSaved;
           return{success:true,caseId:id,sales:assignedSales,unassigned:isUnassignedSales(assignedSales),historySaved,notificationSaved,noteSaved};
         }
         lastError=inserted;
@@ -1180,14 +1184,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   const [confirmDel,setConfirmDel]=useState(false);
   const [confirmAuxDelete,setConfirmAuxDelete]=useState(null);
   const [saving,setSaving]=useState(false);
-  const [lineRetrying,setLineRetrying]=useState(false);
-  const [lineCooldownLeft,setLineCooldownLeft]=useState(0);
   const [auxLoadError,setAuxLoadError]=useState('');
-  useEffect(()=>{
-    if(lineCooldownLeft<=0)return;
-    const timer=setTimeout(()=>setLineCooldownLeft(v=>Math.max(0,v-1)),1000);
-    return()=>clearTimeout(timer);
-  },[lineCooldownLeft]);
   const isAdmin=currentUser.role==='Admin';
   const caseId=caseData.caseid;
   const [showTransfer,setShowTransfer]=useState(false);
@@ -1240,43 +1237,6 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
   const contactRaw=contact||'';
   const contactVal=formatContact(contactRaw);
   const isQR=contactRaw.startsWith('http')||contactRaw.startsWith('data:image');
-  async function retryLineNotification(){
-    if(lineRetrying||lineCooldownLeft>0)return;
-    const raw=String(caseData.contact||'').trim();
-    const digits=raw.replace(/\D/g,'');
-    const contactBy=(raw.startsWith('http')||raw.startsWith('data:image'))?'QR Code':(/^\d{8,10}$/.test(digits)?'เบอร์':'ไลน์');
-    setLineRetrying(true);
-    const result=await notifyLineCaseCreated({
-      caseId,
-      customername:caseData.customername||'-',
-      contact:contactBy==='QR Code'?'':raw,
-      hasContact:!!raw,
-      contact_by:contactBy,
-      status:caseData.status||'รอข้อมูล',
-      sales:caseData.sales||UNASSIGNED_SALES
-    });
-    setLineRetrying(false);
-    if(result?.skipped){
-      showToast('ยังไม่ได้ส่ง LINE เพราะระบบแจ้งเตือน LINE ถูกปิดอยู่','warn',5000);
-      return;
-    }
-    if(result?.success){
-      showToast('ส่ง LINE ใหม่สำเร็จแล้ว'+(result?.recipientName?' → '+result.recipientName:''),'ok',3000);
-      return;
-    }
-    if(result?.recipientMissing){
-      showToast(result?.error||'ยังไม่ได้ลงทะเบียนปลายทาง LINE','warn',6500);
-      return;
-    }
-    if(result?.lineStatus===429){
-      const wait=Math.max(15,Number(result?.cooldownSeconds)||60);
-      setLineCooldownLeft(wait);
-      showToast((result?.error||'LINE จำกัดการส่งชั่วคราว')+' — กรุณาอย่ากดส่งซ้ำทันที','warn',8000);
-      return;
-    }
-    const suffix=result?.lineStatus?' (LINE '+result.lineStatus+')':'';
-    showToast('ส่ง LINE ใหม่ไม่สำเร็จ'+suffix+' — '+(result?.error||'กรุณาลองใหม่'),'err',8000);
-  }
   async function save(){
     if(saving)return;
     setSaving(true);
@@ -1351,7 +1311,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
               <button className={`btn ${editAll?'cp-action-danger':'cp-action-edit'}`} style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setClipAd(getClipAd(caseData.attachment));setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
               <button className="btn btn-ghost cp-action-danger" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setConfirmDel(true)}>🗑 ลบ</button>
-              {isAdmin&&<button className="btn btn-ghost cp-action-line" style={{flexBasis:'100%',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:'1px solid rgba(6,199,85,.45)',color:lineCooldownLeft>0?'var(--text3)':'#06c755',opacity:lineCooldownLeft>0?.65:1}} onClick={retryLineNotification} disabled={lineRetrying||saving||lineCooldownLeft>0}>📨 {lineRetrying?'กำลังส่ง LINE...':lineCooldownLeft>0?`รอ ${lineCooldownLeft} วิ แล้วส่งใหม่`:'ส่ง LINE ใหม่'}</button>}
+
             </div>
           <button className="btn btn-primary cp-action-save" style={{width:'100%',justifyContent:'center',padding:'11px',fontSize:14,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}} onClick={save} disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกและปิด'}</button>
           
@@ -1382,7 +1342,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
   const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',note:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||(currentUser.role==='Admin'&&!backdated?'คิวเพจ':'ปกติ'),clipad:''});
   const [lineSender,setLineSender]=useState(()=>{try{const saved=localStorage.getItem('casemyp:last-line-sender');if(LINE_SENDERS.includes(saved))return saved;}catch(e){}return 'อาท';});
-  const [loading,setLoading]=useState(false);const [previewId,setPreviewId]=useState('');
+  const [loading,setLoading]=useState(false);const submitInFlight=useRef(false);const [previewId,setPreviewId]=useState('');
   const [duplicates,setDuplicates]=useState([]);
   const [duplicateConfirmed,setDuplicateConfirmed]=useState(false);
   const [backMonth,setBackMonth]=useState(defaultBackMonth);
@@ -1393,35 +1353,45 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   useEffect(()=>{const pre=getCasePrefix();api('getCaseIdPreview',{prefix:pre}).then(r=>{setPreviewId(r.success?r.data:pre+'???');});},[backdated,backMonth]);
   async function submit(){
     if(DESIGN_PREVIEW)return showToast('โหมดตัวอย่าง: ทดลองกรอกได้ แต่ไม่บันทึกข้อมูลจริง','info');
+    if(loading||submitInFlight.current)return;
     if(!form.customername)return showToast('กรุณากรอกชื่อลูกค้า','warn');
     if(backdated&&!backDate)return showToast('กรุณาเลือกวันที่ย้อนหลัง','warn');
+    submitInFlight.current=true;
     setLoading(true);
-    if(!duplicateConfirmed){
-      const duplicateResult=await api('checkCaseDuplicates',{caseid:previewId,customername:form.customername,contact:form.contact});
-      if(duplicateResult.success&&safeArray(duplicateResult.data).length){
-        setDuplicates(duplicateResult.data);setLoading(false);return;
+    try{
+      if(!duplicateConfirmed){
+        const duplicateResult=await api('checkCaseDuplicates',{caseid:previewId,customername:form.customername,contact:form.contact});
+        if(!duplicateResult.success){
+          showToast('ตรวจสอบเคสซ้ำไม่สำเร็จ: '+(duplicateResult.error||'กรุณาลองใหม่'),'err');
+          return;
+        }
+        if(safeArray(duplicateResult.data).length){
+          setDuplicates(duplicateResult.data);
+          return;
+        }
       }
-    }
-    const submitData={...form};
-    submitData.createdBy=currentUser.name;
-    submitData.lineSender=lineSender;
-    submitData.report='';
-    if(forcedSent) submitData.sent=forcedSent;
-    // เก็บ clipad ใน attachment field โดย prefix [CLIP:...]
-    if(submitData.clipad){submitData.attachment='[CLIP:'+submitData.clipad+']';}
-    delete submitData.clipad;
-    if(backdated){
-      const [y,m,d]=String(backDate).split('-');
-      const [hh,mm]=String(backTime||'09:00').split(':');
-      const backTs=`${d}/${m}/${y} ${hh||'09'}:${mm||'00'}:00`;
-      submitData.casePrefix=getCasePrefix();
-      submitData.createdat=backTs;
-      submitData.updatedat=backTs;
-    }
-    const r=await api('addCase',submitData);
-    let lineResult=null;
-    if(r.success){
-      lineResult=await notifyLineCaseCreated({
+      const submitData={...form};
+      submitData.createdBy=currentUser.name;
+      submitData.lineSender=lineSender;
+      submitData.report='';
+      if(forcedSent)submitData.sent=forcedSent;
+      if(submitData.clipad){submitData.attachment='[CLIP:'+submitData.clipad+']';}
+      delete submitData.clipad;
+      if(backdated){
+        const [y,m,d]=String(backDate).split('-');
+        const [hh,mm]=String(backTime||'09:00').split(':');
+        const backTs=`${d}/${m}/${y} ${hh||'09'}:${mm||'00'}:00`;
+        submitData.casePrefix=getCasePrefix();
+        submitData.createdat=backTs;
+        submitData.updatedat=backTs;
+      }
+      const r=await api('addCase',submitData);
+      if(!r.success){
+        showToast(r.error||'เกิดข้อผิดพลาด','err');
+        return;
+      }
+      // The case is durably saved. Do not make the person wait for LINE's API.
+      const linePayload={
         caseId:r.caseId,
         customername:submitData.customername,
         contact:submitData.contact_by==='QR Code'?'':(submitData.contact||''),
@@ -1431,27 +1401,35 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
         sales:r.sales||submitData.sales||UNASSIGNED_SALES,
         note:submitData.note||'',
         sender:lineSender
-      });
-    }
-    setLoading(false);
-    if(r.success){
+      };
+      void notifyLineCaseCreated(linePayload).then(lineResult=>{
+        if(lineResult?.skipped){
+          showToast('เพิ่มเคสแล้ว • ปิดแจ้งเตือน LINE อยู่','info',4000);
+        }else if(lineResult?.success){
+          showToast('แจ้ง LINE '+(lineResult.recipientName||lineSender)+' สำเร็จ','ok');
+        }else if(lineResult?.recipientMissing){
+          showToast('บันทึกเคสแล้ว แต่ '+(lineResult.error||'ยังไม่ได้ลงทะเบียนปลายทาง LINE'),'warn',6500);
+        }else if(lineResult?.lineStatus===429){
+          showToast('บันทึกเคสแล้ว แต่ LINE จำกัดการส่งชั่วคราว','warn',6500);
+        }else{
+          showToast('บันทึกเคสแล้ว แต่แจ้ง LINE ไม่สำเร็จ'+(lineResult?.error?' — '+lineResult.error:''),'warn',5000);
+        }
+      }).catch(()=>showToast('บันทึกเคสแล้ว แต่แจ้ง LINE ไม่สำเร็จ','warn',5000));
       if(r.noteSaved===false){
         showToast('เพิ่มเคสสำเร็จ แต่บันทึกหมายเหตุไม่สำเร็จ กรุณาเปิดเคสแล้วเพิ่ม Note อีกครั้ง','warn',6000);
       }else if(backdated){
-        showToast('เพิ่มเคสย้อนหลังสำเร็จ','ok');
-      }else if(lineResult?.skipped){
-        showToast('เพิ่มเคสสำเร็จ • ปิดแจ้งเตือน LINE อยู่','ok');
-      }else if(lineResult?.success){
-        showToast('เพิ่มเคสสำเร็จ • แจ้ง LINE '+(lineResult.recipientName||lineSender)+' แล้ว','ok');
-      }else if(lineResult?.recipientMissing){
-        showToast('เพิ่มเคสสำเร็จ แต่ '+(lineResult.error||'ยังไม่ได้ลงทะเบียนปลายทาง LINE'),'warn',6500);
-      }else if(lineResult?.lineStatus===429){
-        showToast('เพิ่มเคสสำเร็จ แต่ LINE ถูกจำกัดการส่งชั่วคราว • เคสยังบันทึกปกติ กรุณารอก่อนส่งใหม่','warn',7000);
+        showToast('เพิ่มเคสย้อนหลังสำเร็จ • กำลังแจ้ง LINE','ok');
       }else{
-        showToast('เพิ่มเคสสำเร็จ แต่แจ้ง LINE ไม่สำเร็จ'+(lineResult?.error?' — '+lineResult.error:''),'warn',5000);
+        showToast('เพิ่มเคสสำเร็จ • กำลังแจ้ง LINE','ok');
       }
-      onAdded();onClose();
-    }else showToast(r.error||'เกิดข้อผิดพลาด','err');
+      onAdded();
+      onClose();
+    }catch(error){
+      showToast('เกิดข้อผิดพลาดขณะเพิ่มเคส: '+(error?.message||'กรุณาลองใหม่'),'err',5000);
+    }finally{
+      submitInFlight.current=false;
+      setLoading(false);
+    }
   }
   return <Modal variant="case-form" title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     {DESIGN_PREVIEW&&<div className="casemyp-v2-form-demo-note">🩷 ทดลองดูฟอร์มและสีปุ่มได้ ข้อมูลนี้เป็นตัวอย่าง ไม่ถูกส่งหรือบันทึกจริง</div>}
