@@ -1378,7 +1378,8 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
     submitInFlight.current=true;
     setLoading(true);
     try{
-      if(!duplicateConfirmed){
+      const useRpcDuplicateCheck=SECURE_GATEWAY&&(currentUser.role==='Admin'||currentUser.username==='art');
+      if(!duplicateConfirmed&&!useRpcDuplicateCheck){
         const duplicateResult=await api('checkCaseDuplicates',{caseid:previewId,customername:form.customername,contact:form.contact});
         if(!duplicateResult.success){
           showToast('ตรวจสอบเคสซ้ำไม่สำเร็จ: '+(duplicateResult.error||'กรุณาลองใหม่'),'err');
@@ -1392,6 +1393,8 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       const submitData={...form};
       submitData.createdBy=currentUser.name;
       submitData.fastMode=SECURE_GATEWAY&&(currentUser.role==='Admin'||currentUser.username==='art');
+      submitData.previewId=previewId;
+      submitData.duplicateConfirmed=duplicateConfirmed;
       submitData.lineSender=lineSender;
       submitData.report='';
       if(forcedSent)submitData.sent=forcedSent;
@@ -1406,6 +1409,10 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
         submitData.updatedat=backTs;
       }
       const r=await api('addCase',submitData);
+      if(Array.isArray(r.duplicates)&&r.duplicates.length){
+        setDuplicates(r.duplicates);
+        return;
+      }
       if(!r.success){
         showToast(r.error||'เกิดข้อผิดพลาด','err');
         return;

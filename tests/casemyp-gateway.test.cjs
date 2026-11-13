@@ -203,6 +203,7 @@ test('fast case creation keeps queue-assigned salesperson, history, and notifica
     const u=new URL(url),table=u.pathname.split('/').pop();
     requests.push({table,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null});
     if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='casemyp_save_case_v1')return new Response(JSON.stringify({code:'PGRST202'}),{status:404});
     if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
     if(table==='cases'&&opts.method==='POST')return new Response(JSON.stringify([{caseid:opts.body?JSON.parse(opts.body).caseid:'2611001',sales:'แฟ้บ',version:1}]),{status:201});
     if(table==='cases')return new Response('[]',{status:200});
@@ -227,6 +228,7 @@ test('fast case update rejects stale versions before making any write',async()=>
   global.fetch=async(url,opts={})=>{
     const u=new URL(url),table=u.pathname.split('/').pop();
     if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='casemyp_save_case_v1')return new Response(JSON.stringify({code:'PGRST202'}),{status:404});
     if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
     if(table==='cases')return new Response(JSON.stringify([{caseid:'2611001',version:3,customername:'Before',sales:'แฟ้บ'}]),{status:200});
     if(opts.method==='POST'||opts.method==='PATCH')writes++;
@@ -245,6 +247,7 @@ test('fast case update performs one versioned patch including admin reassignment
     const u=new URL(url),table=u.pathname.split('/').pop();
     requests.push({table,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null,params:u.searchParams});
     if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='casemyp_save_case_v1')return new Response(JSON.stringify({code:'PGRST202'}),{status:404});
     if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
     if(table==='cases'&&opts.method==='PATCH')return new Response(JSON.stringify([{caseid:'2611001',version:4,sales:'พีร์'}]),{status:200});
     if(table==='cases')return new Response(JSON.stringify([{caseid:'2611001',version:3,customername:'Before',sales:'แฟ้บ'}]),{status:200});
@@ -297,4 +300,86 @@ test('current case pages initially request only the current month, with archive 
   assert.match(admin,/option value="all"/);
   assert.match(admin,/api\('searchCases',\{q:term\}\)/);
   assert.match(sales,/api\('searchCases',\{q:term,sales:currentUser.name\}\)/);
+});
+
+test('new RPC saves one operation through service-role-only endpoint without extra case table roundtrips',async()=>{
+  setup();
+  const requests=[];
+  global.fetch=async(url,opts={})=>{
+    const p=new URL(url),table=p.pathname.split('/').pop(),body=opts.body?JSON.parse(opts.body):null;
+    requests.push({table,method:opts.method||'GET',body});
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
+    if(table==='casemyp_save_case_v1')return new Response(JSON.stringify({
+      success:true,caseId:'2611002',sales:'บอลเล็ก',noteSaved:true,historySaved:true,notificationSaved:true
+    }),{status:200});
+    throw new Error('Unexpected database access: '+table);
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const out=res();
+  await handler(req({action:'caseWorkflow',operation:'create',payload:{customername:'Test person',contact:'1234567890',note:'Test'}},cookie),out);
+  assert.equal(out.statusCode,200);
+  assert.equal(out.body.caseId,'2611002');
+  const saves=requests.filter(x=>x.table==='casemyp_save_case_v1');
+  assert.equal(saves.length,1);
+  assert.equal(saves[0].body.p_operation,'create');
+  assert.equal(saves[0].body.p_actor_userid,'A001');
+  assert.equal(requests.filter(x=>x.table==='cases').length,0);
+});
+test('RPC duplicate confirmation is returned without writing cases',async()=>{
+  setup();
+  const requests=[];
+  global.fetch=async(url,opts={})=>{
+    const p=new URL(url),table=p.pathname.split('/').pop();
+    requests.push(table);
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
+    if(table==='casemyp_save_case_v1')return new Response(JSON.stringify({
+      success:false,duplicates:[{caseid:'2611001',customername:'Same',contact:'1234'}]
+    }),{status:200});
+    throw Error('Unexpected route '+table);
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const out=res();await handler(req({action:'caseWorkflow',operation:'create',payload:{customername:'Same'}},cookie),out);
+  assert.equal(out.statusCode,200);
+  assert.equal(out.body.success,false);
+  assert.equal(out.body.duplicates.length,1);
+  assert.equal(requests.filter(x=>x==='casemyp_save_case_v1').length,1);
+});
+test('RPC transport failure never retries an ambiguous case write through legacy path',async()=>{
+  setup();
+  const requests=[];
+  global.fetch=async(url,opts={})=>{
+    const p=new URL(url),table=p.pathname.split('/').pop();requests.push(table);
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
+    if(table==='casemyp_save_case_v1')return new Response(JSON.stringify({message:'Database error',code:'XX000'}),{status:500});
+    throw Error('Unexpected fallback access');
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const out=res();await handler(req({action:'caseWorkflow',operation:'create',payload:{customername:'Test'}},cookie),out);
+  assert.equal(out.statusCode,502);
+  assert.equal(out.body.success,false);
+  assert.equal(requests.filter(x=>x==='cases').length,0);
+});
+test('SQL RPC contract keeps audit triggers and service-role-only access',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const sql=fs.readFileSync(path.join(__dirname,'../supabase/production/20261113_case_save_rpc_v1.sql'),'utf8');
+  const ui=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  assert.match(sql,/SECURITY INVOKER/);
+  assert.match(sql,/REVOKE ALL ON FUNCTION public\.casemyp_save_case_v1\(text,jsonb,text\) FROM PUBLIC/);
+  assert.match(sql,/GRANT EXECUTE ON FUNCTION public\.casemyp_save_case_v1\(text,jsonb,text\) TO service_role/);
+  assert.match(sql,/pg_advisory_xact_lock/);
+  assert.match(sql,/INSERT INTO public\.cases/);
+  assert.match(sql,/SELECT \* INTO v_before FROM public\.cases/);
+  assert.match(sql,/v_expected_version<>v_prev_version/);
+  assert.match(sql,/INSERT INTO public\.history/);
+  assert.match(sql,/INSERT INTO public\.case_notes/);
+  assert.match(sql,/INSERT INTO public\.notifications/);
+  assert.match(ui,/useRpcDuplicateCheck=SECURE_GATEWAY/);
+  assert.match(ui,/submitData\.duplicateConfirmed=duplicateConfirmed/);
+  assert.match(ui,/if\(Array\.isArray\(r\.duplicates\)&&r\.duplicates\.length\)/);
 });
