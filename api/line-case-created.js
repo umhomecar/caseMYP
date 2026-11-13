@@ -60,7 +60,7 @@ async function supabaseRows(table,params,{serverOnly=false}={}){
   const endpoint=new URL(url+'/rest/v1/'+table);
   Object.entries(params||{}).forEach(([k,v])=>endpoint.searchParams.set(k,String(v)));
   const response=await fetch(endpoint,{
-    headers:{apikey:key,Authorization:'Bearer '+key,Accept:'application/json'}
+    headers:{apikey:key,...(key.startsWith('sb_secret_')?{}:{Authorization:'Bearer '+key}),Accept:'application/json'}
   });
   if(!response.ok){
     const detail=oneLine(await response.text().catch(()=>''));
@@ -87,10 +87,10 @@ async function inferLineSender(caseId){
   if(!caseId)return '';
   try{
     const rows=await supabaseRows('history',{
-      select:'sales,detail,action,id',
+      select:'sales,detail,action,createdat',
       caseid:'eq.'+caseId,
       action:'eq.เพิ่มเคส',
-      order:'id.asc',
+      order:'createdat.asc',
       limit:'1'
     });
     const row=rows[0];
@@ -173,7 +173,7 @@ function qrSignature(caseId,token){
 
 async function lineNotificationEnabled(){
   const supaUrl=getSupabaseUrl();
-  const supaKey=getPublicSupabaseKey()||getServerSupabaseKey();
+  const supaKey=getServerSupabaseKey()||getPublicSupabaseKey();
   if(!supaUrl||!supaKey)return true;
 
   try{
@@ -185,7 +185,7 @@ async function lineNotificationEnabled(){
     const response=await fetch(url,{
       headers:{
         apikey:supaKey,
-        Authorization:'Bearer '+supaKey,
+        ...(supaKey.startsWith('sb_secret_')?{}:{Authorization:'Bearer '+supaKey}),
         Accept:'application/json'
       }
     });
