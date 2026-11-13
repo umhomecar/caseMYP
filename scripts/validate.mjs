@@ -151,7 +151,7 @@ if(!getCasesHandler.includes("if(isSbError(rows))return{success:false,error:form
   fail('getCases must distinguish an empty dataset from a failed Supabase request');
 if(!caseCenter.includes("api('getCases'")||!caseCenter.includes('casemyp-v2-case-filters'))
   fail('Current-case filtering or read path is missing');
-if(!caseCenter.includes("const params=scope==='all'?{all:'true'}:{scope:'current_and_pending'}")||
+if(!caseCenter.includes("const params=scope==='all'?{all:'true'}:{scope}")||
    !caseCenter.includes('onUpdated={()=>load(true)}')||!caseCenter.includes('onAdded={()=>load(true)}'))
   fail('Case create/edit must refresh in background without hiding the case list');
 if(!getCasesHandler.includes("data.scope==='current_and_pending'")||
