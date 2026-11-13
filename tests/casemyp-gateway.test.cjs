@@ -32,10 +32,11 @@ function fakeDb(){
   };
   return seen;
 }
-test('fails closed when preview gateway is not enabled',async()=>{
+test('new database gateway is enabled by backend key without a new flag',async()=>{
   setup();process.env.CASEMYP_SECURE_GATEWAY='false';
+  fakeDb();
   const result=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),result);
-  assert.equal(result.statusCode,503);
+  assert.equal(result.statusCode,200);
 });
 test('rejects cross-origin requests',async()=>{
   setup();const input=req({action:'login'});input.headers.origin='https://attacker.example';
@@ -147,4 +148,20 @@ test('fails closed on an unavailable persistent throttle',async()=>{
  global.fetch=async()=>new Response('false',{status:200});
  const result=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),result);
  assert.equal(result.statusCode,429);
+});
+
+test('art operator can write cases without being granted user-management writes',async()=>{
+  setup();
+  global.fetch=async(url)=>{
+    const p=new URL(url);
+    if(p.pathname.endsWith('/casemyp_check_login_limit'))return new Response('true',{status:200});
+    if(p.pathname.endsWith('/users'))return new Response(JSON.stringify([{...exampleUser,username:'art',role:'Sales'}]),{status:200});
+    return new Response('[]',{status:200});
+  };
+  const login=res();await handler(req({action:'login',username:'art',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const caseResult=res();await handler(req({action:'data',table:'cases',method:'POST',query:'',body:{caseid:'2611109',sales:'บอลเล็ก'}} ,cookie),caseResult);
+  assert.equal(caseResult.statusCode,200);
+  const deny=res();await handler(req({action:'data',table:'users',method:'PATCH',query:'userid=eq.A001',body:{role:'Admin'}},cookie),deny);
+  assert.equal(deny.statusCode,403);
 });
