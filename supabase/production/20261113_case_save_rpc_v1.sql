@@ -165,7 +165,7 @@ BEGIN
   END IF;
   v_changed_sales:=v_actor.role='Admin'
      AND nullif(btrim(p_payload->>'newSales'),'') IS NOT NULL
-     AND p_payload->>'newSales' IS DISTINCT FROM v_before.sales;
+     AND (p_payload->>'newSales') IS DISTINCT FROM v_before.sales;
   UPDATE public.cases AS c SET
     updatedat=v_ts,version=v_prev_version+1,
     status=CASE WHEN p_payload ? 'status' THEN p_payload->>'status' ELSE c.status END,
@@ -190,8 +190,8 @@ BEGIN
   IF v_changed_sales THEN
     INSERT INTO public.history(caseid,sales,action,detail,createdat)
     VALUES(v_caseid,v_actor_name,'มอบหมายเคส',
-       'มอบหมาย '||coalesce(v_before.sales,'รอมอบหมาย')||' → '||p_payload->>'newSales',v_ts);
-    IF p_payload->>'newSales'<>'รอมอบหมาย' THEN
+       'มอบหมาย '||coalesce(v_before.sales,'รอมอบหมาย')||' → '||(p_payload->>'newSales'),v_ts);
+    IF (p_payload->>'newSales')<>'รอมอบหมาย' THEN
       INSERT INTO public.notifications(id,sales,caseid,message,createdat,status)
       VALUES(nextval('public.notifications_id_seq'::regclass),p_payload->>'newSales',v_caseid,
         '📋 ได้รับมอบหมายเคส '||v_caseid||' ('||coalesce(v_case.customername,'')||')',v_ts,'unread');
