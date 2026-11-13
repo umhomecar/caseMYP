@@ -577,6 +577,7 @@ async function sbApi(action,data){
       if(dashboardMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(dashboardMonth))return{success:false,error:'เดือนไม่ถูกต้อง'};
       const q={deleted_at:'is.null',order:'caseid.desc',limit:dashboardMonth?'5000':'50000'};
       if(dashboardMonth)q.caseid=`like.${dashboardMonth.slice(2,4)+dashboardMonth.slice(5,7)}*`;
+      else if(data.scope==='current_month')q.caseid=`like.${pre}*`;
       else if(data.scope==='current_and_pending')q.or=`(caseid.like.${pre}*,status.not.in.(${CLOSED_STATUSES.join(',')}),status.is.null)`;
       else if(!data.all)q.caseid=`like.${pre}*`;
       if(data.sales&&data.sales!=='all')q.sales=`eq.${data.sales}`;
@@ -1756,9 +1757,9 @@ function AdminSentCasesPage({currentUser,users,caseType,title,icon}){
 }
 
 function AdminCurrentCases({currentUser,users}){
-  const [scope,setScope]=useState('current_and_pending');
-  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_and_pending'})?.data));
-  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_and_pending'})?.success);
+  const [scope,setScope]=useState('current_month');
+  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_month'})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_month'})?.success);
   const [loadError,setLoadError]=useState('');
   const currentMonthFilters=()=>({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
   const [filter,setFilter]=useState(currentMonthFilters);
@@ -1774,7 +1775,7 @@ function AdminCurrentCases({currentUser,users}){
   const [bulkSales,setBulkSales]=useState('');
   const [bulkSaving,setBulkSaving]=useState(false);
   const load=useCallback((background=false,force=false)=>{
-    const params=scope==='all'?{all:'true'}:{scope:'current_and_pending'};
+    const params=scope==='all'?{all:'true'}:{scope};
     const cached=cacheGetStale('getCases',params);
     if(cached?.success)setCases(safeArray(cached.data));
     if(!background&&!cached?.success)setLoading(true);
@@ -1926,10 +1927,11 @@ function AdminCurrentCases({currentUser,users}){
       <span style={{fontSize:12,color:'var(--text3)'}}>—</span>
       <input type="date" value={filter.dateTo||''} onChange={e=>setFilter(f=>({...f,dateTo:e.target.value}))} style={{fontSize:12,height:30,padding:'0 8px',flex:'0 0 auto',width:130,borderRadius:8}}/>
       <select value={scope} onChange={e=>{setScope(e.target.value);setSelectedIds(new Set());setArchiveMatches([]);setArchiveQuery('');}} style={{fontSize:12,height:30}}>
+        <option value="current_month">เฉพาะเดือนปัจจุบัน (โหลดเร็ว)</option>
         <option value="current_and_pending">เดือนนี้ + เคสเก่าที่ยังค้าง</option>
         <option value="all">ทุกเดือน (รวมเคสปิด)</option>
       </select>
-      <button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>{setFilter(currentMonthFilters());setArchiveMatches([]);setArchiveQuery('');setSelectedIds(new Set());setScope('current_and_pending');}}>↺ ล้างตัวกรอง</button>
+      <button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>{setFilter(currentMonthFilters());setArchiveMatches([]);setArchiveQuery('');setSelectedIds(new Set());setScope('current_month');}}>↺ ล้างตัวกรอง</button>
     </div>
     {selectedIds.size>0&&<div className="card" style={{padding:'10px 12px',marginBottom:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',borderColor:'rgba(88,166,255,.4)'}}><strong style={{fontSize:13}}>เลือกแล้ว {selectedIds.size} เคส</strong><select value={bulkSales} onChange={e=>setBulkSales(e.target.value)} style={{maxWidth:240}}><option value="">-- เลือกเซลส์ผู้รับผิดชอบ --</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" onClick={assignSelected} disabled={!bulkSales||bulkSaving}>{bulkSaving?'กำลังมอบหมาย...':'มอบหมายพร้อมกัน'}</button><button className="btn btn-ghost" onClick={()=>setSelectedIds(new Set())}>ยกเลิกการเลือก</button></div>}
     <div className="admin-cases-mobile-list">
@@ -2476,13 +2478,13 @@ function TodayFollowupBanner({currentUser}){
 }
 
 function SalesCurrentCases({currentUser,users}){
-  const [scope,setScope]=useState('current_and_pending');
-  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_and_pending',sales:currentUser.name})?.data));
-  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_and_pending',sales:currentUser.name})?.success);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
+  const [scope,setScope]=useState('current_month');
+  const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_month',sales:currentUser.name})?.data));
+  const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_month',sales:currentUser.name})?.success);const [sel,setSel]=useState(null);const [q,setQ]=useState('');const [sortDir,setSortDir]=useState('desc');const [filterStatus,setFilterStatus]=useState('');const [showClosed,setShowClosed]=useState(false);
   const [loadError,setLoadError]=useState('');
   const CLOSED_STATUSES=['ปิดเคส','รีเจค','ได้รถจากที่อื่น','โยนเคส','ปล่อยแล้ว'];
   const load=useCallback((force=false)=>{
-    const params=scope==='all'?{all:'true',sales:currentUser.name}:{scope:'current_and_pending',sales:currentUser.name};
+    const params=scope==='all'?{all:'true',sales:currentUser.name}:{scope,sales:currentUser.name};
     const cached=cacheGetStale('getCases',params);
     if(cached?.success)setCases(safeArray(cached.data));
     if(!cached?.success)setLoading(true);
@@ -2518,7 +2520,7 @@ function SalesCurrentCases({currentUser,users}){
     {loadError&&<div className="card" role="alert" style={{marginBottom:12,padding:14,color:'var(--red)'}}>⚠️ {loadError} <button type="button" className="btn cp-action-refresh" onClick={()=>load(true)} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <TodayFollowupBanner currentUser={currentUser}/>
     <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:180}}><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text3)',pointerEvents:'none',fontSize:14}}>🔍</span><input value={q} onChange={e=>{setArchiveQuery('');setQ(e.target.value);}} onKeyDown={e=>e.key==='Enter'&&searchArchive()} placeholder="ค้นหาชื่อ เบอร์ รหัสเคส..." style={{paddingLeft:32,fontSize:13}}/></div>{q&&<button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>{setQ('');setArchiveQuery('');setArchiveMatches([]);}}>✕ ล้าง</button>}<button className="btn btn-ghost" disabled={!q.trim()||archiveSearching} onClick={searchArchive} style={{fontSize:12}}>{archiveSearching?'กำลังค้นหา...':'ค้นหาทุกเดือน'}</button></div>
-    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>{setShowClosed(v=>!v);setScope(v=>v==='all'?'current_and_pending':'all');}}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
+    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border)',borderRadius:20}} onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?<>🆕 ใหม่สุดก่อน ↓</>:<>🕰 เก่าสุดก่อน ↑</>}</button><select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{fontSize:12,padding:'6px 10px',borderRadius:20,minWidth:120,flex:1,maxWidth:180}}><option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="btn btn-ghost" style={{fontSize:12,padding:'6px 12px',borderRadius:20,border:`1px solid ${showClosed?'var(--red)':'var(--border)'}`,color:showClosed?'var(--red)':'var(--text2)'}} onClick={()=>{setShowClosed(v=>!v);setScope(v=>v==='all'?'current_month':'all');}}>{showClosed?'🔴 ซ่อนปิดแล้ว':'⚫ แสดงเคสที่ปิด'}</button><span style={{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}>แสดง {filtered.length} รายการ</span></div>
     {/* Sort by Score button */}
     {!loading&&!q&&!filterStatus&&<div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}><button className="btn btn-ghost" style={{fontSize:11,padding:'4px 10px',borderRadius:20,border:'1px solid var(--border)'}} onClick={()=>setSortDir(s=>s==='score'?'desc':'score')}>{sortDir==='score'?'🧠 เรียงตามคะแนน ✓':'🧠 เรียงตามคะแนน'}</button></div>}
     {loading?<SkeletonCards n={4}/>:loadError&&!cases.length?<div style={{padding:32,textAlign:'center',color:'var(--text2)'}}>โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่</div>:filtered.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text2)'}}><div style={{fontSize:32,marginBottom:8}}>🔍</div><div>{q||filterStatus?'ไม่พบเคสที่ตรงกัน':'ยังไม่มีเคส'}</div></div>:filtered.map((c,i)=>{
