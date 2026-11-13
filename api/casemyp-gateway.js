@@ -204,6 +204,107 @@ async function salesScope(config,user,table,method,query,body){
   }
   return {allow:false};
 }
+
+/* One authenticated server call instead of multiple browser->gateway->database
+   round trips for the two CaseMYP operations accounts. This deliberately reuses
+   existing cases trigger, optimistic version checks, and history/notification rows. */
+function caseNowTH(){
+  const d=new Date(Date.now()+7*3600000),pad=n=>String(n).padStart(2,'0');
+  return pad(d.getUTCDate())+'/'+pad(d.getUTCMonth()+1)+'/'+d.getUTCFullYear()+' '+pad(d.getUTCHours())+':'+pad(d.getUTCMinutes())+':'+pad(d.getUTCSeconds());
+}
+function caseResultOk(r){return r.status>=200&&r.status<300&&Array.isArray(r.data);}
+function caseFail(status,message,extra={}){return {status,result:{success:false,error:message,...extra}};}
+function caseDbError(r){return String(r?.data?.message||r?.data?.details||'ไม่สามารถบันทึกข้อมูลได้').slice(0,250);}
+function isCaseUnassigned(s){return !String(s||'').trim()||String(s).trim()==='รอมอบหมาย';}
+function caseInputString(value,max=5000){return typeof value==='string'&&value.length<=max?value:null;}
+function validCasePayload(p){
+  if(!p||Array.isArray(p)||typeof p!=='object')return false;
+  const fields=['customername','contact','report','status','sales','createdat','updatedat','sent','attachment','caseid','casePrefix','note','lineSender','detail','changedBy','newSales','createdBy'];
+  return fields.every(k=>p[k]===undefined||caseInputString(p[k],k==='attachment'?100000:k==='report'?30000:5000)!==null);
+}
+async function caseCreate(config,user,p){
+  if(!validCasePayload(p))return caseFail(400,'ข้อมูลเคสไม่ถูกต้อง');
+  if(!String(p.customername||'').trim())return caseFail(400,'กรุณากรอกชื่อลูกค้า');
+  const ts=p.createdat||caseNowTH(),prefix=p.casePrefix||String(new Date(Date.now()+7*3600000).getUTCFullYear()).slice(-2)+String(new Date(Date.now()+7*3600000).getUTCMonth()+1).padStart(2,'0');
+  if(!/^\d{4}$/.test(prefix)||p.caseid&&!/^\d{7}$/.test(p.caseid))return caseFail(400,'รหัสเคสไม่ถูกต้อง');
+  const assigned=String(p.sales||'').trim()||'รอมอบหมาย';
+  const row={customername:p.customername,contact:p.contact||'',report:p.report||'',status:p.status||'รอข้อมูล',sales:assigned,createdat:ts,updatedat:p.updatedat||ts,sent:p.sent||'ปกติ',attachment:p.attachment||'',version:1};
+  const max=await db(config,'cases',{select:'caseid',caseid:'like.'+prefix+'*',order:'caseid.desc',limit:1});
+  if(!caseResultOk(max))return caseFail(502,caseDbError(max));
+  const top=String(max.data[0]?.caseid||'');
+  const seq=top.startsWith(prefix)?Number.parseInt(top.slice(4),10)||0:0;
+  let inserted=null,caseid='';
+  for(let attempt=0;attempt<(p.caseid?1:8);attempt++){
+    caseid=p.caseid||prefix+String(seq+attempt+1).padStart(3,'0');
+    const response=await db(config,'cases',{}, {method:'POST',write:true,body:{...row,caseid}});
+    if(caseResultOk(response)&&response.data.length){inserted=response.data[0];break;}
+    if(response.status===409&&response.data?.code==='23505'&&!p.caseid)continue;
+    return caseFail(response.status>=400&&response.status<600?response.status:502,caseDbError(response));
+  }
+  if(!inserted)return caseFail(409,'รหัสเคสซ้ำหลายครั้ง กรุณาลองใหม่');
+  const sales=String(inserted.sales||assigned);
+  const actor=user.name||'แอดมิน';
+  const note=String(p.note||'').trim();
+  const sender=['เกมส์','อาท'].includes(p.lineSender)?p.lineSender:'';
+  const actorNote=sender?' | ผู้ส่ง LINE: '+sender:'';
+  async function writeRow(table,body){
+    try{const r=await db(config,table,{}, {method:'POST',write:true,body});return caseResultOk(r);}catch{return false;}
+  }
+  const [historySaved,noteOutcome,notificationSaved]=await Promise.all([
+    writeRow('history',{caseid,sales:actor,action:'เพิ่มเคส',detail:'เพิ่มเคสใหม่: '+p.customername+(isCaseUnassigned(sales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+sales)+actorNote,createdat:caseNowTH()}),
+    (async()=>{
+      if(!note)return {noteSaved:true,noteHistorySaved:true};
+      const noteSaved=await writeRow('case_notes',{caseid,sales:actor,note,createdat:ts,deletedat:null});
+      const noteHistorySaved=noteSaved?await writeRow('history',{caseid,sales:actor,action:'📝 Note',detail:'📝 Note: '+note,createdat:caseNowTH()}):true;
+      return {noteSaved,noteHistorySaved};
+    })(),
+    isCaseUnassigned(sales)?Promise.resolve(true):writeRow('notifications',{sales,caseid,message:'📋 ได้รับมอบหมายเคสใหม่ '+caseid+' ('+p.customername+')',createdat:caseNowTH(),status:'unread'})
+  ]);
+  return {status:200,result:{success:true,caseId:caseid,sales,unassigned:isCaseUnassigned(sales),historySaved:historySaved&&noteOutcome.noteHistorySaved,noteSaved:noteOutcome.noteSaved,notificationSaved}};
+}
+async function caseUpdate(config,user,p){
+  if(!validCasePayload(p)||!p.caseid||p.caseid.length>64)return caseFail(400,'ข้อมูลเคสไม่ถูกต้อง');
+  const old=await db(config,'cases',{caseid:'eq.'+p.caseid,deleted_at:'is.null',limit:1});
+  if(!caseResultOk(old))return caseFail(502,caseDbError(old));
+  const before=old.data[0];
+  if(!before)return caseFail(404,'ไม่พบเคส หรือเคสอยู่ในถังขยะแล้ว');
+  const version=Number(before.version)||1;
+  if(p.expectedVersion!==undefined&&Number(p.expectedVersion)!==version)return caseFail(409,'เคสนี้ถูกแก้จากอุปกรณ์อื่น กรุณารีเฟรชก่อนบันทึก',{conflict:true});
+  const upd={updatedat:caseNowTH(),version:version+1};
+  for(const field of ['status','report','sales','customername','contact','sent','attachment'])if(p[field]!==undefined)upd[field]=p[field];
+  const changingSales=user.role==='Admin'&&typeof p.newSales==='string'&&p.newSales.trim()&&p.newSales!==before.sales;
+  if(changingSales){
+    upd.sales=p.newSales;
+    upd.assigned_at=new Date().toISOString();
+    upd.assigned_by=user.name||'แอดมิน';
+  }
+  const updated=await db(config,'cases',{caseid:'eq.'+p.caseid,deleted_at:'is.null',version:'eq.'+version},{method:'PATCH',write:true,body:upd});
+  if(!caseResultOk(updated))return caseFail(502,caseDbError(updated));
+  if(!updated.data.length)return caseFail(409,'เคสนี้ถูกแก้จากอุปกรณ์อื่น กรุณารีเฟรชก่อนบันทึก',{conflict:true});
+  const actor=user.name||'ระบบ',changed=[];
+  for(const field of ['status','sales','customername','contact','report','attachment'])
+    if(upd[field]!==undefined&&String(upd[field]??'')!==String(before[field]??''))changed.push(field+': '+String(before[field]??'-')+' → '+String(upd[field]??'-'));
+  async function writeRow(table,body){
+    try{const r=await db(config,table,{}, {method:'POST',write:true,body});return caseResultOk(r);}catch{return false;}
+  }
+  const tasks=[
+    writeRow('history',{caseid:p.caseid,sales:actor,action:'แก้ไข',detail:p.detail||changed.join(' | ')||'บันทึกข้อมูล',createdat:caseNowTH()})
+  ];
+  if(changingSales)tasks.push(writeRow('history',{caseid:p.caseid,sales:actor,action:'มอบหมายเคส',detail:'มอบหมาย '+(before.sales||'รอมอบหมาย')+' → '+p.newSales,createdat:caseNowTH()}));
+  const notify=changingSales&&!isCaseUnassigned(p.newSales)
+    ?writeRow('notifications',{sales:p.newSales,caseid:p.caseid,message:'📋 ได้รับมอบหมายเคส '+p.caseid+' ('+(p.customername||before.customername||'')+')',createdat:caseNowTH(),status:'unread'})
+    :Promise.resolve(true);
+  const [historyResults,notificationSaved]=await Promise.all([Promise.all(tasks),notify]);
+  return {status:200,result:{success:true,data:updated.data[0],historySaved:historyResults.every(Boolean),notificationSaved}};
+}
+async function fastCaseWorkflow(config,user,data){
+  if(user.role!=='Admin'&&!(user.role==='Sales'&&user.username==='art'))return caseFail(403,'ไม่มีสิทธิ์แก้ไขเคส');
+  const p=data.payload;
+  if(data.operation==='create')return caseCreate(config,user,p);
+  if(data.operation==='update')return caseUpdate(config,user,p);
+  return caseFail(400,'คำสั่งไม่ถูกต้อง');
+}
+
 async function handler(req,res){
   if(req.method!=='POST')return json(res,405,{message:'Method not allowed'});
   if(!sameOrigin(req))return json(res,403,{message:'Origin mismatch'});
@@ -226,6 +327,10 @@ async function handler(req,res){
     const user=await currentUser(req,config);
     if(!user)return json(res,401,{message:'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'});
     if(data.action==='session')return json(res,200,{success:true,user:userPublic(user)});
+    if(data.action==='caseWorkflow'){
+      const outcome=await fastCaseWorkflow(config,user,data);
+      return json(res,outcome.status,outcome.result);
+    }
     if(data.action!=='data')return json(res,400,{message:'Unknown action'});
     const method=String(data.method||'GET').toUpperCase(),table=String(data.table||'');
     if(!TABLES.has(table)||!['GET','POST','PATCH','DELETE'].includes(method))return json(res,403,{message:'Operation not allowed'});
