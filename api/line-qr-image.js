@@ -15,7 +15,7 @@ function safeEqual(a,b){
 
 async function loadCaseContact(caseId){
   const supaUrl=String(process.env.CASEMYP_SUPABASE_URL||'').trim().replace(/\/$/,'');
-  const supaKey=String(process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
+  const supaKey=String(process.env.CASEMYP_SUPABASE_SECRET_KEY||process.env.CASEMYP_SUPABASE_SERVICE_ROLE_KEY||process.env.CASEMYP_SUPABASE_ANON_KEY||'').trim();
   if(!supaUrl||!supaKey)throw new Error('Supabase is not configured');
 
   const url=new URL(supaUrl+'/rest/v1/cases');
@@ -27,7 +27,7 @@ async function loadCaseContact(caseId){
   const response=await fetch(url,{
     headers:{
       apikey:supaKey,
-      Authorization:'Bearer '+supaKey,
+      ...(supaKey.startsWith('sb_secret_')?{}:{Authorization:'Bearer '+supaKey}),
       Accept:'application/json'
     }
   });
