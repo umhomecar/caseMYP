@@ -2665,3 +2665,63 @@ body:not(.light) .casemyp-v2-trash button.cp-tool-button{
   /* Validation warnings must remain above the new modal layer. */
   #toast-container{z-index:10030!important;}
 }
+
+
+/* Case detail on phones: keep Close and Save visible above bottom navigation.
+   The dialog is portaled to document.body to avoid transformed page stacking contexts. */
+@media(max-width:768px){
+  .cp-case-detail-overlay{
+    z-index:10020!important;
+    align-items:stretch!important;
+    justify-content:center!important;
+    padding:calc(env(safe-area-inset-top,0px) + 8px) 8px
+            calc(env(safe-area-inset-bottom,0px) + 8px)!important;
+  }
+  body .cp-case-detail-overlay > .cp-case-detail-modal{
+    display:flex!important;
+    flex-direction:column!important;
+    width:100%!important;
+    max-width:100%!important;
+    height:100%!important;
+    max-height:100%!important;
+    min-height:0!important;
+    margin:0!important;
+    overflow:hidden!important;
+    border-radius:18px!important;
+  }
+  .cp-case-detail-modal > .cp-case-detail-header{
+    flex:0 0 auto!important;
+    position:relative;
+    z-index:1;
+    background:var(--bg2);
+    padding:10px 14px!important;
+  }
+  .cp-case-detail-header button[aria-label="ปิดหน้าต่าง"]{
+    min-width:44px!important;
+    min-height:44px!important;
+    display:inline-flex!important;
+    align-items:center;
+    justify-content:center;
+  }
+  .cp-case-detail-modal > .cp-case-detail-body{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    padding:14px!important;
+  }
+  .cp-case-detail-modal > .cp-case-detail-footer{
+    flex:0 0 auto!important;
+    background:var(--bg2);
+    border-top:1px solid var(--border);
+    padding:10px 14px max(12px,env(safe-area-inset-bottom,0px))!important;
+    box-shadow:0 -6px 18px rgba(0,0,0,.13);
+  }
+  .cp-case-detail-footer .cp-action-save{
+    width:100%!important;
+    min-height:48px!important;
+    touch-action:manipulation;
+  }
+}
