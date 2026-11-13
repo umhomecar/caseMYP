@@ -195,3 +195,86 @@ test('mobile case modal is portaled and keeps its close and save actions visible
   assert.match(css,/\.cp-case-detail-modal > \.cp-case-detail-body\{[\s\S]*?max-height:none!important/);
   assert.match(css,/\.cp-case-detail-modal > \.cp-case-detail-footer\{/);
 });
+
+test('fast case creation keeps queue-assigned salesperson, history, and notification',async()=>{
+  setup();
+  const requests=[];
+  global.fetch=async(url,opts={})=>{
+    const u=new URL(url),table=u.pathname.split('/').pop();
+    requests.push({table,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null});
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
+    if(table==='cases'&&opts.method==='POST')return new Response(JSON.stringify([{caseid:opts.body?JSON.parse(opts.body).caseid:'2611001',sales:'แฟ้บ',version:1}]),{status:201});
+    if(table==='cases')return new Response('[]',{status:200});
+    return new Response(JSON.stringify([{id:1}]),{status:201});
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const result=res();
+  await handler(req({action:'caseWorkflow',operation:'create',payload:{customername:'Test person',sales:'รอมอบหมาย',casePrefix:'2611',note:'Needs call'}},cookie),result);
+  assert.equal(result.statusCode,200);
+  assert.equal(result.body.success,true);
+  assert.equal(result.body.sales,'แฟ้บ');
+  assert.equal(result.body.noteSaved,true);
+  assert.ok(requests.some(x=>x.table==='history'&&x.method==='POST'));
+  assert.ok(requests.some(x=>x.table==='case_notes'&&x.method==='POST'));
+  assert.ok(requests.some(x=>x.table==='notifications'&&x.method==='POST'));
+  assert.equal(requests.filter(x=>x.table==='cases'&&x.method==='POST').length,1);
+});
+test('fast case update rejects stale versions before making any write',async()=>{
+  setup();let writes=0;
+  global.fetch=async(url,opts={})=>{
+    const u=new URL(url),table=u.pathname.split('/').pop();
+    if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
+    if(table==='cases')return new Response(JSON.stringify([{caseid:'2611001',version:3,customername:'Before',sales:'แฟ้บ'}]),{status:200});
+    if(opts.method==='POST'||opts.method==='PATCH')writes++;
+    return new Response('[]',{status:200});
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const result=res();await handler(req({action:'caseWorkflow',operation:'update',payload:{caseid:'2611001',expectedVersion:2,status:'ไปต่อได้'}},cookie),result);
+  assert.equal(result.statusCode,409);
+  assert.equal(result.body.conflict,true);
+  assert.equal(writes,0);
+});
+test('fast case update performs one versioned patch including admin reassignment',async()=>{
+  setup();const requests=[];
+  global.fetch=async(url,opts={})=>{
+    const u=new URL(url),table=u.pathname.split('/').pop();
+    requests.push({table,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null,params:u.searchParams});
+    if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
+    if(table==='cases'&&opts.method==='PATCH')return new Response(JSON.stringify([{caseid:'2611001',version:4,sales:'พีร์'}]),{status:200});
+    if(table==='cases')return new Response(JSON.stringify([{caseid:'2611001',version:3,customername:'Before',sales:'แฟ้บ'}]),{status:200});
+    return new Response(JSON.stringify([{id:1}]),{status:201});
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const result=res();await handler(req({action:'caseWorkflow',operation:'update',payload:{caseid:'2611001',expectedVersion:3,status:'ไปต่อได้',newSales:'พีร์'}},cookie),result);
+  assert.equal(result.statusCode,200);
+  assert.equal(result.body.success,true);
+  assert.equal(requests.filter(x=>x.table==='cases'&&x.method==='PATCH').length,1);
+  const patch=requests.find(x=>x.table==='cases'&&x.method==='PATCH');
+  assert.equal(patch.params.get('version'),'eq.3');
+  assert.equal(patch.body.sales,'พีร์');
+  assert.equal(patch.body.version,4);
+  assert.equal(requests.filter(x=>x.table==='history').length,2);
+  assert.equal(requests.filter(x=>x.table==='notifications').length,1);
+});
+test('fast case workflow remains limited to the two operations accounts',async()=>{
+  setup();global.fetch=async(url,opts={})=>{
+    const u=new URL(url),table=u.pathname.split('/').pop();
+    if(table==='users')return new Response(JSON.stringify([{...exampleUser,username:'ball',role:'Sales'}]),{status:200});
+    return new Response('[]',{status:200});
+  };
+  const login=res();await handler(req({action:'login',username:'ball',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const result=res();await handler(req({action:'caseWorkflow',operation:'create',payload:{customername:'Test'}},cookie),result);
+  assert.equal(result.statusCode,403);
+});
+test('mobile app routes two authorized case actions to fast gateway',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  assert.match(source,/action:'caseWorkflow',operation,payload/);
+  assert.match(source,/if\(SECURE_GATEWAY&&data.fastMode\)return fastCaseSave\('create',data\)/);
+  assert.match(source,/if\(SECURE_GATEWAY&&data.fastMode\)return fastCaseSave\('update',data\)/);
+});
