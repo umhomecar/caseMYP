@@ -1252,12 +1252,12 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
     onClose();
   }
   async function doDelete(){if(saving)return;setSaving(true);const r=await api('deleteCase',{caseId,caseid:caseId,deletedBy:currentUser.name});setSaving(false);if(r.success){cacheClear(['getCases','getTrashCases','getDashboard','getHistory','getNotifications']);onUpdated();onClose();showToast('ย้ายเคสไปถังขยะแล้ว','ok');}else{showToast('เกิดข้อผิดพลาด: '+(r.error||'ไม่สามารถลบได้'),'err');}}
-  if(showHistory)return <HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>;
-  return <>
-    <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal casemyp-v2-modal casemyp-v2-modal-edit" style={{maxWidth:480,borderRadius:14}}>
-        <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}><div style={{width:4,height:22,background:'var(--blue)',borderRadius:2,flexShrink:0}}/><span style={{fontWeight:700,fontSize:15}}>ข้อมูลลูกค้า</span><button className="btn btn-ghost cp-action-danger" style={{padding:'4px 8px',marginLeft:'auto'}} onClick={onClose}><Ico.x/></button></div>
-        <div style={{padding:'16px 20px',overflowY:'auto',maxHeight:'calc(100vh - 320px)'}}>
+  if(showHistory)return createPortal(<HistoryModal caseId={caseId} onClose={()=>setShowHistory(false)}/>,document.body);
+  return createPortal(<>
+    <div className="overlay cp-case-detail-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal casemyp-v2-modal casemyp-v2-modal-edit cp-case-detail-modal" role="dialog" aria-modal="true" aria-label="ข้อมูลลูกค้า" style={{maxWidth:480,borderRadius:14}}>
+        <div className="cp-case-detail-header" style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}><div style={{width:4,height:22,background:'var(--blue)',borderRadius:2,flexShrink:0}}/><span style={{fontWeight:700,fontSize:15}}>ข้อมูลลูกค้า</span><button className="btn btn-ghost cp-action-danger" style={{padding:'4px 8px',marginLeft:'auto'}} onClick={onClose} aria-label="ปิดหน้าต่าง"><Ico.x/></button></div>
+        <div className="cp-case-detail-body" style={{padding:'16px 20px',overflowY:'auto',maxHeight:'calc(100vh - 320px)'}}>
           <div style={{marginBottom:14,display:'grid',gap:9}}>
             <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>รหัสเคส: </span><span style={{fontWeight:700,color:'var(--blue)'}}>{caseId}</span><button className="btn btn-primary cp-action-copy" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(caseId)}>คัดลอก</button></div>
             <div style={{fontSize:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{color:'var(--text2)'}}>ชื่อเฟส: </span>{editAll?<input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="ชื่อลูกค้า" style={{flex:1,minWidth:180}}/>:<><span style={{fontWeight:600}}>{customerName||'-'}</span>{customerName&&<button className="btn btn-primary cp-action-copy" style={{padding:'3px 14px',fontSize:12,borderRadius:20}} onClick={()=>copyText(customerName)}>คัดลอก</button>}</>}</div>
@@ -1306,7 +1306,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
           </div>
           <div><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:14,fontWeight:600}}>📝 Notes</span><button className="btn btn-ghost" style={{fontSize:12,padding:'3px 12px',borderRadius:20,border:'1px dashed var(--border)'}} onClick={()=>setAddingNote(!addingNote)}>+ เพิ่ม Note</button></div>{addingNote&&<div style={{marginBottom:10}}><textarea rows={2} value={newNote} onChange={e=>setNewNote(e.target.value)} placeholder="เขียน note..." style={{marginBottom:6}}/><div style={{display:'flex',gap:6}}><button className="btn btn-primary" style={{fontSize:12,padding:'5px 14px'}} onClick={saveNote}>บันทึก</button><button className="btn btn-ghost" style={{fontSize:12,padding:'5px 14px'}} onClick={()=>{setAddingNote(false);setNewNote('');}}>ยกเลิก</button></div></div>}{notesLoading?<div style={{textAlign:'center',color:'var(--text3)',fontSize:12,padding:'8px 0'}}>กำลังโหลด notes...</div>:notes.length===0&&!addingNote?<div style={{textAlign:'center',color:'var(--text3)',fontSize:12,padding:'8px 0'}}>ยังไม่มี notes</div>:<div style={{maxHeight:150,overflowY:'auto'}}>{notes.map((n,i)=><div key={n.id||i} style={{background:'var(--bg3)',borderRadius:6,padding:'8px 10px',marginBottom:6,fontSize:13,display:'flex',gap:8,alignItems:'flex-start'}}><div style={{flex:1}}><div style={{color:'var(--text)'}}>{n.note||n.text}</div><div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>โดย {n.sales||n.by||currentUser.name} · {n.createdDisplay||formatTextDateToTHBE(n.createdat||n.date)}</div></div><button onClick={()=>setConfirmAuxDelete({type:'note',index:i,label:n.note||n.text||'Note นี้'})} title="ลบ Note" aria-label={`ลบ Note ${n.note||n.text||''}`} style={{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:14,padding:0,flexShrink:0,minWidth:32,minHeight:32}}>✕</button></div>)}</div>}</div>
         </div>
-        <div style={{padding:'10px 16px', borderTop:'1px solid var(--border)', paddingBottom:'max(20px, env(safe-area-inset-bottom))'}}>
+        <div className="cp-case-detail-footer" style={{padding:'10px 16px', borderTop:'1px solid var(--border)', paddingBottom:'max(20px, env(safe-area-inset-bottom))'}}>
           <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
               <button className={`btn ${editAll?'cp-action-danger':'cp-action-edit'}`} style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>{if(editAll){setCustomerName(caseData.customername||'');setContact(caseData.contact||'');setClipAd(getClipAd(caseData.attachment));setReport(caseData.report||'');setEditAll(false);}else setEditAll(true);}} disabled={saving}>✏️ {editAll?'ยกเลิกแก้ไข':'แก้ไขทั้งหมด'}</button>
               <button className="btn btn-ghost" style={{flex:1,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5}} onClick={()=>setShowHistory(true)}><Ico.history/> ประวัติ</button>
@@ -1320,7 +1320,7 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
     </div>
     {confirmDel&&<Confirm msg={'ย้ายเคส '+caseId+' ไปถังขยะ 30 วัน? สามารถกู้คืนได้ก่อนครบกำหนด'} onOk={()=>{setConfirmDel(false);doDelete();}} onCancel={()=>setConfirmDel(false)}/>}
     {confirmAuxDelete&&<Confirm msg={`ต้องการลบ ${confirmAuxDelete.type==='note'?'Note':'นัด Follow-up'} “${String(confirmAuxDelete.label).slice(0,80)}” หรือไม่?`} onOk={()=>{const item=confirmAuxDelete;setConfirmAuxDelete(null);if(item.type==='note')deleteNote(item.index);else delFollowup(item.index);}} onCancel={()=>setConfirmAuxDelete(null)}/>}
-  </>;
+  </>,document.body);
 }
 
 function ImageUploader({value,onChange,caseId='',label='📷',accept='image/*',maxMB=10}){
