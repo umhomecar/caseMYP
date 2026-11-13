@@ -297,12 +297,68 @@ async function caseUpdate(config,user,p){
   const [historyResults,notificationSaved]=await Promise.all([Promise.all(tasks),notify]);
   return {status:200,result:{success:true,data:updated.data[0],historySaved:historyResults.every(Boolean),notificationSaved}};
 }
+
+function workflowThaiDigits(text){
+  return String(text||'').replace(/[๐-๙]/g,d=>'0123456789'['๐๑๒๓๔๕๖๗๘๙'.indexOf(d)]);
+}
+function workflowDigits(text){return workflowThaiDigits(text).replace(/[^0-9]/g,'');}
+function workflowLoose(text){return workflowThaiDigits(text).normalize('NFKC').toLowerCase().replace(/[\s\-_.()\/\\:;,'"\x60~!@#$%^&*+=\[\]{}|<>?]+/g,'');}
+async function legacyDuplicateCheck(config,p){
+  if(p.duplicateConfirmed)return {status:200};
+  const response=await db(config,'cases',{select:'caseid,customername,contact',deleted_at:'is.null',order:'updatedat.desc',limit:10000});
+  if(!caseResultOk(response))return caseFail(502,caseDbError(response));
+  const c=workflowDigits(p.contact),n=workflowLoose(p.customername);
+  const matches=response.data.filter(row=>{
+    if(p.previewId&&String(row.caseid)===String(p.previewId))return true;
+    const other=workflowDigits(row.contact);
+    return c.length>=6&&other===c||(n.length>=3&&workflowLoose(row.customername)===n&&c.length>=3&&other.includes(c));
+  }).slice(0,10);
+  if(matches.length)return {status:200,result:{success:false,duplicates:matches,error:'พบเคสที่อาจซ้ำ กรุณาตรวจสอบก่อน'}};
+  return {status:200};
+}
+async function oneCallSave(config,user,data){
+  const started=Date.now();
+  let response,body;
+  try{
+    response=await fetch(config.url+'/rest/v1/rpc/casemyp_save_case_v1',{
+      method:'POST',
+      headers:{...serverHeaders(config.secret),'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({p_operation:data.operation,p_payload:data.payload,p_actor_userid:user.userid})
+    });
+    body=await response.json().catch(()=>({}));
+  }catch(error){
+    console.error('CaseMYP fast RPC network failure:',String(error?.message||error).slice(0,130));
+    return caseFail(502,'เชื่อมต่อฐานข้อมูลเพื่อบันทึกเคสไม่สำเร็จ');
+  }finally{
+    console.info('CaseMYP save RPC duration_ms='+String(Date.now()-started)+' operation='+String(data.operation).slice(0,10));
+  }
+  // Before the additive migration is installed, retain original saving behavior.
+  // Do not fallback on an arbitrary RPC error: an ambiguous response could hide a committed write.
+  if(response.status===404&&body?.code==='PGRST202')return null;
+  if(!response.ok){
+    console.error('CaseMYP save RPC error status='+response.status+' code='+String(body?.code||''));
+    return caseFail(response.status===401||response.status===403?403:502,
+      'บันทึกข้อมูลไม่สำเร็จ: '+String(body?.message||body?.details||'กรุณาลองอีกครั้ง').slice(0,200));
+  }
+  if(!body||typeof body!=='object'||typeof body.success!=='boolean')
+    return caseFail(502,'รูปแบบผลบันทึกไม่ถูกต้อง กรุณาตรวจสอบเคสก่อนลองซ้ำ');
+  // Duplicate/conflict responses are deliberate and not transport errors.
+  return {status:200,result:body};
+}
 async function fastCaseWorkflow(config,user,data){
-  if(user.role!=='Admin'&&!(user.role==='Sales'&&user.username==='art'))return caseFail(403,'ไม่มีสิทธิ์แก้ไขเคส');
-  const p=data.payload;
-  if(data.operation==='create')return caseCreate(config,user,p);
-  if(data.operation==='update')return caseUpdate(config,user,p);
-  return caseFail(400,'คำสั่งไม่ถูกต้อง');
+  if(user.role!=='Admin'&&!(user.role==='Sales'&&user.username==='art'))
+    return caseFail(403,'ไม่มีสิทธิ์แก้ไขเคส');
+  if(!['create','update'].includes(data.operation)||!validCasePayload(data.payload))
+    return caseFail(400,'ข้อมูลเคสไม่ถูกต้อง');
+  const outcome=await oneCallSave(config,user,data);
+  if(outcome)return outcome;
+  // Database RPC not yet deployed: preserve duplicate confirmation and legacy writes.
+  if(data.operation==='create'){
+    const dup=await legacyDuplicateCheck(config,data.payload);
+    if(dup.result||dup.status!==200)return dup;
+    return caseCreate(config,user,data.payload);
+  }
+  return caseUpdate(config,user,data.payload);
 }
 
 async function handler(req,res){
