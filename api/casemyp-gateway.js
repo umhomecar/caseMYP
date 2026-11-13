@@ -254,7 +254,7 @@ async function caseCreate(config,user,p){
     writeRow('history',{caseid,sales:actor,action:'เพิ่มเคส',detail:'เพิ่มเคสใหม่: '+p.customername+(isCaseUnassigned(sales)?' — รอมอบหมายเซลส์':' — มอบหมายให้ '+sales)+actorNote,createdat:caseNowTH()}),
     (async()=>{
       if(!note)return {noteSaved:true,noteHistorySaved:true};
-      const noteSaved=await writeRow('case_notes',{caseid,sales:actor,note,createdat:ts,deleted_at:null});
+      const noteSaved=await writeRow('case_notes',{caseid,sales:actor,note,createdat:ts,deletedat:null});
       const noteHistorySaved=noteSaved?await writeRow('history',{caseid,sales:actor,action:'📝 Note',detail:'📝 Note: '+note,createdat:caseNowTH()}):true;
       return {noteSaved,noteHistorySaved};
     })(),
