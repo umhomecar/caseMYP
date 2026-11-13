@@ -178,3 +178,20 @@ test('case entry keeps automatic LINE send without blocking the saved form',()=>
   assert.match(source,/const \[firstHistorySaved,noteOutcome,notificationSaved\]=await Promise\.all\(/,'post-insert writes should run concurrently');
   assert.match(source,/submitInFlight\.current=true/,'double submit must be guarded');
 });
+
+test('mobile case modal is portaled and keeps its close and save actions visible',()=>{
+  const fs=require('node:fs');
+  const path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../css/styles.css'),'utf8');
+  const detail=source.slice(source.indexOf('function CaseModal('),source.indexOf('function ImageUploader('));
+  assert.match(detail,/return createPortal\(<>/,'detail must portal beyond bottom navigation');
+  assert.match(detail,/className="overlay cp-case-detail-overlay"/);
+  assert.match(detail,/className="cp-case-detail-header"/);
+  assert.match(detail,/className="cp-case-detail-body"/);
+  assert.match(detail,/className="cp-case-detail-footer"/);
+  assert.match(detail,/aria-label="ปิดหน้าต่าง"/);
+  assert.match(detail,/onClick=\{save\}/);
+  assert.match(css,/\.cp-case-detail-modal > \.cp-case-detail-body\{[\s\S]*?max-height:none!important/);
+  assert.match(css,/\.cp-case-detail-modal > \.cp-case-detail-footer\{/);
+});
