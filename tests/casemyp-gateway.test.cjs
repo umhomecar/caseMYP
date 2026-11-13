@@ -226,6 +226,7 @@ test('fast case update rejects stale versions before making any write',async()=>
   setup();let writes=0;
   global.fetch=async(url,opts={})=>{
     const u=new URL(url),table=u.pathname.split('/').pop();
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
     if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
     if(table==='cases')return new Response(JSON.stringify([{caseid:'2611001',version:3,customername:'Before',sales:'แฟ้บ'}]),{status:200});
     if(opts.method==='POST'||opts.method==='PATCH')writes++;
@@ -243,6 +244,7 @@ test('fast case update performs one versioned patch including admin reassignment
   global.fetch=async(url,opts={})=>{
     const u=new URL(url),table=u.pathname.split('/').pop();
     requests.push({table,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null,params:u.searchParams});
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
     if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
     if(table==='cases'&&opts.method==='PATCH')return new Response(JSON.stringify([{caseid:'2611001',version:4,sales:'พีร์'}]),{status:200});
     if(table==='cases')return new Response(JSON.stringify([{caseid:'2611001',version:3,customername:'Before',sales:'แฟ้บ'}]),{status:200});
@@ -264,6 +266,7 @@ test('fast case update performs one versioned patch including admin reassignment
 test('fast case workflow remains limited to the two operations accounts',async()=>{
   setup();global.fetch=async(url,opts={})=>{
     const u=new URL(url),table=u.pathname.split('/').pop();
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
     if(table==='users')return new Response(JSON.stringify([{...exampleUser,username:'ball',role:'Sales'}]),{status:200});
     return new Response('[]',{status:200});
   };
