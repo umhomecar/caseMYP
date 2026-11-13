@@ -165,3 +165,16 @@ test('art operator can write cases without being granted user-management writes'
   const deny=res();await handler(req({action:'data',table:'users',method:'PATCH',query:'userid=eq.A001',body:{role:'Admin'}},cookie),deny);
   assert.equal(deny.statusCode,403);
 });
+
+test('case entry keeps automatic LINE send without blocking the saved form',()=>{
+  const fs=require('node:fs');
+  const path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  assert.equal(source.includes('ส่ง LINE ใหม่'),false,'manual resend action must not appear');
+  assert.equal(source.includes('retryLineNotification'),false,'retry handler must be removed');
+  assert.match(source,/void notifyLineCaseCreated\(linePayload\)\.then\(/,'automatic LINE send must remain');
+  const addModal=source.slice(source.indexOf('function AddCaseModal('),source.indexOf('function AddBookingModal('));
+  assert.equal(addModal.includes('lineResult=await notifyLineCaseCreated'),false,'save must not wait for LINE');
+  assert.match(source,/const \[firstHistorySaved,noteOutcome,notificationSaved\]=await Promise\.all\(/,'post-insert writes should run concurrently');
+  assert.match(source,/submitInFlight\.current=true/,'double submit must be guarded');
+});
