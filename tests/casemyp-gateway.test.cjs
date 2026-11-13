@@ -282,3 +282,19 @@ test('mobile app routes two authorized case actions to fast gateway',()=>{
   assert.match(source,/if\(SECURE_GATEWAY&&data.fastMode\)return fastCaseSave\('create',data\)/);
   assert.match(source,/if\(SECURE_GATEWAY&&data.fastMode\)return fastCaseSave\('update',data\)/);
 });
+
+test('current case pages initially request only the current month, with archive access retained',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const app=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  const admin=app.slice(app.indexOf('function AdminCurrentCases('),app.indexOf('function SalesCurrentCases('));
+  const sales=app.slice(app.indexOf('function SalesCurrentCases('),app.indexOf('\nfunction ',app.indexOf('function SalesCurrentCases(')+20));
+  assert.match(admin,/const \[scope,setScope\]=useState\('current_month'\)/);
+  assert.match(sales,/const \[scope,setScope\]=useState\('current_month'\)/);
+  assert.match(admin,/const params=scope==='all'\?\{all:'true'\}:\{scope\}/);
+  assert.match(sales,/const params=scope==='all'\?\{all:'true',sales:currentUser.name\}:\{scope,sales:currentUser.name\}/);
+  assert.match(app,/else if\(data.scope==='current_month'\)q.caseid=`like\.\$\{pre\}\*`/);
+  assert.match(admin,/option value="current_and_pending"/);
+  assert.match(admin,/option value="all"/);
+  assert.match(admin,/api\('searchCases',\{q:term\}\)/);
+  assert.match(sales,/api\('searchCases',\{q:term,sales:currentUser.name\}\)/);
+});
