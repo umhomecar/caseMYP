@@ -481,6 +481,21 @@ async function genCaseId(attempt=0,customPrefix=''){
   return pre+String(max+1+attempt).padStart(3,'0');
 }
 
+async function fastCaseSave(operation,payload){
+  try{
+    const response=await fetch('/api/casemyp-gateway',{
+      method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'caseWorkflow',operation,payload})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)return{success:false,error:result.error||result.message||'บันทึกเคสไม่สำเร็จ',conflict:!!result.conflict};
+    return result;
+  }catch(error){
+    return{success:false,error:error?.message||'เชื่อมต่อระบบบันทึกเคสไม่สำเร็จ'};
+  }
+}
+
 async function sbApi(action,data){
   const CLOSED=['ปิดเคส','รีเจค','ปล่อยแล้ว','ได้รถจากที่อื่น','โยนเคส'];
   switch(action){
@@ -587,6 +602,7 @@ async function sbApi(action,data){
       return{success:true,data:matches};
     }
     case 'addCase':{
+      if(SECURE_GATEWAY&&data.fastMode)return fastCaseSave('create',data);
       const ts=data.createdat||nowTH();
       const updatedTs=data.updatedat||ts;
       let assignedSales=String(data.sales||'').trim()||UNASSIGNED_SALES;
@@ -629,6 +645,7 @@ async function sbApi(action,data){
       return{success:false,error:'รหัสเคสซ้ำหลายครั้ง กรุณากดเพิ่มเคสใหม่อีกครั้ง'};
     }
     case 'updateCase':{
+      if(SECURE_GATEWAY&&data.fastMode)return fastCaseSave('update',data);
       const rows=await sbQ('GET','cases',{caseid:`eq.${data.caseid}`,deleted_at:'is.null',limit:'1'});
       if(isSbError(rows))return{success:false,error:formatSbError(rows)};
       const before=safeArray(rows)[0];
@@ -1242,9 +1259,10 @@ function CaseModal({caseData,users,currentUser,onClose,onUpdated}){
     setSaving(true);
     const nextAttachment=isAdmin?withClipAd(caseData.attachment,clipAd):(caseData.attachment||'');
     const optimisticData={...caseData,status,report,customername:customerName,contact,attachment:nextAttachment,sales:(isAdmin&&newSales)?newSales:caseData.sales};
-    const upd={caseid:caseId,status,sent:caseData.sent||'ปกติ',report,customername:customerName,contact,attachment:nextAttachment,expectedVersion:Number(caseData.version)||1,changedBy:currentUser.name,detail:'แก้ไขข้อมูลเคส'};
+    const upd={caseid:caseId,status,sent:caseData.sent||'ปกติ',report,customername:customerName,contact,attachment:nextAttachment,expectedVersion:Number(caseData.version)||1,changedBy:currentUser.name,detail:'แก้ไขข้อมูลเคส',fastMode:SECURE_GATEWAY&&(isAdmin||currentUser.username==='art')};
+    if(isAdmin&&newSales&&newSales!==caseData.sales)upd.newSales=newSales;
     let r=await api('updateCase',upd);
-    if(r.success&&isAdmin&&newSales&&newSales!==caseData.sales)r=await api('adminChangeSales',{caseId,newSales,changedBy:currentUser.name});
+    if(r.success&&!upd.fastMode&&isAdmin&&newSales&&newSales!==caseData.sales)r=await api('adminChangeSales',{caseId,newSales,changedBy:currentUser.name});
     setSaving(false);
     if(!r?.success){showToast('บันทึกไม่สำเร็จ: '+(r?.error||'กรุณาลองใหม่'),'err',5000);return;}
     onUpdated(optimisticData);
@@ -1372,6 +1390,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       }
       const submitData={...form};
       submitData.createdBy=currentUser.name;
+      submitData.fastMode=SECURE_GATEWAY&&(currentUser.role==='Admin'||currentUser.username==='art');
       submitData.lineSender=lineSender;
       submitData.report='';
       if(forcedSent)submitData.sent=forcedSent;
