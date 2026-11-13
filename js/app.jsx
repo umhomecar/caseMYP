@@ -16,6 +16,7 @@ const SUPA_URL=String(RUNTIME_CONFIG.supabaseUrl||'').trim().replace(/\/+$/,'');
 const SUPA_KEY=String(RUNTIME_CONFIG.supabaseAnonKey||'').trim();
 const DEPLOY_ENV=String(RUNTIME_CONFIG.deployEnvironment||'unknown').trim();
 const AUTH_MODE=String(RUNTIME_CONFIG.authMode||'legacy').trim().toLowerCase()==='supabase'?'supabase':'legacy';
+const SECURE_GATEWAY=AUTH_MODE==='legacy'&&RUNTIME_CONFIG.secureGateway===true;
 
 function getSupabaseConfigError(){
   if(!SUPA_URL||!SUPA_KEY){
@@ -419,7 +420,14 @@ async function sbFetch(url,opts){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),REQUEST_TIMEOUT_MS);
   try{
-    const response=await fetch(url,{...opts,signal:controller.signal});
+    let target=url,request={...opts,signal:controller.signal};
+    if(SECURE_GATEWAY&&String(url).startsWith(SUPA_URL+'/rest/v1/')){
+      const endpoint=new URL(url);
+      const table=endpoint.pathname.split('/rest/v1/')[1];
+      target='/api/casemyp-gateway';
+      request={method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'data',table,method:opts.method||'GET',query:endpoint.search,range:opts.headers?.Range||'',body:opts.body?JSON.parse(opts.body):null})};
+    }
+    const response=await fetch(target,request);
     if(response.status===204)return[];
     const text=await response.text();
     let parsed=null;
@@ -488,6 +496,11 @@ async function sbApi(action,data){
         rows=await sbQ('GET','users',{select:'userid,username,name,role,status,avatar,startdate,auth_user_id,email',auth_user_id:`eq.${authResult.data.user.id}`,status:'eq.active',limit:'1'});
         if(isSbError(rows)){await supabase.auth.signOut();return{success:false,error:formatSbError(rows)};}
         if(!rows?.length){await supabase.auth.signOut();return{success:false,error:'บัญชีนี้ยังไม่ได้เชื่อมกับผู้ใช้ใน CasePool หรือถูกปิดใช้งาน'};}
+      }else if(SECURE_GATEWAY){
+        const response=await fetch('/api/casemyp-gateway',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',username:data.username,password:data.password})});
+        const payload=await response.json().catch(()=>({}));
+        if(!response.ok||!payload.success)return{success:false,error:payload.message||'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'};
+        return{success:true,user:payload.user};
       }else{
         rows=await sbQ('GET','users',{username:`eq.${data.username}`,password:`eq.${data.password}`,status:'eq.active'});
         if(isSbError(rows))return{success:false,error:formatSbError(rows)};
@@ -3201,10 +3214,19 @@ function ConnectionBanner(){
 }
 
 function App(){
-  const [user,setUser]=useState(()=>AUTH_MODE==='supabase'?null:readPersistedSession());
-  const [authReady,setAuthReady]=useState(AUTH_MODE!=='supabase');
+  const [user,setUser]=useState(()=>AUTH_MODE==='supabase'||SECURE_GATEWAY?null:readPersistedSession());
+  const [authReady,setAuthReady]=useState(AUTH_MODE!=='supabase'&&!SECURE_GATEWAY);
   const [showLogoutConfirm,setShowLogoutConfirm]=useState(false);
   useEffect(()=>{const el=document.getElementById('app-loader');if(el){el.style.pointerEvents='none';el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),400);}},[]);
+  useEffect(()=>{
+    if(!SECURE_GATEWAY)return;
+    let active=true;
+    fetch('/api/casemyp-gateway',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'session'})})
+      .then(async response=>response.ok?response.json():null)
+      .then(data=>{if(active){if(data?.success){savePersistedSession(data.user);setUser(data.user);}else{clearPersistedSession();setUser(null);}setAuthReady(true);}})
+      .catch(()=>{if(active){clearPersistedSession();setUser(null);setAuthReady(true);}});
+    return()=>{active=false;};
+  },[]);
   useEffect(()=>{
     if(AUTH_MODE!=='supabase'||!supabase)return;
     let active=true;
@@ -3253,6 +3275,13 @@ function App(){
     // ปิด realtime channels ทั้งหมดก่อน logout
     try{if(supabase)supabase.removeAllChannels();}catch(e){}
     if(AUTH_MODE==='supabase'&&supabase){try{await supabase.auth.signOut();}catch(e){}}
+    if(SECURE_GATEWAY){
+      try{
+        const response=await fetch('/api/casemyp-gateway',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok||result.success!==true){showToast('ออกจากระบบไม่สำเร็จ กรุณาลองอีกครั้ง','err');return;}
+      }catch(e){showToast('ไม่สามารถออกจากระบบได้ กรุณาลองอีกครั้ง','err');return;}
+    }
     clearPersistedSession();
     Object.keys(_cache).forEach(k=>delete _cache[k]);
     setUser(null);

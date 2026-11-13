@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "npm run build && node scripts/validate.mjs"
+    "check": "npm run build && node scripts/validate.mjs && node --test tests/casemyp-gateway.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.57.4",
