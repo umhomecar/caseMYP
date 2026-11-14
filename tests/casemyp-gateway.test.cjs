@@ -383,3 +383,57 @@ test('SQL RPC contract keeps audit triggers and service-role-only access',()=>{
   assert.match(ui,/submitData\.duplicateConfirmed=duplicateConfirmed/);
   assert.match(ui,/if\(Array\.isArray\(r\.duplicates\)&&r\.duplicates\.length\)/);
 });
+
+
+test('QR Code photo larger than 5000 characters can create case with intact contact image',async()=>{
+  setup();
+  const photo='data:image/jpeg;base64,'+'A'.repeat(120000);
+  const requests=[];
+  global.fetch=async(url,opts={})=>{
+    const path=new URL(url).pathname,table=path.split('/').pop();
+    requests.push({table,body:opts.body?JSON.parse(opts.body):null});
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
+    if(table==='casemyp_save_case_v1')return new Response(JSON.stringify({success:true,caseId:'2611009',sales:'แฟ้บ',noteSaved:true,historySaved:true,notificationSaved:true}),{status:200});
+    throw Error('Unexpected endpoint '+table);
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const output=res();await handler(req({action:'caseWorkflow',operation:'create',payload:{customername:'QR test case',contact:photo,contact_by:'QR Code',duplicateConfirmed:true}},cookie),output);
+  assert.equal(output.statusCode,200);
+  assert.equal(output.body.success,true);
+  const sent=requests.find(x=>x.table==='casemyp_save_case_v1');
+  assert.equal(sent.body.p_payload.contact,photo,'QR data must reach SQL unchanged');
+  assert.equal(requests.filter(x=>x.table==='casemyp_save_case_v1').length,1);
+});
+test('QR Code safety limits reject malformed or oversized image data URL',async()=>{
+  setup();
+  let writes=0;
+  global.fetch=async(url)=>{
+    const table=new URL(url).pathname.split('/').pop();
+    if(table==='casemyp_check_login_limit')return new Response('true',{status:200});
+    if(table==='users')return new Response(JSON.stringify([exampleUser]),{status:200});
+    if(table==='casemyp_save_case_v1')writes++;
+    return new Response('[]',{status:200});
+  };
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  for(const contact of [
+    'data:image/svg+xml;base64,'+'A'.repeat(120000),
+    'data:image/jpeg;base64,'+'%'.repeat(120000),
+    'data:image/png;base64,'+'A'.repeat(2000001),
+    'B'.repeat(120000)
+  ]){
+    const out=res();await handler(req({action:'caseWorkflow',operation:'create',payload:{customername:'QR validation test',contact}},cookie),out);
+    assert.equal(out.statusCode,400);
+    assert.equal(out.body.success,false);
+  }
+  assert.equal(writes,0,'Invalid QR data should never reach SQL RPC');
+});
+test('QR upload preview validates image format and bounded encoding in case form',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  assert.match(source,/compressed\.length>2000000/);
+  assert.match(source,/\/\^data:image/);
+  assert.match(source,/function QrUploader/);
+});
