@@ -217,10 +217,19 @@ function caseFail(status,message,extra={}){return {status,result:{success:false,
 function caseDbError(r){return String(r?.data?.message||r?.data?.details||'ไม่สามารถบันทึกข้อมูลได้').slice(0,250);}
 function isCaseUnassigned(s){return !String(s||'').trim()||String(s).trim()==='รอมอบหมาย';}
 function caseInputString(value,max=5000){return typeof value==='string'&&value.length<=max?value:null;}
+const MAX_QR_DATA_URL_LENGTH=2000000; // < 1.5 MB encoded image, below Vercel's request body limit
+function validCaseContact(value){
+  if(typeof value!=='string')return false;
+  if(value.length<=5000)return true; // existing phone, LINE ID or image URL behavior
+  // QR images from ImageUploader are encoded as base64 in the contact field.
+  // Validate the entire MIME/data URI and enforce a strict upper bound.
+  if(value.length>MAX_QR_DATA_URL_LENGTH)return false;
+  return /^data:image\/(?:png|jpe?g);base64,[A-Za-z0-9+/]+={0,2}$/i.test(value);
+}
 function validCasePayload(p){
   if(!p||Array.isArray(p)||typeof p!=='object')return false;
   const fields=['customername','contact','report','status','sales','createdat','updatedat','sent','attachment','caseid','casePrefix','note','lineSender','detail','changedBy','newSales','createdBy'];
-  return fields.every(k=>p[k]===undefined||caseInputString(p[k],k==='attachment'?100000:k==='report'?30000:5000)!==null);
+  return fields.every(k=>p[k]===undefined||(k==='contact'?validCaseContact(p[k]):caseInputString(p[k],k==='attachment'?100000:k==='report'?30000:5000)!==null));
 }
 async function caseCreate(config,user,p){
   if(!validCasePayload(p))return caseFail(400,'ข้อมูลเคสไม่ถูกต้อง');
