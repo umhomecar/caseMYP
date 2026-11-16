@@ -2034,7 +2034,13 @@ function AdminDashboard({currentUser,users}){
   const groupCounts=items=>{const result={pass:0,fail:0,closed:0,sold:0,pending:0};items.forEach(c=>{result[getGroup(c)]++;});return result;};
   const overall=groupCounts(rows);
   const groups=[['pass','ไปต่อได้','#10b981'],['fail','ไปต่อไม่ได้','#ef4444'],['closed','ปิดเคส','#a78bfa'],['sold','ปล่อยแล้ว','#34d399'],['pending','ติดตาม / อื่น ๆ','#f59e0b']];
-  const adOutcomeRows=ads.map(a=>({name:a.name,count:a.rows.length,counts:groupCounts(a.rows)}));
+  // Keep the overview's grouped KPIs unchanged; the ad results table shows exact statuses.
+  const adStatusCounts=items=>{
+    const counts={'รอข้อมูล':0,'ไปต่อได้':0,'จอง':0,'ปิดเคส':0,'โยนเคส':0};
+    items.forEach(c=>{const status=String(c.status||'').trim();if(Object.prototype.hasOwnProperty.call(counts,status))counts[status]++;});
+    return counts;
+  };
+  const adOutcomeRows=ads.map(a=>({name:a.name,count:a.rows.length,counts:adStatusCounts(a.rows)}));
   const palette=['#ffd028','#ff8a38','#ad43bd','#198bd3','#10ab92','#e76588','#8d83ff','#2ec7a0'];
   const kpis=[['เคสทั้งหมด',rows.length,'#4da3ff','rgba(77,163,255,.12)'],['แอดที่มีเคส',ads.filter(a=>a.name!=='ไม่ระบุแอด').length,'#b38aff','rgba(179,138,255,.12)'],['ไปต่อได้',overall.pass,'#20ce92','rgba(32,206,146,.12)'],['ไปต่อไม่ได้',overall.fail,'#ff6878','rgba(255,104,120,.12)'],['ปิดเคส',overall.closed,'#ffab3d','rgba(255,171,61,.12)'],['ปล่อยแล้ว',overall.sold,'#24c7c0','rgba(36,199,192,.12)'],['ติดตาม / อื่น ๆ',overall.pending,'#f8cf4c','rgba(248,207,76,.12)']];
   const drillRows=drilldown?(drilldown.type==='ad'?(adMap[drilldown.key]?.rows||[]):rows.filter(c=>(c.status||'ไม่ระบุสถานะ')===drilldown.key)):[];
@@ -2075,9 +2081,9 @@ function AdminDashboard({currentUser,users}){
       </div>
 
       <div className="card" style={{marginTop:16,overflowX:'auto'}}><strong>📋 ตารางผลลัพธ์ของทุกแอด</strong>
-        <table style={{width:'100%',marginTop:14}}><thead><tr><th>แอด</th><th>ได้รับ</th><th>ไปต่อได้</th><th>ไปต่อไม่ได้</th><th>ปิดเคส</th><th>ปล่อยแล้ว</th><th>ติดตาม / อื่น ๆ</th><th>% ไปต่อได้</th></tr></thead>
-          <tbody>{adOutcomeRows.map(a=><tr key={a.name} onClick={()=>setChosen(a.name.toLocaleLowerCase())} style={{cursor:'pointer'}}><td>{a.name}</td><td>{a.count}</td><td>{a.counts.pass}</td><td>{a.counts.fail}</td><td>{a.counts.closed}</td><td>{a.counts.sold}</td><td>{a.counts.pending}</td><td>{a.count?Math.round(a.counts.pass/a.count*100):0}%</td></tr>)}</tbody></table>
-        <div style={{marginTop:12,fontSize:11,color:'var(--text2)'}}>เกณฑ์: ไปต่อได้รวม ไปต่อได้/จอง/รอเซ็นต์/รอผล/อนุมัติ · ไปต่อไม่ได้รวม ติดต่อไม่ได้/รีเจค/ได้รถจากที่อื่น · ปิดเคสและปล่อยแล้วแยกกัน · สถานะที่เหลืออยู่ในติดตาม/อื่น ๆ ตัวเลขทุกกลุ่มไม่ซ้ำกัน</div>
+        <table style={{width:'100%',marginTop:14}}><thead><tr><th>แอด</th><th>ได้รับ</th><th>รอข้อมูล</th><th>ไปต่อได้</th><th>จอง</th><th>ปิดเคส</th><th>โยนเคส</th><th>% ไปต่อได้</th></tr></thead>
+          <tbody>{adOutcomeRows.map(a=><tr key={a.name} onClick={()=>setChosen(a.name.toLocaleLowerCase())} style={{cursor:'pointer'}}><td>{a.name}</td><td>{a.count}</td><td>{a.counts['รอข้อมูล']}</td><td>{a.counts['ไปต่อได้']}</td><td>{a.counts['จอง']}</td><td>{a.counts['ปิดเคส']}</td><td>{a.counts['โยนเคส']}</td><td>{a.count?Math.round(a.counts['ไปต่อได้']/a.count*100):0}%</td></tr>)}</tbody></table>
+        <div style={{marginTop:12,fontSize:11,color:'var(--text2)'}}>นับตามสถานะปัจจุบันตรงตัว · ได้รับ = เคสทั้งหมดของแอดนั้นในเดือนที่เลือก (รวมสถานะอื่นที่ไม่ได้แสดงในตาราง) · % ไปต่อได้ = ไปต่อได้ ÷ ได้รับ × 100</div>
       </div>
     </>}
   </div>;

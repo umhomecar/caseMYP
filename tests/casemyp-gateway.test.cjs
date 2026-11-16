@@ -437,3 +437,37 @@ test('QR upload preview validates image format and bounded encoding in case form
   assert.match(source,/\/\^data:image/);
   assert.match(source,/function QrUploader/);
 });
+
+
+test('ad outcome table uses requested exact status columns and counts',()=>{
+  const fs=require('node:fs');
+  const path=require('node:path');
+  const vm=require('node:vm');
+  const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  const sectionStart=source.indexOf('📋 ตารางผลลัพธ์ของทุกแอด');
+  const sectionEnd=source.indexOf('</table>',sectionStart);
+  assert.ok(sectionStart>0&&sectionEnd>sectionStart,'outcome table must exist');
+  const section=source.slice(sectionStart,sectionEnd);
+  assert.ok(section.includes('<th>แอด</th><th>ได้รับ</th><th>รอข้อมูล</th><th>ไปต่อได้</th><th>จอง</th><th>ปิดเคส</th><th>โยนเคส</th><th>% ไปต่อได้</th>'),'columns and order must match user requirements');
+  assert.ok(!section.includes('<th>ไปต่อไม่ได้</th>'));
+  assert.ok(!section.includes('<th>ปล่อยแล้ว</th>'));
+  assert.ok(!section.includes('<th>ติดตาม / อื่น ๆ</th>'));
+  assert.ok(section.includes('a.counts[\'รอข้อมูล\']'));
+  assert.ok(section.includes('a.counts[\'จอง\']'));
+  assert.ok(section.includes('a.counts[\'โยนเคส\']'));
+  assert.ok(section.includes("Math.round(a.counts['ไปต่อได้']/a.count*100)"),'pass rate uses exact status, not grouped pass');
+  const match=source.match(/const adStatusCounts=items=>\{[\s\S]*?\n  \};/);
+  assert.ok(match,'exact-status counting helper exists');
+  const count=vm.runInNewContext(match[0].replace(/^const adStatusCounts=/,'(').replace(/;$/,')'));
+  const actual=count([
+    {status:'รอข้อมูล'}, {status:'ไปต่อได้'}, {status:' จอง '}, {status:'ปิดเคส'},
+    {status:'โยนเคส'}, {status:'ไปต่อได้'}, {status:'ปล่อยแล้ว'}, {status:'รอเซ็นต์'}
+  ]);
+  assert.equal(actual['รอข้อมูล'],1);
+  assert.equal(actual['ไปต่อได้'],2);
+  assert.equal(actual['จอง'],1);
+  assert.equal(actual['ปิดเคส'],1);
+  assert.equal(actual['โยนเคส'],1);
+  assert.equal(Math.round(actual['ไปต่อได้']/8*100),25);
+  assert.match(source,/const overall=groupCounts\(rows\)/,'overview KPI grouping must remain unchanged');
+});
