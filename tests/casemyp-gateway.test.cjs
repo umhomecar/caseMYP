@@ -471,3 +471,97 @@ test('ad outcome table uses requested exact status columns and counts',()=>{
   assert.equal(Math.round(actual['ไปต่อได้']/8*100),25);
   assert.match(source,/const overall=groupCounts\(rows\)/,'overview KPI grouping must remain unchanged');
 });
+
+
+test('persistent login cookie lasts 15 days and does not expose passwords',async()=>{
+  setup();fakeDb();
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  assert.equal(login.statusCode,200);
+  const cookie=login.headers['Set-Cookie'];
+  assert.match(cookie,/Max-Age=1296000(?:;|$)/);
+  assert.match(cookie,/HttpOnly; Secure; SameSite=Strict; Path=\/api\/casemyp-gateway/);
+  const token=cookie.split(';')[0].split('=')[1],payload=JSON.parse(Buffer.from(token.split('.')[0],'base64url').toString());
+  assert.equal(payload.uid,exampleUser.userid);
+  assert.ok(payload.exp>Date.now()+14*24*3600000);
+  assert.ok(payload.exp<=Date.now()+15*24*3600000);
+  assert.ok(!Object.hasOwn(payload,'password'));
+});
+test('session probes and ordinary data reads never renew a 15-day idle cookie',async()=>{
+  setup();fakeDb();
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  const probe=res();await handler(req({action:'session'},cookie),probe);
+  assert.equal(probe.statusCode,200);
+  assert.equal(probe.headers['Set-Cookie'],undefined,'passive session probe must not reset inactivity');
+  const read=res();await handler(req({action:'data',table:'cases',method:'GET',query:'limit=1'},cookie),read);
+  assert.equal(read.statusCode,200);
+  assert.equal(read.headers['Set-Cookie'],undefined,'automatic data polling must not reset inactivity');
+});
+test('authenticated foreground interaction slides the cookie window forward',async()=>{
+  setup();fakeDb();
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const previous=login.headers['Set-Cookie'].split(';')[0];
+  const touched=res();await handler(req({action:'activity'},previous),touched);
+  assert.equal(touched.statusCode,200);
+  assert.equal(touched.body.success,true);
+  const cookie=touched.headers['Set-Cookie'];
+  assert.match(cookie,/Max-Age=1296000(?:;|$)/);
+  const renewed=cookie.split(';')[0];
+  assert.notEqual(renewed,previous,'refreshed token must have a new signed nonce');
+  const payload=JSON.parse(Buffer.from(renewed.split('=')[1].split('.')[0],'base64url').toString());
+  assert.ok(payload.exp>Date.now()+14*24*3600000);
+  const check=res();await handler(req({action:'session'},renewed),check);
+  assert.equal(check.statusCode,200);
+});
+test('no interaction for 15 days expires server session without renewal',async()=>{
+  setup();fakeDb();
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const raw=login.headers['Set-Cookie'].split(';')[0];
+  const original=JSON.parse(Buffer.from(raw.split('=')[1].split('.')[0],'base64url').toString());
+  const crypto=require('node:crypto');
+  const makeCookie=exp=>{
+    const payload=Buffer.from(JSON.stringify({...original,exp})).toString('base64url');
+    const mac=crypto.createHmac('sha256',process.env.CASEMYP_SESSION_SECRET).update(payload).digest('base64url');
+    return 'casemyp_new_session='+payload+'.'+mac;
+  };
+  for(const invalidExp of [Date.now()-1000,Date.now()+16*24*60*60*1000]){
+    const response=res();await handler(req({action:'activity'},makeCookie(invalidExp)),response);
+    assert.equal(response.statusCode,401);
+    assert.equal(response.headers['Set-Cookie'],undefined,'expired or impossible future session must never renew');
+  }
+  const tampered=res();await handler(req({action:'activity'},raw.replace(/.$/,'X')),tampered);
+  assert.equal(tampered.statusCode,401);
+});
+test('inactive users cannot refresh their session',async()=>{
+  setup();fakeDb();
+  const login=res();await handler(req({action:'login',username:'admin',password:'test-only-password'}),login);
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  global.fetch=async(url)=>{
+    const table=new URL(url).pathname.split('/').pop();
+    if(table==='users')return new Response('[]',{status:200});
+    throw Error('Unexpected route '+table);
+  };
+  const response=res();await handler(req({action:'activity'},cookie),response);
+  assert.equal(response.statusCode,401);
+  assert.equal(response.headers['Set-Cookie'],undefined);
+});
+test('foreground interaction, not background polling, renews the client session',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  const effect=source.slice(source.indexOf("const activityEvents=['click'"),source.indexOf('  function handleLogin(u)'));
+  assert.match(effect,/action:'activity'/);
+  assert.match(effect,/now-lastServerTouch<5\*60\*1000/);
+  assert.match(effect,/visibilitychange/);
+  assert.match(effect,/status===401/);
+  assert.ok(!effect.includes('setInterval(onActivity'),'background timer must not extend idle cookie');
+  assert.match(source,/sessionUnavailable/,'network problems should show a retry rather than a logout');
+});
+
+
+test('secure frontend tolerates localStorage being purged while signed server cookie remains valid',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const code=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  assert.match(code,/let lastVerifiedActivity=Date\.now\(\)/);
+  assert.match(code,/SECURE_GATEWAY\?Math\.max\(lastVerifiedActivity,persistedLast\):persistedLast/);
+  assert.match(code,/lastVerifiedActivity=now/);
+});
