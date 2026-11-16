@@ -556,3 +556,12 @@ test('foreground interaction, not background polling, renews the client session'
   assert.ok(!effect.includes('setInterval(onActivity'),'background timer must not extend idle cookie');
   assert.match(source,/sessionUnavailable/,'network problems should show a retry rather than a logout');
 });
+
+
+test('secure frontend tolerates localStorage being purged while signed server cookie remains valid',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const code=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  assert.match(code,/let lastVerifiedActivity=Date\.now\(\)/);
+  assert.match(code,/SECURE_GATEWAY\?Math\.max\(lastVerifiedActivity,persistedLast\):persistedLast/);
+  assert.match(code,/lastVerifiedActivity=now/);
+});
