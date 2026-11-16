@@ -4,7 +4,7 @@
 const crypto=require('node:crypto');
 const PROJECT='vujcmmnnakqqjiejavfs';
 const COOKIE='casemyp_new_session';
-const TTL_MS=8*60*60*1000;
+const TTL_MS=15*24*60*60*1000; // Sliding inactivity window, renewed by explicit foreground app activity only.
 const TABLES=new Set(['users','cases','standalone_cases','case_notes','case_followups','history','notifications','bookings','page_queue_state','targets','bank_logos','line_recipients','profile_images','fcm_tokens','audit_log']);
 const ADMIN_ONLY=new Set(['users','page_queue_state','targets','bank_logos','line_recipients','profile_images','fcm_tokens','audit_log']);
 const SALES_WRITE=new Set(['cases','standalone_cases','case_notes','case_followups','history','notifications','bookings']);
@@ -392,6 +392,12 @@ async function handler(req,res){
     const user=await currentUser(req,config);
     if(!user)return json(res,401,{message:'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'});
     if(data.action==='session')return json(res,200,{success:true,user:userPublic(user)});
+    // Only a verified, explicitly user-initiated action renews the 15-day cookie.
+    // Passive data reads, background polling and session probes must not extend it.
+    if(data.action==='activity'){
+      setSession(res,config,user);
+      return json(res,200,{success:true});
+    }
     if(data.action==='caseWorkflow'){
       const outcome=await fastCaseWorkflow(config,user,data);
       return json(res,outcome.status,outcome.result);
