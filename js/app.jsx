@@ -3228,15 +3228,32 @@ function ConnectionBanner(){
 function App(){
   const [user,setUser]=useState(()=>AUTH_MODE==='supabase'||SECURE_GATEWAY?null:readPersistedSession());
   const [authReady,setAuthReady]=useState(AUTH_MODE!=='supabase'&&!SECURE_GATEWAY);
+  const [sessionUnavailable,setSessionUnavailable]=useState(false);
   const [showLogoutConfirm,setShowLogoutConfirm]=useState(false);
   useEffect(()=>{const el=document.getElementById('app-loader');if(el){el.style.pointerEvents='none';el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),400);}},[]);
   useEffect(()=>{
     if(!SECURE_GATEWAY)return;
     let active=true;
     fetch('/api/casemyp-gateway',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'session'})})
-      .then(async response=>response.ok?response.json():null)
-      .then(data=>{if(active){if(data?.success){savePersistedSession(data.user);setUser(data.user);}else{clearPersistedSession();setUser(null);}setAuthReady(true);}})
-      .catch(()=>{if(active){clearPersistedSession();setUser(null);setAuthReady(true);}});
+      .then(async response=>{
+        const data=await response.json().catch(()=>({}));
+        if(!active)return;
+        if(response.ok&&data?.success){
+          savePersistedSession(data.user);
+          setUser(data.user);
+          setSessionUnavailable(false);
+        }else if(response.status===401){
+          clearPersistedSession();
+          setUser(null);
+          setSessionUnavailable(false);
+        }else{
+          // A temporary network or backend error is not a real logout.
+          // Keep the HttpOnly cookie and offer a retry instead of showing login.
+          setSessionUnavailable(true);
+        }
+        setAuthReady(true);
+      })
+      .catch(()=>{if(active){setSessionUnavailable(true);setAuthReady(true);}});
     return()=>{active=false;};
   },[]);
   useEffect(()=>{
@@ -3258,29 +3275,54 @@ function App(){
   },[]);
   useEffect(()=>{
     if(!user)return;
-    let lastWrite=0;
-    const activityEvents=['click','keydown','mousemove','touchstart','scroll'];
-    const onActivity=()=>{
-      const now=Date.now();
-      if(now-lastWrite>60000){lastWrite=now;touchPersistedSession(user);}
-    };
+    let lastWrite=0,lastServerTouch=0,activityInFlight=false,active=true;
+    const activityEvents=['click','keydown','pointerdown','touchstart','wheel'];
     const checkExpired=()=>{
       try{
         const raw=localStorage.getItem(CASEPOOL_SESSION_KEY);
         const data=raw?JSON.parse(raw):null;
         const last=Number(data?.lastActivity||0);
-        if(!last||Date.now()-last>CASEPOOL_IDLE_LIMIT_MS){
+        if(last&&Date.now()-last<=CASEPOOL_IDLE_LIMIT_MS)return false;
+      }catch(e){}
+      clearPersistedSession();
+      try{if(supabase)supabase.removeAllChannels();}catch(e){}
+      Object.keys(_cache).forEach(k=>delete _cache[k]);
+      setUser(null);
+      return true;
+    };
+    const onActivity=()=>{
+      if(!active||checkExpired())return;
+      const now=Date.now();
+      if(now-lastWrite>=60000){lastWrite=now;touchPersistedSession(user);}
+      // Server-side expiration is authoritative; renew only on real interaction,
+      // never on automatic data requests or a periodic background timer.
+      if(!SECURE_GATEWAY||activityInFlight||now-lastServerTouch<5*60*1000)return;
+      lastServerTouch=now;activityInFlight=true;
+      fetch('/api/casemyp-gateway',{
+        method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'activity'})
+      }).then(response=>{
+        if(active&&response.status===401){
           clearPersistedSession();
-          try{if(supabase)supabase.removeAllChannels();}catch(e){}
           Object.keys(_cache).forEach(k=>delete _cache[k]);
           setUser(null);
         }
-      }catch(e){clearPersistedSession();setUser(null);}
+      }).catch(()=>{/* Temporary connectivity failures must not log the user out. */})
+        .finally(()=>{activityInFlight=false;});
     };
-    touchPersistedSession(user);
+    const onForeground=()=>{if(document.visibilityState==='visible')onActivity();};
     activityEvents.forEach(ev=>window.addEventListener(ev,onActivity,{passive:true}));
+    window.addEventListener('focus',onActivity);
+    document.addEventListener('visibilitychange',onForeground);
     const timer=setInterval(checkExpired,60*60*1000);
-    return()=>{activityEvents.forEach(ev=>window.removeEventListener(ev,onActivity));clearInterval(timer);};
+    return()=>{
+      active=false;
+      activityEvents.forEach(ev=>window.removeEventListener(ev,onActivity));
+      window.removeEventListener('focus',onActivity);
+      document.removeEventListener('visibilitychange',onForeground);
+      clearInterval(timer);
+    };
   },[user?.userId]);
   function handleLogin(u){savePersistedSession(u);setUser(u);}
   async function handleLogout(){
@@ -3300,6 +3342,11 @@ function App(){
     setShowLogoutConfirm(false);
   }
   if(!authReady)return <div style={{minHeight:'100vh',display:'grid',placeItems:'center',background:'var(--bg)',color:'var(--text2)'}}>กำลังตรวจสอบเซสชัน...</div>;
+  if(SECURE_GATEWAY&&sessionUnavailable)return <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,padding:24,background:'var(--bg)',color:'var(--text)'}}>
+    <strong>เชื่อมต่อระบบล็อกอินไม่ได้ชั่วคราว</strong>
+    <div style={{color:'var(--text2)',textAlign:'center'}}>ยังไม่ได้ออกจากระบบ กรุณาลองเชื่อมต่ออีกครั้ง</div>
+    <button type="button" className="btn btn-primary" onClick={()=>location.reload()}>ลองเชื่อมต่อใหม่</button>
+  </div>;
   if(!user)return <><ConnectionBanner/><LoginPage onLogin={handleLogin}/></>;
   const logoutConfirmModal=showLogoutConfirm&&<div className="overlay" style={{zIndex:9999}}><div className="modal" style={{maxWidth:320}}><div className="modal-bd" style={{textAlign:'center',padding:'32px 24px'}}><div style={{fontSize:40,marginBottom:12}}>👋</div><div style={{fontWeight:700,fontSize:16,marginBottom:8}}>ออกจากระบบ?</div><div style={{fontSize:13,color:'var(--text2)',marginBottom:24}}>{user.name} · {user.role}</div><div style={{display:'flex',gap:10}}><button className="btn btn-ghost" style={{flex:1,padding:'10px'}} onClick={()=>setShowLogoutConfirm(false)}>ยกเลิก</button><button className="btn btn-danger" style={{flex:1,padding:'10px'}} onClick={handleLogout}>ออกจากระบบ</button></div></div></div></div>;
   if(user.role==='Admin')return <><ConnectionBanner/>{logoutConfirmModal}<AdminApp currentUser={user} onLogout={()=>setShowLogoutConfirm(true)}/></>;
