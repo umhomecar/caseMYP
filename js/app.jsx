@@ -3276,14 +3276,19 @@ function App(){
   useEffect(()=>{
     if(!user)return;
     let lastWrite=0,lastServerTouch=0,activityInFlight=false,active=true;
+    // Server verified the signed cookie before rendering this logged-in session.
+    // Keep a memory fallback when mobile browsers purge localStorage independently.
+    let lastVerifiedActivity=Date.now();
     const activityEvents=['click','keydown','pointerdown','touchstart','wheel'];
     const checkExpired=()=>{
+      let persistedLast=0;
       try{
         const raw=localStorage.getItem(CASEPOOL_SESSION_KEY);
         const data=raw?JSON.parse(raw):null;
-        const last=Number(data?.lastActivity||0);
-        if(last&&Date.now()-last<=CASEPOOL_IDLE_LIMIT_MS)return false;
+        persistedLast=Number(data?.lastActivity||0);
       }catch(e){}
+      const last=SECURE_GATEWAY?Math.max(lastVerifiedActivity,persistedLast):persistedLast;
+      if(last&&Date.now()-last<=CASEPOOL_IDLE_LIMIT_MS)return false;
       clearPersistedSession();
       try{if(supabase)supabase.removeAllChannels();}catch(e){}
       Object.keys(_cache).forEach(k=>delete _cache[k]);
@@ -3293,6 +3298,7 @@ function App(){
     const onActivity=()=>{
       if(!active||checkExpired())return;
       const now=Date.now();
+      lastVerifiedActivity=now;
       if(now-lastWrite>=60000){lastWrite=now;touchPersistedSession(user);}
       // Server-side expiration is authoritative; renew only on real interaction,
       // never on automatic data requests or a periodic background timer.
