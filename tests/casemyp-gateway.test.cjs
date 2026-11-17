@@ -565,3 +565,54 @@ test('secure frontend tolerates localStorage being purged while signed server co
   assert.match(code,/SECURE_GATEWAY\?Math\.max\(lastVerifiedActivity,persistedLast\):persistedLast/);
   assert.match(code,/lastVerifiedActivity=now/);
 });
+
+
+test('case center hides unused booking navigation and creation without deleting booking implementation',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  const caseCenter=source.slice(source.indexOf('function AdminCurrentCases('),source.indexOf('function SalesCurrentCases('));
+  const admin=source.slice(source.indexOf('function AdminApp('),source.indexOf('function App('));
+  assert.ok(!caseCenter.includes('📋 เพิ่มจอง'),'unused booking button must disappear');
+  assert.ok(!caseCenter.includes('showAddBook'),'case center should not open unused booking modal');
+  assert.ok(!admin.includes("key:'bookings'"),'Admin booking menu must disappear');
+  assert.ok(!admin.includes('bookings:<AdminBookings'),'unused booking page must no longer be routed');
+  assert.ok(source.includes('function AdminBookings('),'historical booking logic/data must not be deleted');
+  assert.ok(source.includes('function AddBookingModal('),'preserve legacy booking data implementation for audit/restore');
+});
+test('case center ad filter shows distinct clip ads on desktop and mobile with exact status-safe matching',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  const caseCenter=source.slice(source.indexOf('function AdminCurrentCases('),source.indexOf('function SalesCurrentCases('));
+  assert.match(caseCenter,/const currentMonthFilters=\(\)=>\(\{sales:'all',status:'',ad:'all'/);
+  assert.match(caseCenter,/const adOptions=\[\.\.\.new Set\(safeArray\(combinedCases\)\.map\(c=>getClipAd\(c\.attachment\)\)/);
+  assert.match(caseCenter,/getClipAd\(c\.attachment\);[\s\S]*?filter\.ad==='__no_ad__'&&caseAd/);
+  assert.match(caseCenter,/caseAd!==filter\.ad/);
+  assert.equal((caseCenter.match(/aria-label="กรองแอด"/g)||[]).length,2,'filter must exist on desktop and mobile');
+  assert.ok(caseCenter.includes('<option value="all">ทุกแอด</option>'));
+  assert.ok(caseCenter.includes('ไม่ระบุแอด'));
+  const getClipAd=attachment=>{
+    const m=String(attachment||'').match(/\[CLIP:([\s\S]*?)\]/);
+    return m?String(m[1]||'').trim():'';
+  };
+  const cases=[
+    {attachment:'[CLIP:FE]',status:'รอข้อมูล'},
+    {attachment:'[CLIP:FE]',status:'จอง'},
+    {attachment:'[CLIP:D-max]',status:'รอข้อมูล'},
+    {attachment:'',status:'ไปต่อได้'}
+  ];
+  const ads=[...new Set(cases.map(c=>getClipAd(c.attachment)).filter(Boolean))];
+  assert.deepEqual(ads,['FE','D-max']);
+  assert.equal(cases.filter(c=>getClipAd(c.attachment)==='FE').length,2);
+  assert.equal(cases.filter(c=>!getClipAd(c.attachment)).length,1);
+  assert.equal(cases.filter(c=>getClipAd(c.attachment)==='FE'&&c.status==='รอข้อมูล').length,1);
+});
+test('case center search input is compact and redundant magnifier is removed without losing archive search',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const code=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
+  const cases=code.slice(code.indexOf('function AdminCurrentCases('),code.indexOf('function SalesCurrentCases('));
+  assert.match(cases,/flex:'0 1 370px',width:'100%',maxWidth:370,minWidth:200/);
+  assert.ok(!cases.includes('onClick={search} title="ค้นหา" aria-label="ค้นหา"'),'duplicate icon should be removed');
+  assert.match(cases,/onKeyDown=\{e=>e\.key==='Enter'&&search\(\)\}/,'Enter must still support search');
+  assert.match(cases,/onClick=\{search\}/,'visible archive-search button must remain');
+  assert.match(cases,/api\('searchCases',\{q:term\}\)/,'search all months must still work');
+});
