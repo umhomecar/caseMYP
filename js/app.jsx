@@ -1768,13 +1768,12 @@ function AdminCurrentCases({currentUser,users}){
   const [cases,setCases]=useState(()=>safeArray(cacheGetStale('getCases',{scope:'current_month'})?.data));
   const [loading,setLoading]=useState(()=>!cacheGetStale('getCases',{scope:'current_month'})?.success);
   const [loadError,setLoadError]=useState('');
-  const currentMonthFilters=()=>({sales:'all',status:'',q:'',dateFrom:'',dateTo:''});
+  const currentMonthFilters=()=>({sales:'all',status:'',ad:'all',q:'',dateFrom:'',dateTo:''});
   const [filter,setFilter]=useState(currentMonthFilters);
   const [sortDir,setSortDir]=useState('desc');
   const [sel,setSel]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
   const [showBackdate,setShowBackdate]=useState(false);
-  const [showAddBook,setShowAddBook]=useState(false);
   const [showExportModal,setShowExportModal]=useState(false);
   const [showExport,setShowExport]=useState(false);
   const [exportFilter,setExportFilter]=useState({dateFrom:'',dateTo:'',salesFilter:'all',statusFilter:''});
@@ -1823,6 +1822,11 @@ function AdminCurrentCases({currentUser,users}){
   const combinedCases=archiveQuery&&archiveQuery===String(filter.q||'').trim()
     ?[...new Map([...cases,...archiveMatches].map(c=>[String(c.caseid),c])).values()]
     :cases;
+  // Derive ad choices from the cases already loaded, using the same CLIP metadata
+  // displayed in the case list. No additional request or schema change is required.
+  const adOptions=[...new Set(safeArray(combinedCases).map(c=>getClipAd(c.attachment)).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'th'));
+  const hasCasesWithoutAd=safeArray(combinedCases).some(c=>!getClipAd(c.attachment));
   const filtered=safeArray(combinedCases).filter(c=>{
     const q=String(filter.q||'').trim().toLowerCase();
     if(q){
@@ -1832,6 +1836,9 @@ function AdminCurrentCases({currentUser,users}){
     if(filter.sales===UNASSIGNED_SALES&&!isUnassignedSales(c.sales))return false;
     if(filter.sales!=='all'&&filter.sales!==UNASSIGNED_SALES&&c.sales!==filter.sales)return false;
     if(filter.status&&c.status!==filter.status)return false;
+    const caseAd=getClipAd(c.attachment);
+    if(filter.ad==='__no_ad__'&&caseAd)return false;
+    if(filter.ad&&filter.ad!=='all'&&filter.ad!=='__no_ad__'&&caseAd!==filter.ad)return false;
     if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom+'T00:00:00'))return false;}
     if(filter.dateTo){const d=parseD2(c.createdat);const to=new Date(filter.dateTo+'T00:00:00');to.setHours(23,59,59,999);if(!d||d>to)return false;}
     return true;
@@ -1906,10 +1913,16 @@ function AdminCurrentCases({currentUser,users}){
   }
   return <div className="page casemyp-v2-cases">
     {DESIGN_PREVIEW&&<div className="casemyp-v2-preview-notice">🎨 โหมดตัวอย่าง · ข้อมูลจำลอง ไม่สามารถบันทึกหรือส่ง LINE จริงได้</div>}
-    <div className="page-hd casemyp-v2-cases-heading"><div style={{width:'100%'}}><div className="casemyp-v2-eyebrow">WORKSPACE / CASE MANAGEMENT</div><div className="page-title">📋 เคสปัจจุบัน <span className="casemyp-v2-title-accent">· Case Center</span></div><div className="admin-current-cases-desktop-summary" style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div><div className="admin-current-cases-mobile-search"><input value={filter.q} onChange={e=>{const v=e.target.value;setFilter(f=>({...f,q:v}));if(!v.trim())load();}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ค้นหา รหัสเคส ชื่อลูกค้า เบอร์..." inputMode="search"/></div></div><div className="admin-current-cases-desktop-tools" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" onClick={()=>setShowAddBook(true)}>📋 เพิ่มจอง</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary cp-action-add" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
+    <div className="page-hd casemyp-v2-cases-heading"><div style={{width:'100%'}}><div className="casemyp-v2-eyebrow">WORKSPACE / CASE MANAGEMENT</div><div className="page-title">📋 เคสปัจจุบัน <span className="casemyp-v2-title-accent">· Case Center</span></div><div className="admin-current-cases-desktop-summary" style={{fontSize:12,color:'var(--text2)',marginTop:2}}>แสดง {filtered.length} เคส · รอมอบหมาย {unassignedCount} เคส</div><div className="admin-current-cases-mobile-search"><input value={filter.q} onChange={e=>{const v=e.target.value;setFilter(f=>({...f,q:v}));if(!v.trim())load();}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ค้นหา รหัสเคส ชื่อลูกค้า เบอร์..." inputMode="search"/>
+      <select aria-label="กรองแอด" value={filter.ad} onChange={e=>setFilter(f=>({...f,ad:e.target.value}))} style={{width:'100%',marginTop:8,minHeight:42,borderRadius:12,fontSize:14}}>
+        <option value="all">ทุกแอด</option>
+        {adOptions.map(ad=><option key={ad} value={ad}>{ad}</option>)}
+        {hasCasesWithoutAd&&<option value="__no_ad__">ไม่ระบุแอด</option>}
+      </select>
+    </div></div><div className="admin-current-cases-desktop-tools" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-ghost" style={{fontSize:13,color:'var(--green)',border:'1px solid rgba(63,185,80,.4)'}} onClick={exportCSV}>📥 Export CSV</button><button className="btn btn-ghost" style={{color:'var(--purple)',border:'1px solid rgba(188,140,255,.35)'}} onClick={()=>setShowBackdate(true)}>🕒 เพิ่มย้อนหลัง</button><button className="btn btn-primary cp-action-add" onClick={()=>setShowAdd(true)}><Ico.plus/> เพิ่มลูกค้า</button></div></div>
     {loadError&&<div className="card" role="alert" style={{padding:14,marginBottom:12,color:'var(--red)'}}>⚠️ {loadError} — {cases.length?'ยังแสดงข้อมูลที่โหลดไว้ก่อนหน้า':'ยังไม่สามารถโหลดรายการได้'} <button type="button" className="btn cp-action-refresh" onClick={()=>load()} style={{marginLeft:10}}>ลองใหม่</button></div>}
     <div className="admin-current-cases-desktop-filters casemyp-v2-case-filters" style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
-      <div style={{position:'relative',flex:'1 1 160px',minWidth:0}}>
+      <div style={{position:'relative',flex:'0 1 370px',width:'100%',maxWidth:370,minWidth:200}}>
         <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:13,color:'var(--text3)',pointerEvents:'none'}}>🔍</span>
         <input value={filter.q} onChange={e=>{setArchiveQuery('');setFilter(f=>({...f,q:e.target.value}));}} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="ชื่อ เบอร์ รหัสเคส" style={{paddingLeft:28,fontSize:13,height:34}}/>
       </div>
@@ -1920,8 +1933,12 @@ function AdminCurrentCases({currentUser,users}){
       <select value={filter.status} onChange={e=>setFilter(f=>({...f,status:e.target.value}))} style={{fontSize:13,height:34,padding:'0 8px',borderRadius:8,flex:'0 0 auto',maxWidth:120}}>
         <option value="">ทุกสถานะ</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
       </select>
+      <select aria-label="กรองแอด" value={filter.ad} onChange={e=>setFilter(f=>({...f,ad:e.target.value}))} style={{fontSize:13,height:34,padding:'0 8px',borderRadius:8,flex:'0 1 150px',width:150,minWidth:120,maxWidth:180}}>
+        <option value="all">ทุกแอด</option>
+        {adOptions.map(ad=><option key={ad} value={ad}>{ad}</option>)}
+        {hasCasesWithoutAd&&<option value="__no_ad__">ไม่ระบุแอด</option>}
+      </select>
       <div className="cp-list-tools" role="group" aria-label="เครื่องมือจัดการรายการ">
-        <button type="button" className="btn btn-ghost cp-tool-button cp-tool-sort" onClick={search} title="ค้นหา" aria-label="ค้นหา"><Ico.search/></button>
         <button type="button" className="btn btn-ghost cp-tool-button cp-tool-sort" onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')} title="เรียงลำดับ" aria-label="เรียงลำดับ">{sortDir==='desc'?'↓':'↑'}</button>
         <button type="button" className="btn cp-tool-button cp-action-refresh" onClick={()=>{cacheClear(['getCases','getDashboard']);load();}} title="รีเฟรชรายการ" aria-label="รีเฟรชรายการ">↻</button>
         <span className="cp-count-pill" aria-live="polite">{filtered.length} เคส</span>
@@ -1995,7 +2012,6 @@ function AdminCurrentCases({currentUser,users}){
     </div>}
     {showAdd&&<AddCaseModal users={users} currentUser={currentUser} onClose={()=>setShowAdd(false)} onAdded={()=>load(true)}/>}
     {showBackdate&&<AddCaseModal backdated users={users} currentUser={currentUser} onClose={()=>setShowBackdate(false)} onAdded={()=>load(true)}/>}
-    {showAddBook&&<AddBookingModal currentUser={currentUser} users={users} onClose={()=>setShowAddBook(false)} onAdded={()=>{}}/>}
     {/* FAB มือถือ */}
     <button className="fab" onClick={()=>setShowAdd(true)} title="เพิ่มลูกค้า">＋</button>
   </div>;
@@ -2998,7 +3014,6 @@ function AdminApp({currentUser,onLogout}){
     line_oa:<AdminSentCasesPage currentUser={currentUser} users={users} caseType="line_oa" title="Line OA" icon="💬"/>,
     dashboard:<AdminDashboard currentUser={currentUser} users={users}/>,
     analytics:<AdminAnalytics currentUser={currentUser}/>,
-    bookings:<AdminBookings currentUser={currentUser} users={users}/>,
     trash:<AdminTrash currentUser={currentUser}/>,
     users:<AdminUsers currentUser={currentUser}/>,
     team:<AdminTeam users={users} currentUser={currentUser}/>,
@@ -3008,7 +3023,6 @@ function AdminApp({currentUser,onLogout}){
     {key:'cases',icon:<Ico.home/>,label:'เคสปัจจุบัน'},
     {key:'dashboard',icon:<Ico.dash/>,label:'แดชบอร์ด'},
     {key:'analytics',icon:<Ico.trophy/>,label:'รายงาน'},
-    {key:'bookings',icon:<Ico.book/>,label:'การจอง'},
     {key:'users',icon:<Ico.user/>,label:'ผู้ใช้'},
     {key:'team',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"> <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/> <circle cx="9" cy="7" r="4"/> <path d="M23 21v-2a4 4 0 0 0-3-3.87"/> <path d="M16 3.13a4 4 0 0 1 0 7.75"/> </svg>,label:'ทีม'},
     {key:'private_cases',icon:<span style={{fontSize:18,lineHeight:1}}>🔒</span>,label:'เคสส่วนตัว'},
@@ -3027,7 +3041,7 @@ function AdminApp({currentUser,onLogout}){
   return <div>
     <div className="sidebar">
       <div className="sidebar-logo casemyp-v2-brand"><div className="casemyp-v2-brand-icon">🚘</div><div><div className="casemyp-v2-brand-title">CasePool <span>2.0</span></div><div className="casemyp-v2-brand-sub">MIDNIGHT WORKSPACE</div></div></div><div className="casemyp-v2-menu-label">WORKSPACE</div>
-      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>['dashboard','cases','analytics','bookings','users','private_cases','line_oa','trash'].includes(n.key)):allNavItems).map(n=>
+      <nav className="sidebar-nav">{(DESIGN_PREVIEW?allNavItems.filter(n=>['dashboard','cases','analytics','users','private_cases','line_oa','trash'].includes(n.key)):allNavItems).map(n=>
         <button type="button" key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={()=>setPage(n.key)} aria-current={page===n.key?'page':undefined}>{n.icon}<span>{n.label}</span></button>
       )}</nav>
       <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
