@@ -974,7 +974,8 @@ function SkeletonCards({n=3}){return <div>{Array.from({length:n}).map((_,i)=><di
 function SkeletonRows({n=5,cols=6}){return <>{Array.from({length:n}).map((_,i)=><tr key={i}>{Array.from({length:cols}).map((__,j)=><td key={j}><div className="skeleton" style={{height:14,width:j===0?80:j===cols-1?60:'70%'}}/></td>)}</tr>)}</>;}
 
 function Confirm({msg,onOk,onCancel}){
-  return <div className="overlay"><div className="modal" style={{maxWidth:340}} role="alertdialog" aria-modal="true" aria-label="ยืนยันการทำรายการ"><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}} aria-hidden="true">⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button type="button" className="btn btn-ghost cp-action-danger" onClick={onCancel}>ยกเลิก</button><button type="button" className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
+  // Case detail overlays are raised to z-index 10020 on mobile. Keep confirmations above them.
+  return <div className="overlay" style={{zIndex:10050}}><div className="modal" style={{maxWidth:340}} role="alertdialog" aria-modal="true" aria-label="ยืนยันการทำรายการ"><div className="modal-bd" style={{textAlign:'center',padding:'28px 20px'}}><div style={{fontSize:32,marginBottom:12}} aria-hidden="true">⚠️</div><p style={{fontSize:15,marginBottom:24}}>{msg}</p><div style={{display:'flex',gap:8,justifyContent:'center'}}><button type="button" className="btn btn-ghost cp-action-danger" onClick={onCancel}>ยกเลิก</button><button type="button" className="btn btn-danger" onClick={onOk}>ยืนยัน</button></div></div></div></div>;
 }
 
 function HistoryModal({caseId,onClose}){
