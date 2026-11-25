@@ -2725,3 +2725,72 @@ body:not(.light) .casemyp-v2-trash button.cp-tool-button{
     touch-action:manipulation;
   }
 }
+
+/* CaseMYP compact Case Center, matching approved SP4 arrangement; colors unchanged. */
+@media(min-width:769px){
+ body:not(.light) .casemyp-v2-cases{padding:12px 18px 28px!important;}
+ body:not(.light) .casemyp-v2-cases .page-hd.casemyp-v2-cases-heading{
+  display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
+  justify-content:space-between!important;align-items:center!important;
+  gap:18px!important;padding:12px 18px!important;min-height:0!important;height:auto!important;
+  margin-bottom:9px!important;border-radius:17px!important;
+ }
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading:after{
+  font-size:50px!important;top:4px!important;right:23%!important;opacity:.45!important;
+ }
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading>div:first-child{
+  width:auto!important;min-width:0!important;flex:1 1 auto!important;
+ }
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-eyebrow{
+  font-size:9px!important;letter-spacing:1.1px!important;margin-bottom:3px!important;
+ }
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading .page-title{
+  font-size:clamp(18px,1.6vw,23px)!important;line-height:1.2!important;margin:0!important;
+ }
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading .admin-current-cases-desktop-summary{
+  font-size:11px!important;margin-top:3px!important;
+ }
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading>.admin-current-cases-desktop-tools{
+  display:flex!important;flex:0 0 auto!important;flex-wrap:nowrap!important;
+  width:auto!important;min-width:max-content!important;align-items:center!important;
+  justify-content:flex-end!important;gap:7px!important;margin-left:auto!important;position:relative;z-index:1;
+ }
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading .admin-current-cases-desktop-tools .btn{
+  padding:6px 10px!important;min-height:34px!important;font-size:12px!important;
+  border-radius:9px!important;white-space:nowrap!important;
+ }
+ body:not(.light) .casemyp-v2-cases .admin-current-cases-desktop-filters.casemyp-v2-case-filters{
+  padding:8px 10px!important;margin-bottom:6px!important;min-height:0!important;
+  border-radius:13px!important;gap:6px!important;
+ }
+ body:not(.light) .casemyp-v2-cases .admin-current-cases-desktop-filters input,
+ body:not(.light) .casemyp-v2-cases .admin-current-cases-desktop-filters select{
+  height:34px!important;min-height:34px!important;box-sizing:border-box!important;
+ }
+ body:not(.light) .casemyp-v2-cases .admin-current-cases-desktop-filters .btn{
+  min-height:34px!important;height:34px!important;padding:5px 9px!important;font-size:12px!important;
+ }
+ body:not(.light) .casemyp-v2-cases .admin-current-cases-desktop-date{
+  display:flex!important;flex-wrap:wrap!important;align-items:center!important;
+  justify-content:flex-start!important;column-gap:8px!important;row-gap:6px!important;
+  margin:0 0 9px!important;padding:0 2px!important;
+ }
+ body:not(.light) .casemyp-v2-cases .admin-current-cases-desktop-date input[type="date"]{
+  width:135px!important;min-width:120px!important;height:32px!important;
+  min-height:32px!important;box-sizing:border-box!important;
+ }
+ body:not(.light) .casemyp-v2-cases .admin-current-cases-desktop-date select{
+  width:auto!important;min-width:180px!important;max-width:310px!important;
+  height:32px!important;min-height:32px!important;padding:0 9px!important;
+  flex:0 1 auto!important;box-sizing:border-box!important;
+ }
+ body:not(.light) .casemyp-v2-cases .admin-current-cases-desktop-date .btn{
+  height:32px!important;min-height:32px!important;padding:5px 10px!important;
+ }
+}
+@media(min-width:769px) and (max-width:920px){
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading>.admin-current-cases-desktop-tools .btn{
+  padding:6px 8px!important;font-size:11px!important;
+ }
+ body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading .page-title{font-size:18px!important;}
+}
