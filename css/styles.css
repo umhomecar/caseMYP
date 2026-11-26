@@ -2794,3 +2794,51 @@ body:not(.light) .casemyp-v2-trash button.cp-tool-button{
  }
  body:not(.light) .casemyp-v2-cases .casemyp-v2-cases-heading .page-title{font-size:18px!important;}
 }
+
+/* Clip Ad selector: accessible, responsive popup without changing existing button colors. */
+.cp-clip-ad-open{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  width:100%!important;min-height:42px!important;gap:12px!important;
+  padding:9px 13px!important;text-align:left!important;border-radius:11px!important;
+  border:1px solid var(--border)!important;background:var(--bg3)!important;
+  color:var(--text)!important;box-shadow:none!important;
+}
+.cp-clip-ad-current{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;}
+.cp-clip-ad-overlay{
+  position:fixed;inset:0;z-index:10100;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.75);padding:18px;
+}
+.cp-clip-ad-dialog{
+  width:min(560px,100%);max-height:min(680px,90dvh);min-height:0;display:flex;flex-direction:column;
+  overflow:hidden;background:var(--bg2);color:var(--text);border:1px solid var(--border);
+  border-radius:19px;box-shadow:0 24px 72px rgba(0,0,0,.38);
+}
+.cp-clip-ad-header{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:15px 18px;border-bottom:1px solid var(--border);flex:0 0 auto;}
+.cp-clip-ad-header strong{font-size:16px;}
+.cp-clip-ad-header .btn{border-radius:11px!important;}
+.cp-clip-ad-body{min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px 18px 20px;overflow-y:auto;}
+.cp-clip-ad-body input{box-sizing:border-box;width:100%;min-height:40px;border-radius:11px;}
+.cp-clip-ad-results{display:flex;flex-direction:column;gap:5px;min-height:90px;max-height:275px;
+  overflow-y:auto;padding:7px;border:1px solid var(--border);background:var(--bg3);border-radius:12px;}
+.cp-clip-ad-choice{
+  appearance:none;border:1px solid transparent;border-radius:9px;padding:10px 12px;
+  background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;overflow-wrap:anywhere;
+}
+.cp-clip-ad-choice:hover,.cp-clip-ad-choice.is-selected{
+  background:rgba(147,165,255,.12);border-color:var(--border);
+}
+.cp-clip-ad-hint{font-size:11px;color:var(--text3);line-height:1.5;padding:3px 2px;}
+.cp-clip-ad-add{display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--border);padding-top:12px;}
+.cp-clip-ad-add label{font-size:12px;font-weight:700;color:var(--text2);}
+.cp-clip-ad-add-row{display:flex;align-items:center;gap:8px;}
+.cp-clip-ad-add-row input{min-width:0;flex:1 1 auto;}
+.cp-clip-ad-add-row .btn{white-space:nowrap;min-height:40px;border-radius:10px!important;}
+@media(max-width:620px){
+ .cp-clip-ad-overlay{align-items:flex-end;padding:8px 8px max(8px,env(safe-area-inset-bottom,0px));}
+ .cp-clip-ad-dialog{width:100%;max-height:85dvh;border-radius:18px 18px 14px 14px;}
+ .cp-clip-ad-body{padding:12px;}
+ .cp-clip-ad-add-row{flex-wrap:wrap;}
+ .cp-clip-ad-add-row .btn{width:100%;}
+}
