@@ -1548,7 +1548,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       }else{
         showToast('เพิ่มเคสสำเร็จ • กำลังแจ้ง LINE','ok');
       }
-      if(submitData.clipad)rememberClipAdName(submitData.clipad);
+      if(form.clipad)rememberClipAdName(form.clipad);
       onAdded();
       onClose();
     }catch(error){
