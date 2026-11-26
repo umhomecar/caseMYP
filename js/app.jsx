@@ -141,6 +141,41 @@ function activateOnKey(e,action){if(e.key==='Enter'||e.key===' '){e.preventDefau
 function displayContact(contact){if(!contact&&contact!==0)return '-';const s=String(contact).trim();if(s.startsWith('data:image')||s.startsWith('https://drive.google.com'))return '📷 QR Code';return formatContact(s)||'-';}
 function formatContact(contact){if(!contact&&contact!==0)return '';const s=String(contact).trim();if(s.startsWith('http')||s.startsWith('data:'))return s;if(/^\d{9}$/.test(s))return '0'+s;if(/^\d{8}$/.test(s))return '0'+s;return s;}
 function getClipAd(attachment){const m=String(attachment||'').match(/\[CLIP:([\s\S]*?)\]/);return m?String(m[1]||'').trim():'';}
+// Ad names share a case-insensitive normalized key throughout picker and filters.
+function normalizeClipAdName(name){return String(name||'').normalize('NFKC').replace(/\s+/g,' ').trim();}
+function clipAdKey(name){return normalizeClipAdName(name).toLocaleLowerCase();}
+function uniqueClipAdNames(names){
+  const entries=new Map();
+  for(const raw of names){
+    const name=normalizeClipAdName(raw),key=clipAdKey(name);
+    if(name&&key&&!entries.has(key))entries.set(key,name);
+  }
+  return [...entries.values()].sort((a,b)=>a.localeCompare(b,'th',{sensitivity:'base'}));
+}
+const CLIP_AD_RECENTS_KEY='casemyp:ad-name-picker:v1';
+function savedClipAdNames(){
+  try{const names=JSON.parse(localStorage.getItem(CLIP_AD_RECENTS_KEY)||'[]');return Array.isArray(names)?names:[];}catch{return[];}
+}
+function rememberClipAdName(name){
+  const normalized=normalizeClipAdName(name);
+  if(!normalized)return;
+  try{localStorage.setItem(CLIP_AD_RECENTS_KEY,JSON.stringify(uniqueClipAdNames([...savedClipAdNames(),normalized]).slice(0,300)));}catch{}
+}
+let clipAdNamesCache=null,clipAdNamesCacheAt=0,clipAdNamesPromise=null;
+async function fetchKnownClipAds(){
+  if(DESIGN_PREVIEW)return[];
+  if(clipAdNamesCache&&Date.now()-clipAdNamesCacheAt<120000)return clipAdNamesCache;
+  if(clipAdNamesPromise)return clipAdNamesPromise;
+  clipAdNamesPromise=(async()=>{
+    // Read only the CLIP metadata of historical cases (including closed ones).
+    const rows=await sbQ('GET','cases',{select:'attachment',order:'caseid.desc',limit:'30000'});
+    if(isSbError(rows))throw new Error(formatSbError(rows));
+    clipAdNamesCache=uniqueClipAdNames(safeArray(rows).map(c=>getClipAd(c.attachment)));
+    clipAdNamesCacheAt=Date.now();
+    return clipAdNamesCache;
+  })();
+  try{return await clipAdNamesPromise;}finally{clipAdNamesPromise=null;}
+}
 function withClipAd(attachment,clipAd){const rest=String(attachment||'').replace(/\[CLIP:[\s\S]*?\]/g,'').trim();const clip=String(clipAd||'').trim();return[clip?`[CLIP:${clip}]`:'',rest].filter(Boolean).join('\n');}
 
 const _cache={};
@@ -1354,6 +1389,68 @@ function ImageUploader({value,onChange,caseId='',label='📷',accept='image/*',m
 }
 function QrUploader({value,onChange,caseId=''}){return <ImageUploader value={value} onChange={onChange} caseId={caseId} label="📷" maxMB={10}/>;}
 
+function ClipAdPicker({value,onChange,open,onOpenChange}){
+  const [query,setQuery]=useState('');
+  const [newName,setNewName]=useState('');
+  const [names,setNames]=useState(()=>uniqueClipAdNames(savedClipAdNames()));
+  const [loading,setLoading]=useState(false);
+  const [loadError,setLoadError]=useState('');
+  useEffect(()=>{
+    if(!open)return;
+    let active=true;
+    setNames(uniqueClipAdNames([...savedClipAdNames(),value]));
+    setLoading(true);setLoadError('');
+    fetchKnownClipAds().then(remote=>{
+      if(active)setNames(uniqueClipAdNames([...remote,...savedClipAdNames(),value]));
+    }).catch(e=>{if(active)setLoadError('โหลดรายชื่อแอดเดิมไม่สำเร็จ — ยังเพิ่มชื่อใหม่ได้');})
+      .finally(()=>{if(active)setLoading(false);});
+    return()=>{active=false;};
+  },[open]);
+  const visible=names.filter(name=>clipAdKey(name).includes(clipAdKey(query)));
+  function select(name){
+    const existing=names.find(x=>clipAdKey(x)===clipAdKey(name));
+    const finalName=existing||normalizeClipAdName(name);
+    if(!finalName)return;
+    rememberClipAdName(finalName);
+    onChange(finalName);
+    setNames(prev=>uniqueClipAdNames([...prev,finalName]));
+    onOpenChange(false);
+  }
+  function add(){
+    const name=normalizeClipAdName(newName);
+    if(!name)return showToast('กรุณากรอกชื่อแอด','warn');
+    if(name.length>160)return showToast('ชื่อแอดต้องไม่เกิน 160 ตัวอักษร','warn');
+    if(/[\[\]\n\r]/.test(name))return showToast('ชื่อแอดต้องไม่มีวงเล็บเหลี่ยมหรือการขึ้นบรรทัดใหม่','warn');
+    const matched=names.find(x=>clipAdKey(x)===clipAdKey(name));
+    if(matched)showToast('มีชื่อแอดนี้อยู่แล้ว เลือกรายการเดิมให้ครับ','info',3500);
+    select(matched||name);
+    setNewName('');
+  }
+  return <>
+    <button type="button" className="btn btn-ghost cp-clip-ad-open" onClick={()=>{setQuery('');setNewName('');onOpenChange(true);}}>
+      <span className="cp-clip-ad-current">{value||'เลือกหรือเพิ่มชื่อแอด...'}</span><span aria-hidden="true">⌄</span>
+    </button>
+    {open&&createPortal(<div className="cp-clip-ad-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onOpenChange(false);}}>
+      <section className="cp-clip-ad-dialog" role="dialog" aria-modal="true" aria-label="เลือกและเพิ่มข้อมูลคลิปแอด">
+        <div className="cp-clip-ad-header"><strong>🎬 เลือกข้อมูลคลิปแอด</strong><button type="button" className="btn btn-ghost" onClick={()=>onOpenChange(false)}>✕ ปิด</button></div>
+        <div className="cp-clip-ad-body">
+          <input aria-label="ค้นหาชื่อแอด" autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="🔎 ค้นหาชื่อแอดที่มีอยู่"/>
+          <div className="cp-clip-ad-results">
+            {loading&&<div className="cp-clip-ad-hint">กำลังโหลดชื่อแอดที่เคยใช้...</div>}
+            {loadError&&<div className="cp-clip-ad-hint">{loadError}</div>}
+            {!loading&&visible.length===0&&<div className="cp-clip-ad-hint">ยังไม่มีชื่อที่ตรงกัน เพิ่มชื่อใหม่ได้ด้านล่าง</div>}
+            {visible.map(name=><button type="button" key={clipAdKey(name)} className={'cp-clip-ad-choice'+(clipAdKey(name)===clipAdKey(value)?' is-selected':'')} onClick={()=>select(name)}>{name}{clipAdKey(name)===clipAdKey(value)&&<span>✓</span>}</button>)}
+          </div>
+          <div className="cp-clip-ad-add"><label htmlFor="cp-clip-ad-new">เพิ่มชื่อแอดใหม่</label><div className="cp-clip-ad-add-row">
+            <input id="cp-clip-ad-new" value={newName} onChange={e=>setNewName(e.target.value)} placeholder="ชื่อแอด / แคมเปญ / คลิป URL..." onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();add();}}}/>
+            <button type="button" className="btn btn-primary" onClick={add}>+ เพิ่มและเลือก</button>
+          </div><div className="cp-clip-ad-hint">ชื่อที่พิมพ์เล็กหรือใหญ่ต่างกันจะรวมเป็นรายการเดียว</div></div>
+        </div>
+      </section>
+    </div>,document.body)}
+  </>;
+}
+
 function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedSent=''}){
   const pad=n=>String(n).padStart(2,'0');
   const today=new Date();
@@ -1362,6 +1459,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
   const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',note:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||(currentUser.role==='Admin'&&!backdated?'คิวเพจ':'ปกติ'),clipad:''});
   const [lineSender,setLineSender]=useState(()=>{try{const saved=localStorage.getItem('casemyp:last-line-sender');if(LINE_SENDERS.includes(saved))return saved;}catch(e){}return 'อาท';});
+  const [adPopupOpen,setAdPopupOpen]=useState(false);
   const [loading,setLoading]=useState(false);const submitInFlight=useRef(false);const [previewId,setPreviewId]=useState('');
   const [duplicates,setDuplicates]=useState([]);
   const [duplicateConfirmed,setDuplicateConfirmed]=useState(false);
@@ -1399,7 +1497,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       submitData.lineSender=lineSender;
       submitData.report='';
       if(forcedSent)submitData.sent=forcedSent;
-      if(submitData.clipad){submitData.attachment='[CLIP:'+submitData.clipad+']';}
+      if(submitData.clipad){submitData.clipad=normalizeClipAdName(submitData.clipad);submitData.attachment='[CLIP:'+submitData.clipad+']';}
       delete submitData.clipad;
       if(backdated){
         const [y,m,d]=String(backDate).split('-');
@@ -1450,6 +1548,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       }else{
         showToast('เพิ่มเคสสำเร็จ • กำลังแจ้ง LINE','ok');
       }
+      if(submitData.clipad)rememberClipAdName(submitData.clipad);
       onAdded();
       onClose();
     }catch(error){
@@ -1459,7 +1558,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       setLoading(false);
     }
   }
-  return <Modal variant="case-form" title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={onClose} footer={<><button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
+  return <Modal variant="case-form" title={backdated?'🕒 เพิ่มเคสย้อนหลัง':'➕ เพิ่มข้อมูลลูกค้า'} onClose={()=>adPopupOpen?setAdPopupOpen(false):onClose()} footer={<><button className="btn btn-ghost cp-action-danger" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" onClick={submit} disabled={loading||DESIGN_PREVIEW}>{DESIGN_PREVIEW?'ตัวอย่างเท่านั้น · ไม่บันทึก':loading?'กำลังบันทึก...':'บันทึก'}</button></>}>
     {DESIGN_PREVIEW&&<div className="casemyp-v2-form-demo-note">🩷 ทดลองดูฟอร์มและสีปุ่มได้ ข้อมูลนี้เป็นตัวอย่าง ไม่ถูกส่งหรือบันทึกจริง</div>}
     <div className="casemyp-v2-case-form-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
@@ -1480,7 +1579,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       {currentUser.role==='Admin'&&!backdated&&form.sent==='คิวเพจ'&&<div style={{gridColumn:'1/-1',fontSize:12,color:'var(--green)',padding:'8px 10px',background:'rgba(16,185,129,.08)',borderRadius:8}}>🔄 ระบบกำหนดเซลส์จากคิวกลางเมื่อบันทึกสำเร็จ ไม่จำเป็นต้องเลือกชื่อเอง</div>}
       {currentUser.role==='Admin'&&<div className="form-group" style={{gridColumn:'1/-1',background:'rgba(210,153,34,.06)',border:'1px solid rgba(210,153,34,.25)',borderRadius:8,padding:'10px 12px'}}>
         <label style={{display:'flex',alignItems:'center',gap:6,color:'var(--yellow)',marginBottom:6}}>🎬 ข้อมูลคลิปแอด <span style={{fontSize:11,fontWeight:400,color:'var(--text3)'}}>เห็นเฉพาะ Admin</span></label>
-        <input value={form.clipad} onChange={e=>set('clipad',e.target.value)} placeholder="ชื่อแอด / แคมเปญ / คลิป URL..."/>
+        <ClipAdPicker value={form.clipad} onChange={v=>set('clipad',v)} open={adPopupOpen} onOpenChange={setAdPopupOpen}/>
       </div>}
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>หมายเหตุ</label><textarea rows={3} value={form.note} onChange={e=>set('note',e.target.value)} placeholder="เช่น ลูกค้าสะดวกคุยช่วงเย็น / สนใจรุ่นไหน / ข้อมูลที่ควรรู้ก่อนติดต่อ"/></div>
       {duplicates.length>0&&<div style={{gridColumn:'1/-1',background:'rgba(210,153,34,.10)',border:'1px solid rgba(210,153,34,.45)',borderRadius:10,padding:'12px'}}>
@@ -1825,8 +1924,7 @@ function AdminCurrentCases({currentUser,users}){
     :cases;
   // Derive ad choices from the cases already loaded, using the same CLIP metadata
   // displayed in the case list. No additional request or schema change is required.
-  const adOptions=[...new Set(safeArray(combinedCases).map(c=>getClipAd(c.attachment)).filter(Boolean))]
-    .sort((a,b)=>a.localeCompare(b,'th'));
+  const adOptions=uniqueClipAdNames(safeArray(combinedCases).map(c=>getClipAd(c.attachment)));
   const hasCasesWithoutAd=safeArray(combinedCases).some(c=>!getClipAd(c.attachment));
   const filtered=safeArray(combinedCases).filter(c=>{
     const q=String(filter.q||'').trim().toLowerCase();
@@ -1839,7 +1937,7 @@ function AdminCurrentCases({currentUser,users}){
     if(filter.status&&c.status!==filter.status)return false;
     const caseAd=getClipAd(c.attachment);
     if(filter.ad==='__no_ad__'&&caseAd)return false;
-    if(filter.ad&&filter.ad!=='all'&&filter.ad!=='__no_ad__'&&caseAd!==filter.ad)return false;
+    if(filter.ad&&filter.ad!=='all'&&filter.ad!=='__no_ad__'&&clipAdKey(caseAd)!==clipAdKey(filter.ad))return false;
     if(filter.dateFrom){const d=parseD2(c.createdat);if(!d||d<new Date(filter.dateFrom+'T00:00:00'))return false;}
     if(filter.dateTo){const d=parseD2(c.createdat);const to=new Date(filter.dateTo+'T00:00:00');to.setHours(23,59,59,999);if(!d||d>to)return false;}
     return true;
