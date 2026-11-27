@@ -731,6 +731,18 @@ async function sbApi(action,data){
         const exact=await sbQ('GET','cases',query);
         if(isSbError(exact))return{success:false,error:formatSbError(exact)};
         if(safeArray(exact).length)return{success:true,data:safeArray(exact)};
+        // The case record can be absent even when historical notes/events remain.
+        // Show that history as read-only evidence; never fabricate an editable case.
+        const [events,notes]=await Promise.all([
+          sbQ('GET','history',{select:'caseid,sales,action,detail,createdat',caseid:'eq.'+q,order:'id.asc',limit:'100'}),
+          sbQ('GET','case_notes',{select:'caseid,sales,note,createdat',caseid:'eq.'+q,limit:'100'})
+        ]);
+        if(isSbError(events)||isSbError(notes)){
+          return{success:false,error:formatSbError(isSbError(events)?events:notes)};
+        }
+        return{success:true,data:[],archived:{
+          caseid:q,events:safeArray(events),notes:safeArray(notes)
+        }};
       }
 
       // ✅ Search v2: ค้นแบบผสม Server + Local normalized search
@@ -1903,16 +1915,18 @@ function AdminCurrentCases({currentUser,users}){
   },[scope]);
   useEffect(()=>{load();},[load]);
   const [archiveMatches,setArchiveMatches]=useState([]);
+  const [archiveHistory,setArchiveHistory]=useState(null);
   const [archiveSearching,setArchiveSearching]=useState(false);
   const [archiveQuery,setArchiveQuery]=useState('');
   async function search(){
     const term=String(filter.q||'').trim();
-    if(!term){setArchiveMatches([]);setArchiveQuery('');return;}
+    if(!term){setArchiveMatches([]);setArchiveHistory(null);setArchiveQuery('');return;}
     setArchiveSearching(true);
     const r=await api('searchCases',{q:term});
     setArchiveSearching(false);
     if(!r.success)return showToast(r.error||'ค้นหาข้อมูลย้อนหลังไม่สำเร็จ','err');
     setArchiveMatches(safeArray(r.data));
+    setArchiveHistory(r.archived||null);
     setArchiveQuery(term);
   }
   // Searching the Case Center searches every month automatically, rather than
@@ -1923,6 +1937,7 @@ function AdminCurrentCases({currentUser,users}){
     const id=++archiveRequestId.current;
     if(queryText.length<3){
       setArchiveMatches([]);
+      setArchiveHistory(null);
       setArchiveQuery('');
       setArchiveSearching(false);
       return;
@@ -1935,11 +1950,13 @@ function AdminCurrentCases({currentUser,users}){
         if(id!==archiveRequestId.current)return;
         if(!result.success){
           setArchiveMatches([]);
+          setArchiveHistory(null);
           setArchiveQuery('');
           showToast(result.error||'ค้นหาข้อมูลย้อนหลังไม่สำเร็จ','err');
           return;
         }
         setArchiveMatches(safeArray(result.data));
+        setArchiveHistory(result.archived||null);
         setArchiveQuery(queryText);
       }catch(error){
         if(id===archiveRequestId.current)showToast('ค้นหาข้อมูลย้อนหลังไม่สำเร็จ','err');
@@ -2099,6 +2116,18 @@ function AdminCurrentCases({currentUser,users}){
       <button className="btn btn-ghost" style={{fontSize:11,height:30,padding:'0 8px'}} onClick={()=>{setFilter(currentMonthFilters());setArchiveMatches([]);setArchiveQuery('');setSelectedIds(new Set());setScope('current_month');}}>↺ ล้างตัวกรอง</button>
     </div>
     {selectedIds.size>0&&<div className="card" style={{padding:'10px 12px',marginBottom:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',borderColor:'rgba(88,166,255,.4)'}}><strong style={{fontSize:13}}>เลือกแล้ว {selectedIds.size} เคส</strong><select value={bulkSales} onChange={e=>setBulkSales(e.target.value)} style={{maxWidth:240}}><option value="">-- เลือกเซลส์ผู้รับผิดชอบ --</option>{salesList.map(u=><option key={u.userId} value={u.name}>{u.name}</option>)}</select><button className="btn btn-primary" onClick={assignSelected} disabled={!bulkSales||bulkSaving}>{bulkSaving?'กำลังมอบหมาย...':'มอบหมายพร้อมกัน'}</button><button className="btn btn-ghost" onClick={()=>setSelectedIds(new Set())}>ยกเลิกการเลือก</button></div>}
+    {archiveQuery===queryText&&archiveHistory&&archiveMatches.length===0&&filtered.length===0&&<div className="card" role="status" style={{padding:'13px 16px',margin:'0 0 10px',border:'1px solid rgba(245,158,11,.4)',borderRadius:12}}>
+      <strong style={{fontSize:14,color:'var(--yellow)'}}>📁 รหัส {archiveHistory.caseid} ไม่อยู่ในตารางเคสหลัก</strong>
+      {(archiveHistory.events.length||archiveHistory.notes.length)?<div style={{fontSize:12,color:'var(--text2)',marginTop:6}}>พบข้อมูลประวัติเดิมด้านล่าง (อ่านได้อย่างเดียว ยังไม่สามารถแก้ไขเคสจากรายการนี้)</div>:<div style={{fontSize:12,color:'var(--text2)',marginTop:6}}>ไม่พบข้อมูลรหัสนี้ในฐานข้อมูลเคสและประวัติที่เชื่อมต่ออยู่</div>}
+      {archiveHistory.events.map((entry,i)=><div key={'e'+i} style={{fontSize:12,padding:'7px 0',borderBottom:'1px solid var(--border)',overflowWrap:'anywhere'}}>
+        <strong>{entry.action||'เหตุการณ์'}</strong> · {entry.createdat||'-'} · {entry.sales||'-'}
+        <div style={{marginTop:3,whiteSpace:'pre-wrap'}}>{entry.detail||'-'}</div>
+      </div>)}
+      {archiveHistory.notes.map((entry,i)=><div key={'n'+i} style={{fontSize:12,padding:'7px 0',borderBottom:'1px solid var(--border)',overflowWrap:'anywhere'}}>
+        <strong>📝 โน้ต</strong> · {entry.createdat||'-'}
+        <div style={{marginTop:3,whiteSpace:'pre-wrap'}}>{entry.note||'-'}</div>
+      </div>)}
+    </div>}
     <div className="admin-cases-mobile-list">
       {loading?<Loading/>:filtered.length===0?<div className="admin-mobile-case-empty">ไม่พบเคส</div>:filtered.map((c,i)=><div key={String(c.caseid||i)} className={`admin-mobile-case-card ${getStatusClass(c.status)}`} role="button" tabIndex={0} onClick={()=>setSel(c)} onKeyDown={e=>activateOnKey(e,()=>setSel(c))}>
         <strong className="admin-mobile-case-id">{c.caseid||'-'}</strong>
