@@ -734,7 +734,7 @@ async function sbApi(action,data){
         // The case record can be absent even when historical notes/events remain.
         // Show that history as read-only evidence; never fabricate an editable case.
         const [events,notes]=await Promise.all([
-          sbQ('GET','history',{select:'caseid,sales,action,detail,createdat',caseid:'eq.'+q,order:'id.asc',limit:'100'}),
+          sbQ('GET','history',{select:'caseid,sales,action,detail,createdat',caseid:'eq.'+q,limit:'100'}),
           sbQ('GET','case_notes',{select:'caseid,sales,note,createdat',caseid:'eq.'+q,limit:'100'})
         ]);
         if(isSbError(events)||isSbError(notes)){
