@@ -724,6 +724,14 @@ async function sbApi(action,data){
       const q=String(data.q||'').trim();
       if(!q)return{success:true,data:[]};
       const sales=String(data.sales||'').trim();
+      // Exact case IDs use an indexed lookup without month restriction.
+      if(/^\d{7,12}$/.test(q)){
+        const query={caseid:'eq.'+q,deleted_at:'is.null',limit:'1'};
+        if(sales)query.sales='eq.'+sales;
+        const exact=await sbQ('GET','cases',query);
+        if(isSbError(exact))return{success:false,error:formatSbError(exact)};
+        if(safeArray(exact).length)return{success:true,data:safeArray(exact)};
+      }
 
       // ✅ Search v2: ค้นแบบผสม Server + Local normalized search
       // เหตุผล: Supabase ilike ค้นเบอร์ที่มีขีด/เว้นวรรค, เลขไทย, หรืออักขระพิเศษบางตัวไม่ค่อยเจอ
@@ -1907,6 +1915,40 @@ function AdminCurrentCases({currentUser,users}){
     setArchiveMatches(safeArray(r.data));
     setArchiveQuery(term);
   }
+  // Searching the Case Center searches every month automatically, rather than
+  // requiring a separate click while the page initially loads only this month.
+  const archiveRequestId=useRef(0);
+  const queryText=String(filter.q||'').trim();
+  useEffect(()=>{
+    const id=++archiveRequestId.current;
+    if(queryText.length<3){
+      setArchiveMatches([]);
+      setArchiveQuery('');
+      setArchiveSearching(false);
+      return;
+    }
+    setArchiveQuery('');
+    const timer=setTimeout(async()=>{
+      setArchiveSearching(true);
+      try{
+        const result=await api('searchCases',{q:queryText});
+        if(id!==archiveRequestId.current)return;
+        if(!result.success){
+          setArchiveMatches([]);
+          setArchiveQuery('');
+          showToast(result.error||'ค้นหาข้อมูลย้อนหลังไม่สำเร็จ','err');
+          return;
+        }
+        setArchiveMatches(safeArray(result.data));
+        setArchiveQuery(queryText);
+      }catch(error){
+        if(id===archiveRequestId.current)showToast('ค้นหาข้อมูลย้อนหลังไม่สำเร็จ','err');
+      }finally{
+        if(id===archiveRequestId.current)setArchiveSearching(false);
+      }
+    },450);
+    return()=>clearTimeout(timer);
+  },[queryText]);
   function parseD2(value){
     const raw=String(value||'').trim();
     const th=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
