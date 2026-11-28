@@ -244,8 +244,19 @@ module.exports = async function handler(req,res){
     return res.status(400).json({success:false,error:'Missing caseId or customername'});
   }
 
-  // Production-only opt-in by server secret. Retain LINE when no webhook is configured.
-  if(discordWebhook){
+  const requestedProvider=oneLine(body.notificationProvider).toLowerCase();
+  if(requestedProvider&&!['line','discord'].includes(requestedProvider)){
+    return res.status(400).json({success:false,error:'ช่องทางแจ้งเตือนไม่ถูกต้อง'});
+  }
+  const provider=requestedProvider||(discordWebhook?'discord':'line');
+  if(provider==='discord'&&!discordWebhook){
+    return res.status(503).json({success:false,provider,error:'ยังไม่ได้ตั้งค่า Discord Webhook ในสภาพแวดล้อมนี้'});
+  }
+  if(provider==='line'&&!token){
+    return res.status(503).json({success:false,provider,error:'ยังไม่ได้ตั้งค่า LINE'});
+  }
+  // Explicit choice never silently falls back to the other provider.
+  if(provider==='discord'){
     let endpoint;
     try{
       endpoint=new URL(discordWebhook);
