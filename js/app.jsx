@@ -345,7 +345,7 @@ async function notifyLineCaseCreated(payload){
     }
     return{...data,success:true};
   }catch(e){
-    return{success:false,error:e?.message||'เชื่อมต่อระบบแจ้ง LINE ไม่สำเร็จ'};
+    return{success:false,error:e?.message||'เชื่อมต่อระบบแจ้งเตือนไม่สำเร็จ'};
   }
 }
 
@@ -1478,6 +1478,7 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
   const defaultBackMonth=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}`;
   const defaultBackDate=`${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth()+1)}-${pad(lastMonthDate.getDate())}`;
   const [form,setForm]=useState({customername:'',contact:'',contact_by:'ไลน์',note:'',status:backdated?'กำลังติดต่อ':'รอข้อมูล',sales:currentUser.role==='Admin'?'':currentUser.name,sent:forcedSent||(currentUser.role==='Admin'&&!backdated?'คิวเพจ':'ปกติ'),clipad:''});
+  const [notificationProvider,setNotificationProvider]=useState(()=>{try{const saved=localStorage.getItem('casemyp:last-notification-provider');if(saved==='line'||saved==='discord')return saved;}catch(e){}return 'discord';});
   const [lineSender,setLineSender]=useState(()=>{try{const saved=localStorage.getItem('casemyp:last-line-sender');if(LINE_SENDERS.includes(saved))return saved;}catch(e){}return 'อาท';});
   const [adPopupOpen,setAdPopupOpen]=useState(false);
   const [loading,setLoading]=useState(false);const submitInFlight=useRef(false);const [previewId,setPreviewId]=useState('');
@@ -1546,27 +1547,28 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
         status:submitData.status||'รอข้อมูล',
         sales:r.sales||submitData.sales||UNASSIGNED_SALES,
         note:submitData.note||'',
-        sender:lineSender
+        sender:lineSender,
+        notificationProvider
       };
       void notifyLineCaseCreated(linePayload).then(lineResult=>{
         if(lineResult?.skipped){
-          showToast('เพิ่มเคสแล้ว • ปิดแจ้งเตือน LINE อยู่','info',4000);
+          showToast('เพิ่มเคสแล้ว • ปิดระบบแจ้งเตือนอยู่','info',4000);
         }else if(lineResult?.success){
-          showToast('แจ้ง LINE '+(lineResult.recipientName||lineSender)+' สำเร็จ','ok');
+          showToast(lineResult.provider==='discord'?'แจ้ง Discord สำเร็จ':'แจ้ง LINE '+(lineResult.recipientName||lineSender)+' สำเร็จ','ok');
         }else if(lineResult?.recipientMissing){
           showToast('บันทึกเคสแล้ว แต่ '+(lineResult.error||'ยังไม่ได้ลงทะเบียนปลายทาง LINE'),'warn',6500);
         }else if(lineResult?.lineStatus===429){
           showToast('บันทึกเคสแล้ว แต่ LINE จำกัดการส่งชั่วคราว','warn',6500);
         }else{
-          showToast('บันทึกเคสแล้ว แต่แจ้ง LINE ไม่สำเร็จ'+(lineResult?.error?' — '+lineResult.error:''),'warn',5000);
+          showToast('บันทึกเคสแล้ว แต่ส่งแจ้งเตือนไม่สำเร็จ'+(lineResult?.error?' — '+lineResult.error:''),'warn',5000);
         }
-      }).catch(()=>showToast('บันทึกเคสแล้ว แต่แจ้ง LINE ไม่สำเร็จ','warn',5000));
+      }).catch(()=>showToast('บันทึกเคสแล้ว แต่ส่งแจ้งเตือนไม่สำเร็จ','warn',5000));
       if(r.noteSaved===false){
         showToast('เพิ่มเคสสำเร็จ แต่บันทึกหมายเหตุไม่สำเร็จ กรุณาเปิดเคสแล้วเพิ่ม Note อีกครั้ง','warn',6000);
       }else if(backdated){
-        showToast('เพิ่มเคสย้อนหลังสำเร็จ • กำลังแจ้ง LINE','ok');
+        showToast('เพิ่มเคสย้อนหลังสำเร็จ • กำลังส่งแจ้งเตือน','ok');
       }else{
-        showToast('เพิ่มเคสสำเร็จ • กำลังแจ้ง LINE','ok');
+        showToast('เพิ่มเคสสำเร็จ • กำลังส่งแจ้งเตือน','ok');
       }
       if(form.clipad)rememberClipAdName(form.clipad);
       onAdded();
@@ -1582,7 +1584,8 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
     {DESIGN_PREVIEW&&<div className="casemyp-v2-form-demo-note">🩷 ทดลองดูฟอร์มและสีปุ่มได้ ข้อมูลนี้เป็นตัวอย่าง ไม่ถูกส่งหรือบันทึกจริง</div>}
     <div className="casemyp-v2-case-form-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label>รหัสเคส (สร้างอัตโนมัติ)</label><div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:15,fontWeight:700,color:'var(--blue)',letterSpacing:1}}>{previewId||'กำลังสร้าง...'}</div></div>
-      <div className="form-group" style={{gridColumn:'1/-1'}}><label>ผู้ส่งเคสเข้า LINE</label><select value={lineSender} onChange={e=>{setLineSender(e.target.value);try{localStorage.setItem('casemyp:last-line-sender',e.target.value);}catch(err){}}}>{LINE_SENDERS.map(name=><option key={name} value={name}>{name}</option>)}</select><div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>ระบบจะส่งแจ้งเตือนเคสนี้เข้า LINE ส่วนตัวของผู้ส่งที่ลงทะเบียนกับ Um-Bot</div></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label>ช่องทางส่งแจ้งเตือน</label><div role="group" aria-label="ช่องทางส่งแจ้งเตือน" style={{display:'flex',gap:8}}>{[['line','LINE','#06A94F'],['discord','Discord','#5865F2']].map(([value,label,color])=><button key={value} type="button" aria-pressed={notificationProvider===value} onClick={()=>{setNotificationProvider(value);try{localStorage.setItem('casemyp:last-notification-provider',value);}catch(e){}}} style={{flex:1,padding:'10px 12px',borderRadius:999,border:'1px solid '+(notificationProvider===value?color:'var(--border)'),background:notificationProvider===value?color:'var(--bg3)',color:notificationProvider===value?'#fff':'var(--text)',fontWeight:700,cursor:'pointer'}}>{notificationProvider===value?'✓ ':''}{label}</button>)}</div></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label>ผู้ส่งเคส</label><select value={lineSender} onChange={e=>{setLineSender(e.target.value);try{localStorage.setItem('casemyp:last-line-sender',e.target.value);}catch(err){}}}>{LINE_SENDERS.map(name=><option key={name} value={name}>{name}</option>)}</select><div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>{notificationProvider==='discord'?'ระบบจะส่งแจ้งเตือนไปยัง Discord ห้อง #แจ้งเตือนเคส':'ระบบจะส่งแจ้งเตือนเข้า LINE ส่วนตัวของผู้ส่งที่ลงทะเบียนกับ Um-Bot'}</div></div>
       {backdated&&<div style={{gridColumn:'1/-1',background:'linear-gradient(135deg,rgba(88,166,255,.10),rgba(188,140,255,.08))',border:'1px solid rgba(88,166,255,.25)',borderRadius:12,padding:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
         <div style={{gridColumn:'1/-1',fontSize:13,fontWeight:800,color:'var(--blue)'}}>🕒 โหมดเพิ่มเคสย้อนหลัง</div>
         <div className="form-group" style={{marginBottom:0}}><label>เดือนของรหัสเคส</label><input type="month" value={backMonth} onChange={e=>{setBackMonth(e.target.value);if(e.target.value){const day=String(backDate||'').split('-')[2]||'01';setBackDate(e.target.value+'-'+day);}}}/></div>

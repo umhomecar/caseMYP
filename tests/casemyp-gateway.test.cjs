@@ -579,32 +579,24 @@ test('case center hides unused booking navigation and creation without deleting 
   assert.ok(source.includes('function AdminBookings('),'historical booking logic/data must not be deleted');
   assert.ok(source.includes('function AddBookingModal('),'preserve legacy booking data implementation for audit/restore');
 });
-test('case center ad filter shows distinct clip ads on desktop and mobile with exact status-safe matching',()=>{
-  const fs=require('node:fs'),path=require('node:path');
+test('case center ad filter deduplicates names case-insensitively with status-safe matching',()=>{
+  const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
   const source=fs.readFileSync(path.join(__dirname,'../js/app.jsx'),'utf8');
   const caseCenter=source.slice(source.indexOf('function AdminCurrentCases('),source.indexOf('function SalesCurrentCases('));
   assert.match(caseCenter,/const currentMonthFilters=\(\)=>\(\{sales:'all',status:'',ad:'all'/);
-  assert.match(caseCenter,/const adOptions=\[\.\.\.new Set\(safeArray\(combinedCases\)\.map\(c=>getClipAd\(c\.attachment\)\)/);
+  assert.match(caseCenter,/const adOptions=uniqueClipAdNames\(safeArray\(combinedCases\)\.map\(c=>getClipAd\(c\.attachment\)\)\)/);
   assert.match(caseCenter,/getClipAd\(c\.attachment\);[\s\S]*?filter\.ad==='__no_ad__'&&caseAd/);
-  assert.match(caseCenter,/caseAd!==filter\.ad/);
-  assert.equal((caseCenter.match(/aria-label="กรองแอด"/g)||[]).length,2,'filter must exist on desktop and mobile');
+  assert.match(caseCenter,/clipAdKey\(caseAd\)!==clipAdKey\(filter\.ad\)/);
+  assert.equal((caseCenter.match(/aria-label="กรองแอด"/g)||[]).length,2);
   assert.ok(caseCenter.includes('<option value="all">ทุกแอด</option>'));
   assert.ok(caseCenter.includes('ไม่ระบุแอด'));
-  const getClipAd=attachment=>{
-    const m=String(attachment||'').match(/\[CLIP:([\s\S]*?)\]/);
-    return m?String(m[1]||'').trim():'';
-  };
-  const cases=[
-    {attachment:'[CLIP:FE]',status:'รอข้อมูล'},
-    {attachment:'[CLIP:FE]',status:'จอง'},
-    {attachment:'[CLIP:D-max]',status:'รอข้อมูล'},
-    {attachment:'',status:'ไปต่อได้'}
-  ];
-  const ads=[...new Set(cases.map(c=>getClipAd(c.attachment)).filter(Boolean))];
-  assert.deepEqual(ads,['FE','D-max']);
-  assert.equal(cases.filter(c=>getClipAd(c.attachment)==='FE').length,2);
-  assert.equal(cases.filter(c=>!getClipAd(c.attachment)).length,1);
-  assert.equal(cases.filter(c=>getClipAd(c.attachment)==='FE'&&c.status==='รอข้อมูล').length,1);
+  const helpers=source.slice(source.indexOf('function normalizeClipAdName('),source.indexOf('const CLIP_AD_RECENTS_KEY='));
+  const {uniqueClipAdNames,clipAdKey}=vm.runInNewContext(helpers+'\n;({uniqueClipAdNames,clipAdKey})');
+  const cases=[{ad:'FE',status:'รอข้อมูล'},{ad:'fe',status:'จอง'},{ad:'D-max',status:'รอข้อมูล'},{ad:'',status:'ไปต่อได้'}];
+  assert.deepEqual(Array.from(uniqueClipAdNames(cases.map(c=>c.ad))),['D-max','FE']);
+  assert.equal(cases.filter(c=>clipAdKey(c.ad)===clipAdKey('FE')).length,2);
+  assert.equal(cases.filter(c=>!clipAdKey(c.ad)).length,1);
+  assert.equal(cases.filter(c=>clipAdKey(c.ad)===clipAdKey('FE')&&c.status==='รอข้อมูล').length,1);
 });
 test('case center search input is compact and redundant magnifier is removed without losing archive search',()=>{
   const fs=require('node:fs'),path=require('node:path');
@@ -615,4 +607,44 @@ test('case center search input is compact and redundant magnifier is removed wit
   assert.match(cases,/onKeyDown=\{e=>e\.key==='Enter'&&search\(\)\}/,'Enter must still support search');
   assert.match(cases,/onClick=\{search\}/,'visible archive-search button must remain');
   assert.match(cases,/api\('searchCases',\{q:term\}\)/,'search all months must still work');
+});
+
+test('case notification honors explicit channel, default Discord, and never silently falls back',async()=>{
+  const notify=require('../api/line-case-created.js');
+  const keys=['DISCORD_WEBHOOK_URL','LINE_CHANNEL_ACCESS_TOKEN','LINE_GROUP_ID','CASEMYP_ALLOWED_ORIGIN'];
+  const saved=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
+  const originalFetch=global.fetch;
+  try{
+    process.env.DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/123456/fake-test-token';
+    process.env.LINE_CHANNEL_ACCESS_TOKEN='test-token';
+    process.env.LINE_GROUP_ID='test-group';
+    delete process.env.CASEMYP_ALLOWED_ORIGIN;
+    const seen=[];
+    global.fetch=async(url,opts)=>{
+      const u=new URL(url);
+      if(u.hostname.endsWith('.supabase.co'))return new Response('[]',{status:200});
+      seen.push({host:u.hostname,body:JSON.parse(opts.body)});
+      return new Response('{}',{status:200});
+    };
+    const payload={caseId:'2601001',customername:'Synthetic test',contact:'000000',sales:'Test'};
+    for(const provider of ['discord','line',undefined]){
+      seen.length=0;
+      const result=res();
+      await notify(req({...payload,notificationProvider:provider}),result);
+      assert.equal(result.body.success,true);
+      assert.equal(seen.length,1);
+      assert.equal(seen[0].host,provider==='line'?'api.line.me':'discord.com');
+      if(provider!=='line'){
+        assert.equal(result.body.provider,'discord');
+        assert.deepEqual(seen[0].body.allowed_mentions,{parse:[]});
+      }
+    }
+    delete process.env.DISCORD_WEBHOOK_URL;
+    seen.length=0;
+    const missing=res();await notify(req({...payload,notificationProvider:'discord'}),missing);
+    assert.equal(missing.statusCode,503);assert.equal(seen.length,0);
+  }finally{
+    global.fetch=originalFetch;
+    for(const k of keys){if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];}
+  }
 });

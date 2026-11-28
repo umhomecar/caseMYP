@@ -218,7 +218,8 @@ module.exports = async function handler(req,res){
     return res.status(200).json({success:true,skipped:true,reason:'disabled'});
   }
 
-  if(!token){
+  const discordWebhook=String(process.env.DISCORD_WEBHOOK_URL||'').trim();
+  if(!token&&!discordWebhook){
     return res.status(503).json({success:false,error:'LINE notification is not configured'});
   }
 
@@ -241,6 +242,66 @@ module.exports = async function handler(req,res){
 
   if(!caseId||!customername){
     return res.status(400).json({success:false,error:'Missing caseId or customername'});
+  }
+
+  const requestedProvider=oneLine(body.notificationProvider).toLowerCase();
+  if(requestedProvider&&!['line','discord'].includes(requestedProvider)){
+    return res.status(400).json({success:false,error:'ช่องทางแจ้งเตือนไม่ถูกต้อง'});
+  }
+  const provider=requestedProvider||(discordWebhook?'discord':'line');
+  if(provider==='discord'&&!discordWebhook){
+    return res.status(503).json({success:false,provider,error:'ยังไม่ได้ตั้งค่า Discord Webhook ในสภาพแวดล้อมนี้'});
+  }
+  if(provider==='line'&&!token){
+    return res.status(503).json({success:false,provider,error:'ยังไม่ได้ตั้งค่า LINE'});
+  }
+  // Explicit choice never silently falls back to the other provider.
+  if(provider==='discord'){
+    let endpoint;
+    try{
+      endpoint=new URL(discordWebhook);
+      if(endpoint.protocol!=='https:'||endpoint.hostname!=='discord.com'||endpoint.port||endpoint.username||endpoint.password||!/^\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/.test(endpoint.pathname))throw new Error('invalid webhook');
+      endpoint.search='';
+      endpoint.searchParams.set('wait','true');
+    }catch{
+      return res.status(503).json({success:false,error:'ตั้งค่า Discord Webhook ไม่ถูกต้อง'});
+    }
+    const isQr=contactBy==='QR Code';
+    const lines=[
+      '📋 เคสลูกค้าใหม่',
+      'รหัสเคส: '+caseId,
+      'ชื่อลูกค้า: '+customername,
+      isQr?'ติดต่อ: QR Code':contactLabel(contactBy)+': '+(contact||'-'),
+      'สถานะ: '+status,
+      'เซลส์: '+sales
+    ];
+    if(requestedSender)lines.push('ผู้ส่งเคส: '+requestedSender);
+    if(note)lines.push('หมายเหตุ: '+note);
+    const embed={description:lines.join('\n').slice(0,4096),color:5793266};
+    if(isQr&&hasContact){
+      if(!token)return res.status(503).json({success:false,error:'ยังไม่ได้ตั้งค่าคีย์สำหรับรูป QR'});
+      // Use the canonical production origin, not a caller-controlled Host header.
+      const sig=qrSignature(caseId,token);
+      embed.image={url:'https://case-myp.vercel.app/api/line-qr-image?caseId='+encodeURIComponent(caseId)+'&sig='+encodeURIComponent(sig)};
+    }
+    try{
+      const result=await fetch(endpoint,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({embeds:[embed],allowed_mentions:{parse:[]}}),
+        redirect:'error',
+        signal:AbortSignal.timeout(10000)
+      });
+      if(!result.ok){
+        console.error('Discord notification failed',result.status);
+        return res.status(result.status===429?429:502).json({success:false,error:'ส่งแจ้งเตือน Discord ไม่สำเร็จ (HTTP '+result.status+')',discordStatus:result.status,retryable:false});
+      }
+      return res.status(200).json({success:true,provider:'discord',targetType:'discord',imageIncluded:Boolean(embed.image),recipientName:''});
+    }catch{
+      // Never log the webhook URL or customer data.
+      console.error('Discord notification request failed');
+      return res.status(502).json({success:false,error:'เชื่อมต่อ Discord ไม่สำเร็จ'});
+    }
   }
 
   let target;
