@@ -345,7 +345,7 @@ async function notifyLineCaseCreated(payload){
     }
     return{...data,success:true};
   }catch(e){
-    return{success:false,error:e?.message||'เชื่อมต่อระบบแจ้ง LINE ไม่สำเร็จ'};
+    return{success:false,error:e?.message||'เชื่อมต่อระบบแจ้งเตือนไม่สำเร็จ'};
   }
 }
 
@@ -1550,23 +1550,23 @@ function AddCaseModal({users,currentUser,onClose,onAdded,backdated=false,forcedS
       };
       void notifyLineCaseCreated(linePayload).then(lineResult=>{
         if(lineResult?.skipped){
-          showToast('เพิ่มเคสแล้ว • ปิดแจ้งเตือน LINE อยู่','info',4000);
+          showToast('เพิ่มเคสแล้ว • ปิดระบบแจ้งเตือนอยู่','info',4000);
         }else if(lineResult?.success){
-          showToast('แจ้ง LINE '+(lineResult.recipientName||lineSender)+' สำเร็จ','ok');
+          showToast(lineResult.provider==='discord'?'แจ้ง Discord สำเร็จ':'แจ้ง LINE '+(lineResult.recipientName||lineSender)+' สำเร็จ','ok');
         }else if(lineResult?.recipientMissing){
           showToast('บันทึกเคสแล้ว แต่ '+(lineResult.error||'ยังไม่ได้ลงทะเบียนปลายทาง LINE'),'warn',6500);
         }else if(lineResult?.lineStatus===429){
           showToast('บันทึกเคสแล้ว แต่ LINE จำกัดการส่งชั่วคราว','warn',6500);
         }else{
-          showToast('บันทึกเคสแล้ว แต่แจ้ง LINE ไม่สำเร็จ'+(lineResult?.error?' — '+lineResult.error:''),'warn',5000);
+          showToast('บันทึกเคสแล้ว แต่ส่งแจ้งเตือนไม่สำเร็จ'+(lineResult?.error?' — '+lineResult.error:''),'warn',5000);
         }
-      }).catch(()=>showToast('บันทึกเคสแล้ว แต่แจ้ง LINE ไม่สำเร็จ','warn',5000));
+      }).catch(()=>showToast('บันทึกเคสแล้ว แต่ส่งแจ้งเตือนไม่สำเร็จ','warn',5000));
       if(r.noteSaved===false){
         showToast('เพิ่มเคสสำเร็จ แต่บันทึกหมายเหตุไม่สำเร็จ กรุณาเปิดเคสแล้วเพิ่ม Note อีกครั้ง','warn',6000);
       }else if(backdated){
-        showToast('เพิ่มเคสย้อนหลังสำเร็จ • กำลังแจ้ง LINE','ok');
+        showToast('เพิ่มเคสย้อนหลังสำเร็จ • กำลังส่งแจ้งเตือน','ok');
       }else{
-        showToast('เพิ่มเคสสำเร็จ • กำลังแจ้ง LINE','ok');
+        showToast('เพิ่มเคสสำเร็จ • กำลังส่งแจ้งเตือน','ok');
       }
       if(form.clipad)rememberClipAdName(form.clipad);
       onAdded();
